@@ -200,3 +200,10 @@ export type UpdateCooperativeManagerInput = z.infer<typeof updateCooperativeMana
 export type AddCooperativeMemberInput = z.infer<typeof addCooperativeMemberSchema>["body"];
 
 export type UpdateCooperativeMemberInput = z.infer<typeof updateCooperativeMemberSchema>["body"];
+
+/*for now let us stop here, i will tell you when to continue. 
+so i have services and controller i want to start implementing the codes. 
+
+
+let me show an example of how i want it to be*/ 
+
