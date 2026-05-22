@@ -14,54 +14,41 @@ enum UserStatus {
 }
 
 model User {
-  id String @id @default(uuid())
-
-  // Basic identity
+  id       String  @id @default(uuid())
   fullName String
   email    String  @unique
   phone    String? @unique
   password String
 
-  // Role and account state
   role   Role       @default(FARMER)
   status UserStatus @default(PENDING)
 
-  // Verification
   isEmailVerified Boolean @default(false)
   isPhoneVerified Boolean @default(false)
 
-  // Password reset
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
 
-  // Cloudinary profile image
   profileImageUrl      String?
   profileImagePublicId String?
 
-  // Location
   province String?
   district String?
   sector   String?
   cell     String?
   village  String?
 
-  // Security tracking
   lastLoginAt       DateTime?
   passwordChangedAt DateTime?
 
-  // Relations
-  farmerProfile Farmer?
-  institutionProfile Institution?
+  farmerProfile             Farmer?
+  institution               Institution?
   cooperativeManagerProfile CooperativeManager?
+  reviewedLoanApplications  LoanApplication[]
+  loanStatusChanges         LoanStatusHistory[]
+  notifications             Notification[]
+  analyticsReports          AnalyticsReport[]
 
-  reviewedLoanApplications LoanApplication[]
-  loanStatusChanges        LoanStatusHistory[]
-
-  notifications Notification[]
-
-  analyticsReports AnalyticsReport[]
-
-  // Audit
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

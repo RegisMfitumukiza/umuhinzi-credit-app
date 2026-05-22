@@ -15,40 +15,26 @@ enum InstitutionStatus {
 }
 
 model Institution {
-  id String @id @default(uuid())
-
-  // User relationship
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Institution details
-  name              String
-  type              InstitutionType
-  registrationNumber String? @unique
-  licenseNumber      String? @unique
-
-  // Contact information
-  email   String?
-  phone   String?
-  address String?
-
-  // Location
-  province String?
-  district String?
-  sector   String?
-  cell     String?
-  village  String?
-
-  // Status
-  status InstitutionStatus @default(PENDING)
-
-  // Relations
-  loanApplications LoanApplication[]
-  loans            Loan[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  type               InstitutionType
+  registrationNumber String?           @unique
+  licenseNumber      String?           @unique
+  email              String?
+  phone              String?
+  address            String?
+  province           String?
+  district           String?
+  sector             String?
+  cell               String?
+  village            String?
+  status             InstitutionStatus @default(PENDING)
+  loanApplications   LoanApplication[]
+  loans              Loan[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([type])
   @@index([status])
