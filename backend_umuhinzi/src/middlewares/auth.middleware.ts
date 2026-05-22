@@ -1,127 +1,109 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
+import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { Role } from "../generated/prisma/client.js";
-import { prisma } from "../lib/prisma.js";
 
-type AuthPayload = {
-  userId: string;
-  role: Role;
+
+type jwtPayload = {
+  id: string;
 };
 
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       user?: AuthPayload;
-//     }
-//   }
-// }
 
-export const authenticate = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  const authHeader = req.headers.authorization;
-
+const getTokenFromHeader = (authHeader?: string): string => {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return next(new APIError("No token provided", 401));
+    throw new APIError("No token provided", 401);
   }
 
   const token = authHeader.split(" ")[1];
 
+  if (!token) {
+    throw new APIError("Invalid authorization format", 401);
+  }
+
+  return token;
+};
+
+export const authenticate = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
+    const token = getTokenFromHeader(req.headers.authorization);
+
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-      return next(new APIError("JWT_SECRET is missing", 500));
+      throw new APIError("JWT_SECRET is missing", 500);
     }
 
-    const decoded = jwt.verify(token, secret) as AuthPayload;
+    const decoded = jwt.verify(token, secret) as jwtPayload;
+
+    if (!decoded.id) {
+      throw new APIError("Invalid token payload", 401);
+    }
 
     const user = await prisma.user.findUnique({
       where: {
-        id: decoded.userId
+        id: decoded.id,
       },
       select: {
         id: true,
+        fullName: true,
+        email: true,
         role: true,
-        isBanned: true
-      }
+        status: true,
+        isEmailVerified: true,
+      },
     });
 
     if (!user) {
-      return next(new APIError("User not found", 404));
+      throw new APIError("User not found", 404);
     }
 
-    if (user.isBanned) {
-      return next(new APIError("Your account has been banned", 403));
+    if (user.status !== "ACTIVE") {
+      throw new APIError("Account is not active", 403);
     }
 
-    req.user = {
-      userId: user.id,
-      role: user.role
-    };
+    req.user = user;
 
     next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return next(new APIError("Token expired", 401));
-    }
 
+  } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return next(new APIError("Invalid token", 401));
     }
 
-    return next(new APIError("Authentication failed", 401));
+    if (error instanceof jwt.TokenExpiredError) {
+      return next(new APIError("Token expired", 401));
+    }
+
+    next(error)
   }
 };
 
-export const requireAdmin = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
+export const authorizeRoles = (...roles: Role[]) => {
+  return (
+    req: Request,
+    _res: Response,
+    next: NextFunction
+  ): void => {
+    if (!req.user) {
+      return next(new APIError("User not authenticated", 401));
+    }
 
-  if (req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: admins only", 403));
-  }
+    if (!roles.includes(req.user.role)) {
+      return next(new APIError("You are not allowed to access this resource", 403));
+    }
 
-  next();
+    next();
+  };
 };
 
-export const requireHost = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
 
-  if (req.user.role !== Role.HOST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: hosts only", 403));
-  }
 
-  next();
-};
 
-export const requireGuest = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
 
-  if (req.user.role !== Role.GUEST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: guests only", 403));
-  }
 
-  next();
-};
