@@ -2,7 +2,7 @@ import express from "express";
 import compression from "compression";
 import cors from "cors";
 
-// import apiV1 from "./routes/v1/versioning.js";
+import apiV1 from "./routes/v1/index.js";
 
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
@@ -41,7 +41,7 @@ setupSwagger(app);
 
 /* ================= ROUTES ================= */
 
-// app.use("/api/v1", apiLimiter, apiV1);
+app.use("/api/v1", apiLimiter, apiV1);
 
 /* ================= ERROR HANDLING ================= */
 

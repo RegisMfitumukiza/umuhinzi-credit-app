@@ -10,14 +10,6 @@ type AuthPayload = {
   role: Role;
 };
 
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       user?: AuthPayload;
-//     }
-//   }
-// }
-
 export const authenticate = async (
   req: Request,
   res: Response,
@@ -41,27 +33,21 @@ export const authenticate = async (
     const decoded = jwt.verify(token, secret) as AuthPayload;
 
     const user = await prisma.user.findUnique({
-      where: {
-        id: decoded.userId
-      },
-      select: {
-        id: true,
-        role: true,
-        isBanned: true
-      }
+      where: { id: decoded.userId },
+      select: { id: true, role: true, status: true },
     });
 
     if (!user) {
       return next(new APIError("User not found", 404));
     }
 
-    if (user.isBanned) {
-      return next(new APIError("Your account has been banned", 403));
+    if (user.status !== "ACTIVE") {
+      return next(new APIError("Your account is not active", 403));
     }
 
     req.user = {
       userId: user.id,
-      role: user.role
+      role: user.role,
     };
 
     next();
@@ -94,34 +80,15 @@ export const requireAdmin = (
   next();
 };
 
-export const requireHost = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
+export const requireRole = (...roles: Role[]) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      return next(new APIError("Unauthorized", 401));
+    }
 
-  if (req.user.role !== Role.HOST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: hosts only", 403));
-  }
+    if (!roles.includes(req.user.role)) {
+      return next(new APIError("Access denied: insufficient permissions", 403));
+    }
 
-  next();
-};
-
-export const requireGuest = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
-
-  if (req.user.role !== Role.GUEST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: guests only", 403));
-  }
-
-  next();
-};
+    next();
+  };
