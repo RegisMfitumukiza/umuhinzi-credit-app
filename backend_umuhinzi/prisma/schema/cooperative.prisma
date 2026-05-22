@@ -1,0 +1,93 @@
+enum CooperativeStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum CooperativeMemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+  LEFT
+}
+
+model Cooperative {
+  id String @id @default(uuid())
+
+  // Cooperative details
+  name               String
+  registrationNumber String? @unique
+  description        String?
+
+  // Contact information
+  email   String?
+  phone   String?
+  address String?
+
+  // Location
+  province String?
+  district String?
+  sector   String?
+  cell     String?
+  village  String?
+
+  // Status
+  status CooperativeStatus @default(PENDING)
+
+  // Relations
+  managers CooperativeManager[]
+  members  CooperativeMember[]
+  farmers  Farmer[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([district])
+  @@index([sector])
+  @@index([createdAt])
+}
+
+model CooperativeManager {
+  id String @id @default(uuid())
+
+  // User relationship
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Cooperative relationship
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+
+  position String?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cooperativeId])
+  @@index([createdAt])
+}
+
+model CooperativeMember {
+  id String @id @default(uuid())
+
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+
+  farmerId String @unique
+  farmer   Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  status CooperativeMemberStatus @default(PENDING)
+  joinedAt DateTime?
+  leftAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cooperativeId])
+  @@index([farmerId])
+  @@index([status])
+}

@@ -215,8 +215,6 @@ Enums:
 InputType: SEED, FERTILIZER, PESTICIDE, LABOR, IRRIGATION, TRANSPORT, EQUIPMENT, OTHER
 
 
-Yield & Productivity
-
 YieldRecord
 - id
 - cropId
@@ -428,6 +426,8 @@ Priority: LOW, MEDIUM, HIGH
 
 
 Notifications
+
+
 Notification
 - id
 - userId
