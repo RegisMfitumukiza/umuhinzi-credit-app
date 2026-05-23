@@ -4,6 +4,7 @@ declare global {
   namespace Express {
     interface User {
       userId: string;
+      farmerId?: string;
       role: Role;
       email?: string;
     }

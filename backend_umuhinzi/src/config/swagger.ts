@@ -13,9 +13,9 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Airbnb API",
+      title: "Umuhinzi Credit API",
       version: "1.0.0",
-      description: "REST API for Airbnb listings, users, and authentication",
+      description: "REST API for Umuhinzi Credit agricultural finance workflows",
     },
     servers: [
       {
@@ -39,7 +39,7 @@ const options: swaggerJsdoc.Options = {
   },
   // Tell swagger-jsdoc where to find the JSDoc comments
   // It scans these files for @swagger annotations
-  apis: ["./src/routes/**/*.ts", "./src/routes/**/*.js"],
+  apis: ["./src/routes/**/*.ts", "./src/modules/**/*.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

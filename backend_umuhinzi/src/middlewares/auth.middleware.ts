@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 import { APIError } from "../utils/ApiError.js";
-import { Role } from "../generated/prisma/client.js";
+import { Role, UserStatus } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 
 type AuthPayload = {
@@ -10,13 +10,10 @@ type AuthPayload = {
   role: Role;
 };
 
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       user?: AuthPayload;
-//     }
-//   }
-// }
+type RoleValue = Role | readonly Role[];
+
+const normalizeRoles = (roles: RoleValue): Role[] =>
+  Array.isArray(roles) ? [...roles] : [roles];
 
 export const authenticate = async (
   req: Request,
@@ -47,7 +44,12 @@ export const authenticate = async (
       select: {
         id: true,
         role: true,
-        isBanned: true
+        status: true,
+        farmerProfile: {
+          select: {
+            id: true
+          }
+        }
       }
     });
 
@@ -55,13 +57,14 @@ export const authenticate = async (
       return next(new APIError("User not found", 404));
     }
 
-    if (user.isBanned) {
-      return next(new APIError("Your account has been banned", 403));
+    if (user.status !== UserStatus.ACTIVE) {
+      return next(new APIError("Your account is not active", 403));
     }
 
     req.user = {
       userId: user.id,
-      role: user.role
+      role: user.role,
+      farmerId: user.farmerProfile?.id
     };
 
     next();
@@ -78,9 +81,24 @@ export const authenticate = async (
   }
 };
 
+export const authorizeRoles = (allowedRoles: RoleValue) =>
+  (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      return next(new APIError("Unauthorized", 401));
+    }
+
+    const roles = normalizeRoles(allowedRoles);
+
+    if (!roles.includes(req.user.role)) {
+      return next(new APIError("Access denied", 403));
+    }
+
+    next();
+  };
+
 export const requireAdmin = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   if (!req.user) {
@@ -89,38 +107,6 @@ export const requireAdmin = (
 
   if (req.user.role !== Role.ADMIN) {
     return next(new APIError("Access denied: admins only", 403));
-  }
-
-  next();
-};
-
-export const requireHost = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
-
-  if (req.user.role !== Role.HOST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: hosts only", 403));
-  }
-
-  next();
-};
-
-export const requireGuest = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    return next(new APIError("Unauthorized", 401));
-  }
-
-  if (req.user.role !== Role.GUEST && req.user.role !== Role.ADMIN) {
-    return next(new APIError("Access denied: guests only", 403));
   }
 
   next();

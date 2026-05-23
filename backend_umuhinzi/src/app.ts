@@ -3,6 +3,7 @@ import compression from "compression";
 import cors from "cors";
 
 // import apiV1 from "./routes/v1/versioning.js";
+import farmRoutes from "./modules/farms/farm.routes.js";
 
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
@@ -42,6 +43,7 @@ setupSwagger(app);
 /* ================= ROUTES ================= */
 
 // app.use("/api/v1", apiLimiter, apiV1);
+app.use("/api", apiLimiter, farmRoutes);
 
 /* ================= ERROR HANDLING ================= */
 
