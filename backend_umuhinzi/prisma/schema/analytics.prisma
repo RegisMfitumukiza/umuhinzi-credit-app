@@ -1,0 +1,37 @@
+model AnalyticsReport {
+  id            String           @id @default(uuid())
+  reportType    ReportType
+  visibility    ReportVisibility @default(ADMIN_ONLY)
+  title         String
+  description   String?
+  data          Json
+  generatedById String?
+  generatedAt   DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  generatedBy   User?            @relation(fields: [generatedById], references: [id])
+
+  @@index([reportType])
+  @@index([visibility])
+  @@index([generatedById])
+  @@index([generatedAt])
+  @@index([createdAt])
+}
+
+enum ReportType {
+  FARMER_GROWTH
+  PRODUCTIVITY
+  LOAN_ANALYTICS
+  REGIONAL_PERFORMANCE
+  FINANCIAL_INCLUSION
+  REPAYMENT_PERFORMANCE
+  COOPERATIVE_PERFORMANCE
+}
+
+enum ReportVisibility {
+  ADMIN_ONLY
+  INSTITUTION
+  COOPERATIVE
+  GOVERNMENT_PARTNER
+  PUBLIC_SUMMARY
+}

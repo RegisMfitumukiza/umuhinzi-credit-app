@@ -1,0 +1,47 @@
+model Recommendation {
+  id          String                 @id @default(uuid())
+  farmerId    String
+  type        RecommendationType
+  priority    RecommendationPriority @default(MEDIUM)
+  status      RecommendationStatus   @default(ACTIVE)
+  title       String
+  message     String
+  actionLabel String?
+  actionUrl   String?
+  isRead      Boolean                @default(false)
+  readAt      DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  farmer      Farmer                 @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId])
+  @@index([type])
+  @@index([priority])
+  @@index([status])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+enum RecommendationType {
+  LOAN_AMOUNT
+  FINANCIAL_IMPROVEMENT
+  REPAYMENT_STRATEGY
+  PRODUCTIVITY
+  RISK_REDUCTION
+  DATA_COMPLETENESS
+  GENERAL_ADVISORY
+}
+
+enum RecommendationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RecommendationStatus {
+  ACTIVE
+  READ
+  ARCHIVED
+  DISMISSED
+}

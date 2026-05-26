@@ -1,0 +1,62 @@
+model Crop {
+  id                  String        @id @default(uuid())
+  farmId              String
+  seasonId            String
+  cropName            String
+  cropType            CropType
+  plantingDate        DateTime
+  expectedHarvestDate DateTime?
+  actualHarvestDate   DateTime?
+  estimatedArea       Float?
+  status              CropStatus    @default(PLANNED)
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  farm                Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  season              FarmingSeason @relation(fields: [seasonId], references: [id])
+  farmExpenses        FarmExpense[]
+  inputCosts          InputCost[]
+  yieldRecords        YieldRecord[]
+
+  @@index([farmId])
+  @@index([seasonId])
+  @@index([cropName])
+  @@index([cropType])
+  @@index([status])
+  @@index([plantingDate])
+}
+
+model FarmingSeason {
+  id                  String               @id @default(uuid())
+  name                String
+  year                Int
+  startDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  crops               Crop[]
+  financialSummaries  FinancialSummary[]
+  productivityRecords ProductivityRecord[]
+
+  @@unique([name, year])
+  @@index([year])
+  @@index([startDate])
+}
+
+enum CropType {
+  CEREAL
+  LEGUME
+  VEGETABLE
+  FRUIT
+  ROOT_TUBER
+  CASH_CROP
+  OTHER
+}
+
+enum CropStatus {
+  PLANNED
+  PLANTED
+  GROWING
+  HARVESTED
+  FAILED
+}

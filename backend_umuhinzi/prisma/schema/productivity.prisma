@@ -1,0 +1,47 @@
+model YieldRecord {
+  id            String            @id @default(uuid())
+  cropId        String
+  expectedYield Float?
+  actualYield   Float
+  unit          String            @default("kg")
+  harvestDate   DateTime
+  qualityGrade  YieldQualityGrade @default(AVERAGE)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  crop          Crop              @relation(fields: [cropId], references: [id], onDelete: Cascade)
+
+  @@index([cropId])
+  @@index([harvestDate])
+  @@index([qualityGrade])
+  @@index([createdAt])
+}
+
+model ProductivityRecord {
+  id                 String        @id @default(uuid())
+  farmerId           String
+  seasonId           String
+  totalExpectedYield Float?
+  totalActualYield   Float
+  unit               String        @default("kg")
+  productivityRate   Float
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  farmer             Farmer        @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  season             FarmingSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([farmerId, seasonId])
+  @@index([farmerId])
+  @@index([seasonId])
+  @@index([productivityRate])
+  @@index([createdAt])
+}
+
+enum YieldQualityGrade {
+  EXCELLENT
+  GOOD
+  AVERAGE
+  POOR
+  DAMAGED
+}

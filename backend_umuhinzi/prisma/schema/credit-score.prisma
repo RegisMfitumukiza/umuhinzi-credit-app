@@ -1,0 +1,76 @@
+model CreditScore {
+  id                     String              @id @default(uuid())
+  farmerId               String
+  score                  Int
+  riskLevel              RiskLevel
+  yieldConsistencyScore  Float               @default(0)
+  farmingHistoryScore    Float               @default(0)
+  incomeStabilityScore   Float               @default(0)
+  repaymentBehaviorScore Float               @default(0)
+  productivityScore      Float               @default(0)
+  dataCompletenessScore  Float               @default(0)
+  summary                String?
+  generatedAt            DateTime            @default(now())
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  farmer                 Farmer              @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  factors                CreditScoreFactor[]
+  loanApplications       LoanApplication[]
+  riskAssessment         RiskAssessment?
+
+  @@index([farmerId])
+  @@index([score])
+  @@index([riskLevel])
+  @@index([generatedAt])
+}
+
+model CreditScoreFactor {
+  id            String                @id @default(uuid())
+  creditScoreId String
+  type          CreditScoreFactorType
+  factorName    String
+  factorValue   Float
+  weight        Float
+  contribution  Float
+  description   String?
+  createdAt     DateTime              @default(now())
+  creditScore   CreditScore           @relation(fields: [creditScoreId], references: [id], onDelete: Cascade)
+
+  @@index([creditScoreId])
+  @@index([type])
+}
+
+model RiskAssessment {
+  id                String      @id @default(uuid())
+  farmerId          String
+  creditScoreId     String      @unique
+  riskLevel         RiskLevel
+  reason            String?
+  recommendedAction String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  creditScore       CreditScore @relation(fields: [creditScoreId], references: [id], onDelete: Cascade)
+  farmer            Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId])
+  @@index([riskLevel])
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+enum CreditScoreFactorType {
+  YIELD_CONSISTENCY
+  FARMING_HISTORY
+  INCOME_STABILITY
+  REPAYMENT_BEHAVIOR
+  PRODUCTIVITY
+  FARM_SIZE
+  LIVESTOCK_VALUE
+  COOPERATIVE_MEMBERSHIP
+  DATA_COMPLETENESS
+}

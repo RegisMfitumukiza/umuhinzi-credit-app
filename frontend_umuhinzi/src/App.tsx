@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { FarmDashboardPage } from "./pages/FarmDashboardPage";
+import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
 import { FarmListPage } from "./pages/FarmListPage";
 import { FarmCreatePage } from "./pages/FarmCreatePage";
 import { FarmEditPage } from "./pages/FarmEditPage";
@@ -19,14 +20,17 @@ import { InstitutionsPage } from "./pages/InstitutionsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { InputCostsPage } from "./pages/InputCostsPage";
 import { LivestockPage } from "./pages/LivestockPage";
+import { RegisterRolePage } from "./pages/RegisterRolePage";
+import { RegisterPersonalPage } from "./pages/RegisterPersonalPage";
+import { RegisterFarmPage } from "./pages/RegisterFarmPage";
 
 export const App = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<FarmDashboardPage />} />
-        <Route path="/farms" element={<FarmListPage />} />
+        <Route path="/dashboard" element={<FinancialDashboardPage />} />
+        <Route path="/farms" element={<FarmDashboardPage />} />
         <Route path="/farms/new" element={<FarmCreatePage />} />
         <Route path="/farms/:id" element={<FarmDetailsPage />} />
         <Route path="/farms/:id/edit" element={<FarmEditPage />} />
@@ -41,6 +45,9 @@ export const App = () => {
         <Route path="/cooperatives" element={<CooperativesPage />} />
         <Route path="/institutions" element={<InstitutionsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/register" element={<RegisterRolePage />} />
+        <Route path="/register/personal" element={<RegisterPersonalPage />} />
+        <Route path="/register/farm" element={<RegisterFarmPage />} />
         <Route path="/input-costs" element={<InputCostsPage />} />
         <Route path="/livestock" element={<LivestockPage />} />
       </Route>

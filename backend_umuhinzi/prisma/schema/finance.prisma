@@ -1,0 +1,76 @@
+model MarketPrice {
+  id             String   @id @default(uuid())
+  cropName       String
+  marketLocation String
+  pricePerUnit   Float
+  unit           String   @default("kg")
+  recordedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([cropName])
+  @@index([marketLocation])
+  @@index([recordedAt])
+}
+
+model FarmExpense {
+  id          String      @id @default(uuid())
+  farmerId    String
+  cropId      String?
+  type        ExpenseType
+  amount      Float
+  description String?
+  expenseDate DateTime
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  crop        Crop?       @relation(fields: [cropId], references: [id])
+  farmer      Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId])
+  @@index([cropId])
+  @@index([type])
+  @@index([expenseDate])
+  @@index([createdAt])
+}
+
+model FinancialSummary {
+  id             String         @id @default(uuid())
+  farmerId       String
+  seasonId       String
+  totalIncome    Float          @default(0)
+  totalExpenses  Float          @default(0)
+  netProfit      Float          @default(0)
+  cashFlowStatus CashFlowStatus @default(NEUTRAL)
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  farmer         Farmer         @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  season         FarmingSeason  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([farmerId, seasonId])
+  @@index([farmerId])
+  @@index([seasonId])
+  @@index([cashFlowStatus])
+  @@index([createdAt])
+}
+
+enum CashFlowStatus {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum ExpenseType {
+  SEED
+  FERTILIZER
+  PESTICIDE
+  HERBICIDE
+  LABOR
+  IRRIGATION
+  TRANSPORT
+  EQUIPMENT
+  STORAGE
+  RENT
+  LOAN_REPAYMENT
+  OTHER
+}

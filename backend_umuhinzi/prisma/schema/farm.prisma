@@ -1,0 +1,61 @@
+model Farm {
+  id            String        @id @default(uuid())
+  farmerId      String
+  name          String
+  description   String?
+  landSize      Float
+  landUnit      LandUnit      @default(HECTARE)
+  ownershipType OwnershipType @default(OWNED)
+  soilType      SoilType      @default(UNKNOWN)
+  status        FarmStatus    @default(ACTIVE)
+  province      String?
+  district      String
+  sector        String?
+  cell          String?
+  village       String?
+  latitude      Float?
+  longitude     Float?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  crops         Crop[]
+  farmer        Farmer        @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId])
+  @@index([district])
+  @@index([sector])
+  @@index([ownershipType])
+  @@index([soilType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum LandUnit {
+  HECTARE
+  ACRE
+  SQUARE_METER
+}
+
+enum OwnershipType {
+  OWNED
+  RENTED
+  FAMILY_LAND
+  COOPERATIVE_LAND
+  GOVERNMENT_ALLOCATED
+  OTHER
+}
+
+enum SoilType {
+  CLAY
+  SANDY
+  SILT
+  LOAM
+  PEAT
+  CHALKY
+  UNKNOWN
+}
+
+enum FarmStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+}

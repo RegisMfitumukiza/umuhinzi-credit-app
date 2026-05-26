@@ -23,18 +23,12 @@ const toQueryString = (query: FarmQuery) => {
 
 export const farmApi = {
   listMine: async (query: FarmQuery = {}) => {
-    const response = await api.get<{ data: Farm[]; meta: FarmListResponse["meta"] }>(`/farms/me${toQueryString(query)}`);
-    return {
-      farms: response.data.data,
-      meta: response.data.meta,
-    };
+    const response = await api.get<FarmListResponse>(`/farms/me${toQueryString(query)}`);
+    return response.data;
   },
   listAll: async (query: FarmQuery = {}) => {
-    const response = await api.get<{ data: Farm[]; meta: FarmListResponse["meta"] }>(`/admin/farms${toQueryString(query)}`);
-    return {
-      farms: response.data.data,
-      meta: response.data.meta,
-    };
+    const response = await api.get<FarmListResponse>(`/admin/farms${toQueryString(query)}`);
+    return response.data;
   },
   getById: async (farmId: string) => {
     const response = await api.get<{ data: Farm }>(`/farms/${farmId}`);

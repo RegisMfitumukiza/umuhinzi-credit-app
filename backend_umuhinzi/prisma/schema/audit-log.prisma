@@ -1,0 +1,48 @@
+model AuditLog {
+  id          String        @id @default(uuid())
+  actorId     String?
+  action      AuditAction
+  resource    AuditResource
+  resourceId  String?
+  description String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime      @default(now())
+  actor       User?         @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([createdAt])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PASSWORD_RESET
+  STATUS_CHANGE
+  ROLE_CHANGE
+  FILE_UPLOAD
+  FILE_DELETE
+  SYSTEM
+}
+
+enum AuditResource {
+  USER
+  FARMER
+  INSTITUTION
+  COOPERATIVE
+  FARM
+  CROP
+  LOAN
+  REPAYMENT
+  CREDIT_SCORE
+  NOTIFICATION
+  AUTH
+  SYSTEM
+}
