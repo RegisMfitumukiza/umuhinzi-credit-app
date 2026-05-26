@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 type AuthState = {
   token: string | null;
@@ -10,6 +11,7 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("umuhinzi_token"));
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (token) {
@@ -20,7 +22,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [token]);
 
   const login = (nextToken: string) => setToken(nextToken);
-  const logout = () => setToken(null);
+  const logout = () => {
+    // clear token and user, then redirect to landing page
+    setToken(null);
+    localStorage.removeItem("umuhinzi_user");
+    navigate("/");
+  };
 
   return <AuthContext.Provider value={{ token, login, logout }}>{children}</AuthContext.Provider>;
 };
