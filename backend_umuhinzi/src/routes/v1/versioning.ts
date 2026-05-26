@@ -16,6 +16,7 @@ import {
   financialSummaryRouter,
   marketPriceRouter,
 } from "./finance.routes.js";
+import { creditScoreRouter } from "./credit-score.routes.js";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/productivity", productivityRouter);
 router.use("/expenses", expenseRouter);
 router.use("/financial-summaries", financialSummaryRouter);
 router.use("/market-prices", marketPriceRouter);
+router.use("/credit-scores", creditScoreRouter);
 
 export default router;
