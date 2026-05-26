@@ -14,18 +14,37 @@ export const LoginPage = () => {
     event.preventDefault();
 
     const storedAccount = JSON.parse(localStorage.getItem("umuhinzi_account") || "null");
+    const storedRole = localStorage.getItem("umuhinzi_last_role");
 
     if (!email.trim() || !password.trim()) {
       showToast("Enter your email and password", "error");
       return;
     }
 
-    const accountMatches = storedAccount && storedAccount.email === email.trim() && storedAccount.password === password.trim();
-    const account = accountMatches ? storedAccount : {
-      role: email.toLowerCase().includes("coop") ? "COOPERATIVE_MANAGER" : "FARMER",
-      email: email.trim(),
-      password: password.trim(),
-    };
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    // Admin shortcut: accept admin credentials via normal login page
+    if (trimmedEmail.toLowerCase() === "admin@umuhinzi.test" && trimmedPassword === "Admin123!") {
+      const adminAccount = { role: "ADMIN", email: trimmedEmail, password: trimmedPassword };
+      localStorage.setItem("umuhinzi_account", JSON.stringify(adminAccount));
+      localStorage.setItem("umuhinzi_user", JSON.stringify({ id: `admin-1`, fullName: "Platform Admin", email: trimmedEmail, role: "admin" }));
+      localStorage.setItem("umuhinzi_last_role", "admin");
+      login("admin-demo-token");
+      showToast("Welcome admin", "success");
+      navigate("/admin");
+      return;
+    }
+
+    const accountMatches = storedAccount && storedAccount.email === trimmedEmail && storedAccount.password === trimmedPassword;
+    const fallbackRole = storedRole === "COOPERATIVE_MANAGER" ? "COOPERATIVE_MANAGER" : "FARMER";
+    const account = accountMatches
+      ? storedAccount
+      : {
+          role: trimmedEmail.toLowerCase().includes("coop") || trimmedEmail.toLowerCase().includes("manager") ? "COOPERATIVE_MANAGER" : fallbackRole,
+          email: trimmedEmail,
+          password: trimmedPassword,
+        };
 
     localStorage.setItem("umuhinzi_account", JSON.stringify(account));
     localStorage.setItem("umuhinzi_user", JSON.stringify({

@@ -29,39 +29,36 @@ export const CooperativeSidebar = () => {
         <NavLink to="/cooperatives" end className={navClass}>
           Dashboard
         </NavLink>
-        <NavLink to="/cooperatives" className={navClass}>
+        <NavLink to="/cooperatives/applications" className={navClass}>
           Applications
         </NavLink>
-        <NavLink to="/cooperatives" className={navClass}>
+        <NavLink to="/cooperatives/risk-analytics" className={navClass}>
           Risk Analytics
         </NavLink>
-        <NavLink to="/cooperatives" className={navClass}>
-          Cooperatives
-        </NavLink>
-        <NavLink to="/cooperatives" className={navClass}>
+        <NavLink to="/cooperatives/regional-map" className={navClass}>
           Regional Map
         </NavLink>
-        <NavLink to="/cooperatives" className={navClass}>
+        <NavLink to="/cooperatives/reports" className={navClass}>
           Reports
         </NavLink>
 
-        <div className="mt-6 border-t border-stone-200 pt-4">
+        {/* <div className="mt-6 border-t border-stone-200 pt-4">
           <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-stone-400">Pages</p>
           <div className="flex flex-col gap-1">
-            <NavLink to="/cooperatives" className={pageClass}>
+            <NavLink to="/cooperatives/member-list" className={pageClass}>
               Member List
             </NavLink>
-            <NavLink to="/cooperatives" className={pageClass}>
+            <NavLink to="/cooperatives/loan-status" className={pageClass}>
               Loan Status
             </NavLink>
-            <NavLink to="/cooperatives" className={pageClass}>
+            <NavLink to="/cooperatives/productivity" className={pageClass}>
               Productivity
             </NavLink>
-            <NavLink to="/cooperatives" className={pageClass}>
+            <NavLink to="/cooperatives/settings" className={pageClass}>
               Settings
             </NavLink>
           </div>
-        </div>
+        </div> */}
       </nav>
     </aside>
   );

@@ -1,0 +1,66 @@
+import { useEffect, useState } from "react";
+
+const loadUsers = () => {
+  try {
+    const raw = localStorage.getItem("umuhinzi_users");
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+};
+
+export const AdminUsersPage = () => {
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const u = loadUsers();
+    setUsers(u);
+  }, []);
+
+  const toggleEnable = (id: string) => {
+    const updated = users.map((u) => (u.id === id ? { ...u, enabled: !u.enabled } : u));
+    setUsers(updated);
+    localStorage.setItem("umuhinzi_users", JSON.stringify(updated));
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
+      <div className="mx-auto max-w-[1200px]">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-stone-900">User Management</h1>
+            <p className="mt-1 text-sm text-stone-500">Enable or disable platform users.</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-xs uppercase tracking-[0.12em] text-stone-400">
+              <tr>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Role</th>
+                <th className="px-3 py-2 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-t border-stone-100">
+                  <td className="px-3 py-3 font-medium text-stone-900">{u.fullName}</td>
+                  <td className="px-3 py-3 text-stone-600">{u.email}</td>
+                  <td className="px-3 py-3 text-stone-600">{u.role}</td>
+                  <td className="px-3 py-3 text-right">
+                    <button onClick={() => toggleEnable(u.id)} className={`rounded-full px-3 py-2 text-sm ${u.enabled ? 'bg-emerald-500 text-white' : 'border border-stone-200 text-stone-700'}`}>
+                      {u.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminUsersPage;

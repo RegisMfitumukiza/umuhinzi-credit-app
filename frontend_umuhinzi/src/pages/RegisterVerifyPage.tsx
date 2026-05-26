@@ -37,6 +37,7 @@ export const RegisterVerifyPage = () => {
     localStorage.setItem("umuhinzi_account", JSON.stringify(user));
     localStorage.setItem("umuhinzi_user", JSON.stringify(user));
     localStorage.setItem("umuhinzi_token", "demo");
+    localStorage.setItem("umuhinzi_last_role", user.role);
     localStorage.removeItem("umuhinzi_registration");
 
     navigate("/login");

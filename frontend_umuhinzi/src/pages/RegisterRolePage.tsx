@@ -38,6 +38,7 @@ export const RegisterRolePage = () => {
     }
 
     localStorage.setItem("umuhinzi_registration", JSON.stringify({ role: selectedRole }));
+    localStorage.setItem("umuhinzi_last_role", selectedRole);
     navigate("/register/personal");
   };
 

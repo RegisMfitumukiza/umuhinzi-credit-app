@@ -17,6 +17,10 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { CooperativesPage } from "./pages/CooperativesPage";
+import { CooperativeApplicationsPage } from "./pages/CooperativeApplicationsPage";
+import { CooperativeRiskAnalyticsPage } from "./pages/CooperativeRiskAnalyticsPage";
+import { CooperativeReportsPage } from "./pages/CooperativeReportsPage";
+import { CooperativeApplicationDetailsPage } from "./pages/CooperativeApplicationDetailsPage";
 import { InstitutionsPage } from "./pages/InstitutionsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { InputCostsPage } from "./pages/InputCostsPage";
@@ -26,6 +30,11 @@ import { RegisterPersonalPage } from "./pages/RegisterPersonalPage";
 import { RegisterFarmPage } from "./pages/RegisterFarmPage";
 import { RegisterVerifyPage } from "./pages/RegisterVerifyPage";
 import { LandingPage } from "./pages/LandingPage";
+import { AdminLoginPage } from "./pages/AdminLoginPage";
+import { AdminDashboardPage } from "./pages/AdminDashboardPage";
+import { AdminLayout } from "./layout/AdminLayout";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AdminProfilePage } from "./pages/AdminProfilePage";
 
 export const App = () => {
   return (
@@ -36,6 +45,13 @@ export const App = () => {
       <Route path="/register/personal" element={<RegisterPersonalPage />} />
       <Route path="/register/farm" element={<RegisterFarmPage />} />
       <Route path="/register/verify" element={<RegisterVerifyPage />} />
+
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route element={<AdminLayout />}>
+        <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/admin/profile" element={<AdminProfilePage />} />
+      </Route>
 
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<FinancialDashboardPage />} />
@@ -59,6 +75,16 @@ export const App = () => {
 
       <Route element={<CooperativeLayout />}>
         <Route path="/cooperatives" element={<CooperativesPage />} />
+        <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
+        <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
+        <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />
+        <Route path="/cooperatives/groups" element={<CooperativesPage />} />
+        <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
+        <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
+        <Route path="/cooperatives/member-list" element={<CooperativesPage />} />
+        <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
+        <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
+        <Route path="/cooperatives/settings" element={<CooperativesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
