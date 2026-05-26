@@ -28,9 +28,10 @@ const passwordSchema = z
     (value) =>
       /[A-Z]/.test(value) &&
       /[a-z]/.test(value) &&
-      /\d/.test(value),
+      /\d/.test(value) &&
+      /[!@#$%^&*(),.?":{}|<>]/.test(value),
     {
-      message: "Password must contain uppercase, lowercase and a number",
+      message: "Password must contain uppercase, lowercase, a number and a special character",
     }
   );
 
@@ -181,7 +182,7 @@ registry.register("VerifyEmailInput", verifyEmailSchema);
 
 /* ================= TYPES ================= */
 
-export type RegisterUserInput = z.infer<typeof registerUserSchema>["body"];
+export type RegisterUserInput = z.infer<typeof registerUserSchema>["body"]
 export type LoginUserInput = z.infer<typeof loginUserSchema>["body"];
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
 export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>["body"];

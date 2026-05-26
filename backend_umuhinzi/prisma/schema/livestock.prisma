@@ -1,3 +1,22 @@
+model Livestock {
+  id             String           @id @default(uuid())
+  farmerId       String
+  type           LivestockType
+  purpose        LivestockPurpose @default(COMMERCIAL)
+  quantity       Int              @default(1)
+  estimatedValue Float?
+  notes          String?
+  status         LivestockStatus  @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  farmer         Farmer           @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId])
+  @@index([type])
+  @@index([purpose])
+  @@index([status])
+}
+
 enum LivestockType {
   CATTLE
   GOAT
@@ -26,33 +45,4 @@ enum LivestockStatus {
   SOLD
   DECEASED
   INACTIVE
-}
-
-model Livestock {
-  id String @id @default(uuid())
-
-  // Farmer relationship
-  farmerId String
-  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-
-  // Livestock information
-  type LivestockType
-  purpose LivestockPurpose @default(COMMERCIAL)
-
-  quantity Int @default(1)
-
-  estimatedValue Float?
-
-  notes String?
-
-  status LivestockStatus @default(ACTIVE)
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([farmerId])
-  @@index([type])
-  @@index([purpose])
-  @@index([status])
 }

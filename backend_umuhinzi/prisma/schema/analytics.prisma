@@ -1,3 +1,23 @@
+model AnalyticsReport {
+  id            String           @id @default(uuid())
+  reportType    ReportType
+  visibility    ReportVisibility @default(ADMIN_ONLY)
+  title         String
+  description   String?
+  data          Json
+  generatedById String?
+  generatedAt   DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  generatedBy   User?            @relation(fields: [generatedById], references: [id])
+
+  @@index([reportType])
+  @@index([visibility])
+  @@index([generatedById])
+  @@index([generatedAt])
+  @@index([createdAt])
+}
+
 enum ReportType {
   FARMER_GROWTH
   PRODUCTIVITY
@@ -14,32 +34,4 @@ enum ReportVisibility {
   COOPERATIVE
   GOVERNMENT_PARTNER
   PUBLIC_SUMMARY
-}
-
-model AnalyticsReport {
-  id String @id @default(uuid())
-
-  reportType ReportType
-  visibility ReportVisibility @default(ADMIN_ONLY)
-
-  title       String
-  description String?
-
-  // Flexible report result payload
-  data Json
-
-  // User who generated the report
-  generatedById String?
-  generatedBy   User? @relation(fields: [generatedById], references: [id], onDelete: SetNull)
-
-  generatedAt DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([reportType])
-  @@index([visibility])
-  @@index([generatedById])
-  @@index([generatedAt])
-  @@index([createdAt])
 }

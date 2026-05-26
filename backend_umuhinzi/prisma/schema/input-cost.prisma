@@ -1,3 +1,24 @@
+model InputCost {
+  id          String    @id @default(uuid())
+  cropId      String
+  type        InputType
+  name        String
+  description String?
+  quantity    Float?
+  unit        String?
+  unitCost    Float?
+  totalCost   Float
+  dateUsed    DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  crop        Crop      @relation(fields: [cropId], references: [id], onDelete: Cascade)
+
+  @@index([cropId])
+  @@index([type])
+  @@index([dateUsed])
+  @@index([createdAt])
+}
+
 enum InputType {
   SEED
   FERTILIZER
@@ -9,34 +30,4 @@ enum InputType {
   EQUIPMENT
   STORAGE
   OTHER
-}
-
-model InputCost {
-  id String @id @default(uuid())
-
-  // Crop relationship
-  cropId String
-  crop   Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
-
-  // Input details
-  type        InputType
-  name        String
-  description String?
-
-  quantity Float?
-  unit     String?
-
-  unitCost  Float?
-  totalCost Float
-
-  dateUsed DateTime
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([cropId])
-  @@index([type])
-  @@index([dateUsed])
-  @@index([createdAt])
 }

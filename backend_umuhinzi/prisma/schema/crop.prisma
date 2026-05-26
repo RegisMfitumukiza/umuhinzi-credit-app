@@ -1,3 +1,48 @@
+model Crop {
+  id                  String        @id @default(uuid())
+  farmId              String
+  seasonId            String
+  cropName            String
+  cropType            CropType
+  plantingDate        DateTime
+  expectedHarvestDate DateTime?
+  actualHarvestDate   DateTime?
+  estimatedArea       Float?
+  status              CropStatus    @default(PLANNED)
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  farm                Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  season              FarmingSeason @relation(fields: [seasonId], references: [id])
+  farmExpenses        FarmExpense[]
+  inputCosts          InputCost[]
+  yieldRecords        YieldRecord[]
+
+  @@index([farmId])
+  @@index([seasonId])
+  @@index([cropName])
+  @@index([cropType])
+  @@index([status])
+  @@index([plantingDate])
+}
+
+model FarmingSeason {
+  id                  String               @id @default(uuid())
+  name                String
+  year                Int
+  startDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  crops               Crop[]
+  financialSummaries  FinancialSummary[]
+  productivityRecords ProductivityRecord[]
+
+  @@unique([name, year])
+  @@index([year])
+  @@index([startDate])
+}
+
 enum CropType {
   CEREAL
   LEGUME
@@ -14,69 +59,4 @@ enum CropStatus {
   GROWING
   HARVESTED
   FAILED
-}
-
-model Crop {
-  id String @id @default(uuid())
-
-  // Farm relationship
-  farmId String
-  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
-
-  // Season relationship
-  seasonId String
-  season FarmingSeason @relation(fields: [seasonId], references: [id])
-
-  // Crop information
-  cropName String
-  cropType CropType
-
-  plantingDate DateTime
-  expectedHarvestDate DateTime?
-  actualHarvestDate DateTime?
-
-  estimatedArea Float?
-  status CropStatus @default(PLANNED)
-
-  notes String?
-
-  // Future relations
-  inputCosts InputCost[]
-  yieldRecords YieldRecord[]
-  farmExpenses FarmExpense[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([farmId])
-  @@index([seasonId])
-  @@index([cropName])
-  @@index([cropType])
-  @@index([status])
-  @@index([plantingDate])
-}
-
-
-model FarmingSeason {
-  id String @id @default(uuid())
-
-  name String
-  year Int
-
-  startDate DateTime
-  endDate DateTime
-
-  // Relations
-  crops Crop[]
-  productivityRecords ProductivityRecord[]
-  financialSummaries FinancialSummary[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([name, year])
-
-  @@index([year])
-  @@index([startDate])
 }

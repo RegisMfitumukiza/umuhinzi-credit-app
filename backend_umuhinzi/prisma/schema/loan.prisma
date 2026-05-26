@@ -1,3 +1,79 @@
+model LoanApplication {
+  id                 String                @id @default(uuid())
+  farmerId           String
+  institutionId      String?
+  creditScoreId      String?
+  requestedAmount    Float
+  recommendedAmount  Float?
+  approvedAmount     Float?
+  purpose            LoanPurpose
+  purposeDescription String?
+  status             LoanApplicationStatus @default(PENDING)
+  reviewedById       String?
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  loan               Loan?
+  creditScore        CreditScore?          @relation(fields: [creditScoreId], references: [id])
+  farmer             Farmer                @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  institution        Institution?          @relation(fields: [institutionId], references: [id])
+  reviewedBy         User?                 @relation(fields: [reviewedById], references: [id])
+
+  @@index([farmerId])
+  @@index([institutionId])
+  @@index([creditScoreId])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([purpose])
+  @@index([createdAt])
+}
+
+model Loan {
+  id                 String              @id @default(uuid())
+  loanApplicationId  String              @unique
+  farmerId           String
+  institutionId      String?
+  principalAmount    Float
+  interestRate       Float               @default(0)
+  totalPayable       Float
+  disbursedAmount    Float?
+  disbursedAt        DateTime?
+  startDate          DateTime?
+  endDate            DateTime?
+  status             LoanStatus          @default(APPROVED)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  farmer             Farmer              @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  institution        Institution?        @relation(fields: [institutionId], references: [id])
+  loanApplication    LoanApplication     @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+  statusHistory      LoanStatusHistory[]
+  repayments         Repayment[]
+  repaymentSchedules RepaymentSchedule[]
+
+  @@index([farmerId])
+  @@index([institutionId])
+  @@index([status])
+  @@index([disbursedAt])
+  @@index([createdAt])
+}
+
+model LoanStatusHistory {
+  id          String     @id @default(uuid())
+  loanId      String
+  status      LoanStatus
+  changedById String?
+  note        String?
+  createdAt   DateTime   @default(now())
+  changedBy   User?      @relation(fields: [changedById], references: [id])
+  loan        Loan       @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId])
+  @@index([changedById])
+  @@index([status])
+  @@index([createdAt])
+}
+
 enum LoanApplicationStatus {
   PENDING
   UNDER_REVIEW
@@ -26,112 +102,4 @@ enum LoanPurpose {
   TRANSPORT
   STORAGE
   OTHER
-}
-
-model LoanApplication {
-  id String @id @default(uuid())
-
-  // Farmer relationship
-  farmerId String
-  farmer   Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-
-  // Institution relationship
-  institutionId String?
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-
-  // Credit score used during application
-  creditScoreId String?
-  creditScore   CreditScore? @relation(fields: [creditScoreId], references: [id], onDelete: SetNull)
-
-  requestedAmount    Float
-  recommendedAmount  Float?
-  approvedAmount     Float?
-
-  purpose LoanPurpose
-  purposeDescription String?
-
-  status LoanApplicationStatus @default(PENDING)
-
-  // Review information
-  reviewedById String?
-  reviewedBy   User? @relation(fields: [reviewedById],references: [id], onDelete: SetNull)
-
-  reviewedAt      DateTime?
-  rejectionReason String?
-
-  // Relations
-  loan Loan?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([farmerId])
-  @@index([institutionId])
-  @@index([creditScoreId])
-  @@index([reviewedById])
-  @@index([status])
-  @@index([purpose])
-  @@index([createdAt])
-}
-
-model Loan {
-  id String @id @default(uuid())
-
-  // Loan application relationship
-  loanApplicationId String @unique
-  loanApplication   LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
-
-  // Farmer relationship
-  farmerId String
-  farmer   Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-
-  // Institution relationship
-  institutionId String?
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-
-  principalAmount Float
-  interestRate    Float @default(0)
-  totalPayable    Float
-  disbursedAmount Float?
-
-  disbursedAt DateTime?
-  startDate   DateTime?
-  endDate     DateTime?
-
-  status LoanStatus @default(APPROVED)
-
-  // Relations
-  statusHistory LoanStatusHistory[]
-  repaymentSchedules RepaymentSchedule[]
-  repayments Repayment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([farmerId])
-  @@index([institutionId])
-  @@index([status])
-  @@index([disbursedAt])
-  @@index([createdAt])
-}
-
-model LoanStatusHistory {
-  id String @id @default(uuid())
-
-  loanId String
-  loan   Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
-
-  status LoanStatus
-
-  changedById String?
-  changedBy   User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
-
-  note String?
-
-  createdAt DateTime @default(now())
-
-  @@index([loanId])
-  @@index([changedById])
-  @@index([status])
-  @@index([createdAt])
 }

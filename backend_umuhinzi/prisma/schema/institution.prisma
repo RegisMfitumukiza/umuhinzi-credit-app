@@ -1,3 +1,32 @@
+model Institution {
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  name               String
+  type               InstitutionType
+  registrationNumber String?           @unique
+  licenseNumber      String?           @unique
+  email              String?
+  phone              String?
+  address            String?
+  province           String?
+  district           String?
+  sector             String?
+  cell               String?
+  village            String?
+  status             InstitutionStatus @default(PENDING)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loans              Loan[]
+  loanApplications   LoanApplication[]
+
+  @@index([type])
+  @@index([status])
+  @@index([district])
+  @@index([sector])
+  @@index([createdAt])
+}
+
 enum InstitutionType {
   SACCO
   MICROFINANCE
@@ -12,47 +41,4 @@ enum InstitutionStatus {
   ACTIVE
   SUSPENDED
   DEACTIVATED
-}
-
-model Institution {
-  id String @id @default(uuid())
-
-  // User relationship
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Institution details
-  name              String
-  type              InstitutionType
-  registrationNumber String? @unique
-  licenseNumber      String? @unique
-
-  // Contact information
-  email   String?
-  phone   String?
-  address String?
-
-  // Location
-  province String?
-  district String?
-  sector   String?
-  cell     String?
-  village  String?
-
-  // Status
-  status InstitutionStatus @default(PENDING)
-
-  // Relations
-  loanApplications LoanApplication[]
-  loans            Loan[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([type])
-  @@index([status])
-  @@index([district])
-  @@index([sector])
-  @@index([createdAt])
 }

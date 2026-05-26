@@ -1,3 +1,44 @@
+model RepaymentSchedule {
+  id             String                  @id @default(uuid())
+  loanId         String
+  dueDate        DateTime
+  expectedAmount Float
+  paidAmount     Float                   @default(0)
+  status         RepaymentScheduleStatus @default(UPCOMING)
+  notes          String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  repayments     Repayment[]
+  loan           Loan                    @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Repayment {
+  id                   String             @id @default(uuid())
+  loanId               String
+  repaymentScheduleId  String?
+  amountPaid           Float
+  paymentMethod        PaymentMethod
+  status               RepaymentStatus    @default(COMPLETED)
+  transactionReference String?            @unique
+  paidAt               DateTime           @default(now())
+  notes                String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  loan                 Loan               @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  repaymentSchedule    RepaymentSchedule? @relation(fields: [repaymentScheduleId], references: [id])
+
+  @@index([loanId])
+  @@index([repaymentScheduleId])
+  @@index([paymentMethod])
+  @@index([status])
+  @@index([paidAt])
+}
+
 enum RepaymentScheduleStatus {
   UPCOMING
   DUE
@@ -20,63 +61,4 @@ enum RepaymentStatus {
   COMPLETED
   FAILED
   REVERSED
-}
-
-model RepaymentSchedule {
-  id String @id @default(uuid())
-
-  // Loan relationship
-  loanId String
-  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
-
-  dueDate        DateTime
-  expectedAmount Float
-  paidAmount     Float @default(0)
-
-  status RepaymentScheduleStatus @default(UPCOMING)
-
-  notes String?
-
-  // Relations
-  repayments Repayment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([loanId])
-  @@index([dueDate])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model Repayment {
-  id String @id @default(uuid())
-
-  // Loan relationship
-  loanId String
-  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
-
-  // Optional schedule relationship
-  repaymentScheduleId String?
-  repaymentSchedule   RepaymentSchedule? @relation(fields: [repaymentScheduleId], references: [id], onDelete: SetNull)
-
-  amountPaid Float
-
-  paymentMethod PaymentMethod
-  status        RepaymentStatus @default(COMPLETED)
-
-  transactionReference String? @unique
-
-  paidAt DateTime @default(now())
-
-  notes String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([loanId])
-  @@index([repaymentScheduleId])
-  @@index([paymentMethod])
-  @@index([status])
-  @@index([paidAt])
 }

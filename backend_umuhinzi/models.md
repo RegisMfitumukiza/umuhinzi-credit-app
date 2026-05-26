@@ -457,3 +457,10 @@ User 1 ─── many AnalyticsReports
 
 Enums:
 ReportType: FARMER_GROWTH, PRODUCTIVITY, LOAN_ANALYTICS, REGIONAL_PERFORMANCE, FINANCIAL_INCLUSION
+
+
+Primary Green: #22c55e
+Dark Text: #111827
+Light Background: #f9fafb
+Border Gray: #e5e7eb
+Muted Gray: #6b7280

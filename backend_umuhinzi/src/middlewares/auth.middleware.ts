@@ -1,15 +1,14 @@
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
-import { Role } from "../generated/prisma/client.js";
+import { authUserSelect } from "../utils/selects/user.select.js";
+import type { Role } from "../generated/prisma/client.js";
 
-
-type jwtPayload = {
+type JwtPayload = {
   id: string;
 };
-
 
 const getTokenFromHeader = (authHeader?: string): string => {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -39,7 +38,7 @@ export const authenticate = async (
       throw new APIError("JWT_SECRET is missing", 500);
     }
 
-    const decoded = jwt.verify(token, secret) as jwtPayload;
+    const decoded = jwt.verify(token, secret) as JwtPayload;
 
     if (!decoded.id) {
       throw new APIError("Invalid token payload", 401);
@@ -49,18 +48,11 @@ export const authenticate = async (
       where: {
         id: decoded.id,
       },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        status: true,
-        isEmailVerified: true,
-      },
+      select: authUserSelect,
     });
 
     if (!user) {
-      throw new APIError("User not found", 404);
+      throw new APIError("User not found", 401);
     }
 
     if (user.status !== "ACTIVE") {
@@ -70,17 +62,16 @@ export const authenticate = async (
     req.user = user;
 
     next();
-
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return next(new APIError("Invalid token", 401));
-    }
-
     if (error instanceof jwt.TokenExpiredError) {
       return next(new APIError("Token expired", 401));
     }
 
-    next(error)
+    if (error instanceof jwt.JsonWebTokenError) {
+      return next(new APIError("Invalid token", 401));
+    }
+
+    next(error);
   }
 };
 
@@ -95,15 +86,38 @@ export const authorizeRoles = (...roles: Role[]) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      return next(new APIError("You are not allowed to access this resource", 403));
+      return next(
+        new APIError("You are not allowed to access this resource", 403)
+      );
     }
 
     next();
   };
 };
 
+/* ================= ROLE SHORTCUTS ================= */
 
+export const requireAdmin = authorizeRoles("ADMIN");
 
+export const requireFarmer = authorizeRoles("FARMER");
 
+export const requireInstitution = authorizeRoles("INSTITUTION");
 
+export const requireCooperativeManager = authorizeRoles("COOPERATIVE_MANAGER");
 
+export const requireGovernmentPartner = authorizeRoles("GOVERNMENT_PARTNER");
+
+export const requireAdminOrGovernmentPartner = authorizeRoles(
+  "ADMIN",
+  "GOVERNMENT_PARTNER"
+);
+
+export const requireAdminOrInstitution = authorizeRoles(
+  "ADMIN",
+  "INSTITUTION"
+);
+
+export const requireFarmerOrCooperativeManager = authorizeRoles(
+  "FARMER",
+  "COOPERATIVE_MANAGER"
+);
