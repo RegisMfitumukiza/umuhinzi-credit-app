@@ -17,6 +17,12 @@ import {
   marketPriceRouter,
 } from "./finance.routes.js";
 import { creditScoreRouter } from "./credit-score.routes.js";
+import {
+  loanApplicationRouter,
+  loanRouter,
+  repaymentRouter,
+  repaymentScheduleRouter,
+} from "./loan.routes.js";
 
 const router = Router();
 
@@ -34,5 +40,9 @@ router.use("/expenses", expenseRouter);
 router.use("/financial-summaries", financialSummaryRouter);
 router.use("/market-prices", marketPriceRouter);
 router.use("/credit-scores", creditScoreRouter);
+router.use("/loan-applications", loanApplicationRouter);
+router.use("/loans", loanRouter);
+router.use("/repayments", repaymentRouter);
+router.use("/repayment-schedules", repaymentScheduleRouter);
 
 export default router;
