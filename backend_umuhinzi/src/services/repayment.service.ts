@@ -191,7 +191,6 @@ export const createRepaymentService = async (
   });
 
   if (!repayment) throw new APIError("Failed to create repayment", 500);
-
   await writeAuditLog({
     actorId: context.actorId ?? userId,
     action: "CREATE",
