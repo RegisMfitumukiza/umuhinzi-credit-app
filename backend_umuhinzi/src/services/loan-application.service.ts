@@ -1,6 +1,13 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import {
+  notifyLoanApplicationSubmitted,
+  notifyLoanApplicationUnderReview,
+  notifyLoanApplicationApproved,
+  notifyLoanApplicationRejected,
+  notifyLoanApplicationCancelled,
+} from "../utils/notification.helper.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -61,6 +68,14 @@ const resolveFarmerIdFromUser = async (userId: string) => {
     );
   }
   return farmer.id;
+};
+
+const resolveFarmerUserId = async (farmerId: string): Promise<string | null> => {
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: farmerId },
+    select: { userId: true },
+  });
+  return farmer?.userId ?? null;
 };
 
 const resolveInstitutionIdFromUser = async (userId: string) => {
@@ -127,6 +142,9 @@ export const createLoanApplicationService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify farmer
+  await notifyLoanApplicationSubmitted(userId, application.id);
 
   return application;
 };
@@ -223,7 +241,11 @@ export const updateLoanApplicationStatusService = async (
         },
       });
 
-      return app;
+      // Re-fetch after loan is created so it appears in the response
+      return tx.loanApplication.findUnique({
+        where: { id: applicationId },
+        select: loanApplicationWithFarmerSelect,
+      });
     });
 
     await writeAuditLog({
@@ -236,6 +258,12 @@ export const updateLoanApplicationStatusService = async (
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     });
+
+    // Notify farmer
+    const farmerUserId = await resolveFarmerUserId(existing.farmerId);
+    if (farmerUserId) {
+      await notifyLoanApplicationApproved(farmerUserId, applicationId, approvedAmount);
+    }
 
     return updatedApplication;
   }
@@ -261,6 +289,18 @@ export const updateLoanApplicationStatusService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Send notification based on new status
+  const farmerUserId = await resolveFarmerUserId(existing.farmerId);
+  if (farmerUserId) {
+    if (status === "UNDER_REVIEW") {
+      await notifyLoanApplicationUnderReview(farmerUserId, applicationId);
+    } else if (status === "REJECTED") {
+      await notifyLoanApplicationRejected(farmerUserId, applicationId, input.rejectionReason);
+    } else if (status === "CANCELLED") {
+      await notifyLoanApplicationCancelled(farmerUserId, applicationId);
+    }
+  }
 
   return updated;
 };

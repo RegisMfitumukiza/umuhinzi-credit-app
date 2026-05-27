@@ -1,6 +1,10 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import {
+  notifyLoanDisbursed,
+  notifyLoanCompleted,
+} from "../utils/notification.helper.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { DisburseLoanInput, UpdateLoanStatusInput } from "../validators/loan.schema.js";
@@ -126,7 +130,7 @@ export const disburseLoanService = async (
   );
 
   const updatedLoan = await prisma.$transaction(async (tx) => {
-    const result = await tx.loan.update({
+    await tx.loan.update({
       where: { id: loanId },
       data: {
         disbursedAmount,
@@ -135,7 +139,6 @@ export const disburseLoanService = async (
         endDate,
         status: "ACTIVE",
       },
-      select: loanWithFarmerSelect,
     });
 
     await tx.loanStatusHistory.create({
@@ -149,7 +152,11 @@ export const disburseLoanService = async (
 
     await tx.repaymentSchedule.createMany({ data: scheduleData });
 
-    return result;
+    // Re-fetch after schedules are created so they appear in the response
+    return tx.loan.findUnique({
+      where: { id: loanId },
+      select: loanWithFarmerSelect,
+    });
   });
 
   await writeAuditLog({
@@ -162,6 +169,15 @@ export const disburseLoanService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify farmer
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: loan.farmerId },
+    select: { userId: true },
+  });
+  if (farmer?.userId) {
+    await notifyLoanDisbursed(farmer.userId, loanId, disbursedAmount);
+  }
 
   return updatedLoan;
 };
@@ -227,6 +243,17 @@ export const updateLoanStatusService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify farmer when loan is completed
+  if (input.status === "COMPLETED") {
+    const loanRecord = await prisma.loan.findUnique({
+      where: { id: loanId },
+      select: { farmer: { select: { userId: true } } },
+    });
+    if (loanRecord?.farmer?.userId) {
+      await notifyLoanCompleted(loanRecord.farmer.userId, loanId);
+    }
+  }
 
   return updated;
 };

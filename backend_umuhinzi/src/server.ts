@@ -4,6 +4,7 @@ import app from "./app.js";
 
 import { prisma } from "./lib/prisma.js";
 import { logger } from "./utils/logger.js";
+import { startOverdueSchedulesJob } from "./jobs/overdue-schedules.job.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -42,6 +43,9 @@ async function startServer() {
       logger.info(
         `Server running on http://localhost:${PORT}`
       );
+
+      // Start background jobs
+      startOverdueSchedulesJob();
     });
   } catch (error) {
     logger.error("Failed to start server", { error });

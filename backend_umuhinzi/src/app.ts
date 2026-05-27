@@ -6,7 +6,7 @@ import apiV1 from "./routes/v1/versioning.js";
 
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
-import { apiLimiter } from "./middlewares/rateLimiting.js";
+import { apiLimiter, perUserLimiter } from "./middlewares/rateLimiting.js";
 import { setupSwagger } from "./config/swagger.js";
 import { requestLogger } from "./middlewares/requestLogger.middleware.js";
 
@@ -41,7 +41,7 @@ setupSwagger(app);
 
 /* ================= ROUTES ================= */
 
-app.use("/api/v1", apiLimiter, apiV1);
+app.use("/api/v1", apiLimiter, perUserLimiter, apiV1);
 
 /* ================= ERROR HANDLING ================= */
 
