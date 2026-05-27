@@ -74,7 +74,7 @@ export const seasonRouter = Router();
 seasonRouter.post(
   "/",
   authenticate,
-  requireAdmin,
+  authorizeRoles("FARMER", "ADMIN"),
   validate(createSeasonSchema),
   createSeason
 );

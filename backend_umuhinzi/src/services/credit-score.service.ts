@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import { notifyCreditScoreUpdated } from "../utils/notification.helper.js";
 
 import type { Prisma, CreditScoreFactorType, RiskLevel } from "../generated/prisma/client.js";
 
@@ -518,6 +519,15 @@ export const generateCreditScoreService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify the farmer about their updated credit score
+  const farmerUser = await prisma.farmer.findUnique({
+    where: { id: farmerId },
+    select: { userId: true },
+  });
+  if (farmerUser?.userId) {
+    await notifyCreditScoreUpdated(farmerUser.userId, totalScore, riskLevel);
+  }
 
   return creditScore;
 };

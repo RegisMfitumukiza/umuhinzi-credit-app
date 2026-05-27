@@ -130,8 +130,7 @@ export const updateCooperativeManagerSchema = z.object({
 export const addCooperativeMemberSchema = z.object({
     body: z.object({
         cooperativeId: uuidSchema("Invalid cooperative ID"),
-        farmerId: uuidSchema("Invalid farmer ID"),
-
+        farmerId: uuidSchema("Invalid farmer ID").optional(),
         status: cooperativeMemberStatusSchema.optional(),
         joinedAt: z.coerce.date().optional(),
     }),

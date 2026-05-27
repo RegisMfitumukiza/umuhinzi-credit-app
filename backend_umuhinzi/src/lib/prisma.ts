@@ -11,7 +11,7 @@ if (!connectionString) {
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false },
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   max: Number(process.env.DB_POOL_MAX) || 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

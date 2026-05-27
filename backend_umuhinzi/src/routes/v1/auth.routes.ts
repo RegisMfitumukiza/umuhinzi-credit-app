@@ -7,6 +7,8 @@ import {
   registerUser,
   resetPassword,
   verifyEmail,
+  refreshToken,
+  logoutUser,
 } from "../../controllers/auth.controller.js";
 
 import { authenticate } from "../../middlewares/auth.middleware.js";
@@ -222,5 +224,47 @@ router.post(
  *         description: Unauthorized
  */
 router.get("/me", authenticate, getAuthUser);
+
+/**
+ * @swagger
+ * /api/v1/auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     description: Issues a new access token using a valid refresh token. The refresh token is rotated on each use.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: New access token issued
+ *       401:
+ *         description: Invalid or expired refresh token
+ */
+router.post("/refresh", refreshToken);
+
+/**
+ * @swagger
+ * /api/v1/auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     description: Invalidates the user's refresh token.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/logout", authenticate, logoutUser);
 
 export default router;

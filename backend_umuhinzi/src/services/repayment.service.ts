@@ -1,6 +1,11 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import {
+  notifyRepaymentRecorded,
+  notifyLoanCompleted,
+} from "../utils/notification.helper.js";
+import { triggerCreditScoreRecalculation } from "../utils/auto-credit-score.helper.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { CreateRepaymentInput } from "../validators/loan.schema.js";
@@ -133,7 +138,6 @@ export const createRepaymentService = async (
         notes: input.notes,
         paidAt: input.paidAt ?? new Date(),
       },
-      select: safeRepaymentSelect,
     });
 
     if (input.repaymentScheduleId) {
@@ -179,8 +183,14 @@ export const createRepaymentService = async (
       });
     }
 
-    return created;
+    // Re-fetch with updated schedule so response is accurate
+    return tx.repayment.findUnique({
+      where: { id: created.id },
+      select: safeRepaymentSelect,
+    });
   });
+
+  if (!repayment) throw new APIError("Failed to create repayment", 500);
 
   await writeAuditLog({
     actorId: context.actorId ?? userId,
@@ -196,6 +206,21 @@ export const createRepaymentService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify farmer of repayment recorded
+  await notifyRepaymentRecorded(userId, input.loanId, input.amountPaid);
+
+  // Check if loan was just completed and notify
+  const updatedLoan = await prisma.loan.findUnique({
+    where: { id: input.loanId },
+    select: { status: true, farmer: { select: { userId: true } } },
+  });
+  if (updatedLoan?.status === "COMPLETED" && updatedLoan.farmer?.userId) {
+    await notifyLoanCompleted(updatedLoan.farmer.userId, input.loanId);
+  }
+
+  // Trigger credit score recalculation — repayment behavior affects score
+  await triggerCreditScoreRecalculation(loan.farmerId);
 
   return repayment;
 };

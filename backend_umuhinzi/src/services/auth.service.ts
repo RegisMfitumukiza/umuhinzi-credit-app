@@ -31,17 +31,26 @@ const getFrontendUrl = () =>
 
 const signAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
+  if (!secret) throw new APIError("JWT_SECRET is missing", 500);
+  const expiresIn = (process.env.JWT_EXPIRES_IN || "15m") as SignOptions["expiresIn"];
+  return jwt.sign({ id: userId }, secret, { expiresIn });
+};
 
-  if (!secret) {
-    throw new APIError("JWT_SECRET is missing", 500);
-  }
+const generateRefreshToken = (): string => crypto.randomBytes(64).toString("hex");
 
-  const expiresIn = (process.env.JWT_EXPIRES_IN ||
-    "7d") as SignOptions["expiresIn"];
+const REFRESH_TOKEN_TTL_DAYS = 30;
 
-  return jwt.sign({ id: userId }, secret, {
-    expiresIn,
+const saveRefreshToken = async (userId: string): Promise<string> => {
+  const token = generateRefreshToken();
+  const expiry = new Date();
+  expiry.setDate(expiry.getDate() + REFRESH_TOKEN_TTL_DAYS);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { refreshToken: token, refreshTokenExpiry: expiry },
   });
+
+  return token;
 };
 
 export const registerUserService = async (
@@ -79,10 +88,10 @@ export const registerUserService = async (
     password: hashedPassword,
     role: input.role ?? "FARMER",
     status: "ACTIVE",
-    isEmailVerified: false,
+    isEmailVerified: process.env.SKIP_EMAIL_VERIFICATION === "true",
     isPhoneVerified: false,
-    emailVerificationToken,
-    emailVerificationTokenExpiry,
+    emailVerificationToken: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationToken,
+    emailVerificationTokenExpiry: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationTokenExpiry,
   } satisfies Prisma.UserCreateInput;
 
   const user = await prisma.user.create({
@@ -90,13 +99,15 @@ export const registerUserService = async (
     select: safeUserSelect,
   });
 
-  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
-
-  await sendEmail({
-    to: user.email,
-    subject: "Verify your Umuhinzi Credit email",
-    html: emailVerificationTemplate(verifyUrl),
-  });
+  // Only send verification email if not skipping
+  if (process.env.SKIP_EMAIL_VERIFICATION !== "true") {
+    const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your Umuhinzi Credit email",
+      html: emailVerificationTemplate(verifyUrl),
+    });
+  }
 
   await writeAuditLog({
     actorId: user.id,
@@ -112,11 +123,13 @@ export const registerUserService = async (
     userAgent: context.userAgent,
   });
 
-  const token = signAccessToken(user.id);
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = await saveRefreshToken(user.id);
 
   return {
     user,
-    token,
+    accessToken,
+    refreshToken,
   };
 };
 
@@ -164,11 +177,13 @@ export const loginUserService = async (
     userAgent: context.userAgent,
   });
 
-  const token = signAccessToken(user.id);
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = await saveRefreshToken(user.id);
 
   return {
     user: updatedUser,
-    token,
+    accessToken,
+    refreshToken,
   };
 };
 
@@ -340,4 +355,64 @@ export const getAuthUserService = async (userId: string) => {
   }
 
   return user;
+};
+
+/* ─────────────────────────────────────────
+   REFRESH TOKEN
+───────────────────────────────────────── */
+
+export const refreshAccessTokenService = async (token: string) => {
+  const user = await prisma.user.findUnique({
+    where: { refreshToken: token },
+    select: {
+      id: true,
+      status: true,
+      refreshToken: true,
+      refreshTokenExpiry: true,
+    },
+  });
+
+  if (!user || !user.refreshToken || !user.refreshTokenExpiry) {
+    throw new APIError("Invalid refresh token", 401);
+  }
+
+  if (user.refreshTokenExpiry < new Date()) {
+    throw new APIError("Refresh token has expired. Please log in again.", 401);
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new APIError("Account is not active", 403);
+  }
+
+  const accessToken = signAccessToken(user.id);
+  // Rotate refresh token on each use
+  const newRefreshToken = await saveRefreshToken(user.id);
+
+  return { accessToken, refreshToken: newRefreshToken };
+};
+
+/* ─────────────────────────────────────────
+   LOGOUT
+───────────────────────────────────────── */
+
+export const logoutService = async (
+  userId: string,
+  context: RequestContext = {}
+) => {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { refreshToken: null, refreshTokenExpiry: null },
+  });
+
+  await writeAuditLog({
+    actorId: userId,
+    action: "LOGOUT",
+    resource: "AUTH",
+    resourceId: userId,
+    description: "User logged out",
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return { message: "Logged out successfully." };
 };

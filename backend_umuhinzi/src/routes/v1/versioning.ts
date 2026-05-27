@@ -23,6 +23,14 @@ import {
   repaymentRouter,
   repaymentScheduleRouter,
 } from "./loan.routes.js";
+import { institutionRouter } from "./institution.routes.js";
+import { cooperativeRouter, cooperativeMemberRouter } from "./cooperative.routes.js";
+import { recommendationRouter } from "./recommendation.routes.js";
+import { notificationRouter } from "./notification.routes.js";
+import { analyticsRouter } from "./analytics.routes.js";
+import { auditLogRouter } from "./audit-log.routes.js";
+import { uploadRouter } from "./upload.routes.js";
+import { exportRouter } from "./export.routes.js";
 
 const router = Router();
 
@@ -44,5 +52,14 @@ router.use("/loan-applications", loanApplicationRouter);
 router.use("/loans", loanRouter);
 router.use("/repayments", repaymentRouter);
 router.use("/repayment-schedules", repaymentScheduleRouter);
+router.use("/institutions", institutionRouter);
+router.use("/cooperatives", cooperativeRouter);
+router.use("/cooperative-members", cooperativeMemberRouter);
+router.use("/recommendations", recommendationRouter);
+router.use("/notifications", notificationRouter);
+router.use("/analytics", analyticsRouter);
+router.use("/audit-logs", auditLogRouter);
+router.use("/uploads", uploadRouter);
+router.use("/exports", exportRouter);
 
 export default router;
