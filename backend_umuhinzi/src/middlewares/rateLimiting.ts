@@ -37,7 +37,6 @@ export const perUserLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    // Use authenticated user ID if available, fall back to IPv6-safe IP
     const userId = (req.user as { id?: string } | undefined)?.id;
     return userId ?? safeIpKey(req);
   },
@@ -46,7 +45,6 @@ export const perUserLimiter = rateLimit({
     message: "You are sending too many requests. Please slow down.",
   },
   skip: (req: Request): boolean => {
-    // Only apply to authenticated requests
     return !(req.user as { id?: string } | undefined)?.id;
   },
 });

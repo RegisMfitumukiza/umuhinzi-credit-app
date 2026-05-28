@@ -129,12 +129,7 @@ router.post("/login", authLimiter, validate(loginUserSchema), loginUser);
  *       429:
  *         description: Too many authentication attempts
  */
-router.post(
-  "/forgot-password",
-  authLimiter,
-  validate(forgotPasswordSchema),
-  forgotPassword
-);
+router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), forgotPassword);
 
 /**
  * @swagger
@@ -168,12 +163,7 @@ router.post(
  *       429:
  *         description: Too many authentication attempts
  */
-router.post(
-  "/reset-password",
-  authLimiter,
-  validate(resetPasswordSchema),
-  resetPassword
-);
+router.post("/reset-password", authLimiter, validate(resetPasswordSchema), resetPassword);
 
 /**
  * @swagger
@@ -201,12 +191,7 @@ router.post(
  *       429:
  *         description: Too many authentication attempts
  */
-router.post(
-  "/verify-email",
-  authLimiter,
-  validate(verifyEmailSchema),
-  verifyEmail
-);
+router.post("/verify-email", authLimiter, validate(verifyEmailSchema), verifyEmail);
 
 /**
  * @swagger
