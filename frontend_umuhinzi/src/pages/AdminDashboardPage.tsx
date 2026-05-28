@@ -1,45 +1,51 @@
-import { useEffect, useMemo, useState } from "react";
-import { applications } from "./CooperativeApplicationsPage";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
 
-const seedUsers = () => {
-  const existing = localStorage.getItem("umuhinzi_users");
-  if (existing) return JSON.parse(existing);
-  const sample = [
-    { id: "u1", fullName: "Alice Mutoni", email: "alice@example.com", role: "FARMER", enabled: true },
-    { id: "u2", fullName: "Jean Gakweya", email: "jean@example.com", role: "FARMER", enabled: true },
-    { id: "u3", fullName: "Grace Uwimana", email: "grace@coop.example", role: "COOPERATIVE_MANAGER", enabled: true },
-    { id: "u4", fullName: "Finance Ops", email: "finance@bank.example", role: "FINANCE", enabled: true },
-    { id: "u5", fullName: "Gov Inspector", email: "gov@example", role: "GOVERNMENT", enabled: false },
-  ];
-  localStorage.setItem("umuhinzi_users", JSON.stringify(sample));
-  return sample;
+type UserStats = {
+  totalUsers: number;
+  byRole: { farmers: number; cooperativeManagers: number; institutions: number; admins: number; governmentPartners: number };
+  byStatus: { active: number; pending: number; suspended: number; deactivated: number };
 };
+type AuditLog = { id: string; action: string; resource: string; description: string; createdAt: string };
 
 export const AdminDashboardPage = () => {
-  const [adminName, setAdminName] = useState("Admin");
-  const [users, setUsers] = useState<any[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("umuhinzi_user");
-      if (raw) {
-        const u = JSON.parse(raw);
-        setAdminName(u.fullName || u.email || "Admin");
+    const load = async () => {
+      try {
+        const [statsRes, logsRes] = await Promise.allSettled([
+          api.get("/v1/users/stats"),
+          api.get("/v1/audit-logs?limit=5"),
+        ]);
+        if (statsRes.status === "fulfilled") setStats(statsRes.value.data.data);
+        if (logsRes.status === "fulfilled") setLogs(logsRes.value.data.data ?? []);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {}
-    const seeded = seedUsers();
-    setUsers(seeded);
+    };
+    load();
   }, []);
 
-  const counts = useMemo(() => {
-    const map: Record<string, number> = { FARMER: 0, COOPERATIVE_MANAGER: 0, FINANCE: 0, GOVERNMENT: 0 };
-    users.forEach((u) => {
-      if (map[u.role] !== undefined) map[u.role]++;
-    });
-    return map;
-  }, [users]);
+  const statCards = [
+    { label: "Total Farmers", value: stats?.byRole.farmers ?? "—" },
+    { label: "Cooperative Managers", value: stats?.byRole.cooperativeManagers ?? "—" },
+    { label: "Finance Institutions", value: stats?.byRole.institutions ?? "—" },
+    { label: "Government Accounts", value: stats?.byRole.governmentPartners ?? "—" },
+  ];
 
-  const totalLoans = applications.reduce((sum, a) => sum + Number(a.amount.replace(/,/g, "")), 0);
+  const statusCards = [
+    { label: "Active Users", value: stats?.byStatus.active ?? "—", color: "text-emerald-600" },
+    { label: "Pending Verification", value: stats?.byStatus.pending ?? "—", color: "text-amber-600" },
+    { label: "Suspended", value: stats?.byStatus.suspended ?? "—", color: "text-rose-600" },
+    { label: "Total Users", value: stats?.totalUsers ?? "—", color: "text-stone-900" },
+  ];
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -47,61 +53,81 @@ export const AdminDashboardPage = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Admin Overview</h1>
-            <p className="mt-1 text-sm text-stone-500">Welcome back, {adminName}</p>
+            <p className="mt-1 text-sm text-stone-500">Welcome back, {user?.fullName ?? "Admin"}</p>
           </div>
+          <button onClick={() => navigate("/admin/users")} className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white">Manage Users</button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Total Farmers</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.FARMER}</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Cooperative Managers</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.COOPERATIVE_MANAGER}</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Finance Institutions</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.FINANCE}</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Government Accounts</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.GOVERNMENT}</div>
-          </div>
+        {/* Role stats */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {statCards.map((s) => (
+            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">{s.label}</div>
+              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : s.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Status stats */}
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {statusCards.map((s) => (
+            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">{s.label}</div>
+              <div className={`mt-2 text-2xl font-semibold ${s.color}`}>{loading ? "—" : s.value}</div>
+            </div>
+          ))}
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
+          {/* User distribution chart */}
           <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-stone-900">User Distribution</h3>
-              <div className="text-sm text-stone-500">Live</div>
+              <h3 className="text-lg font-semibold text-stone-900">User Distribution by Role</h3>
             </div>
-            <div className="h-56">
-              <svg viewBox="0 0 400 160" className="w-full h-full" aria-hidden>
-                {/* simple bar chart */}
-                {Object.entries(counts).map(([k, v], i) => (
-                  <g key={k} transform={`translate(${30 + i * 90},0)`}> 
-                    <rect x={0} y={120 - v * 8} width={40} height={v * 8} fill="#10b981" rx={6} />
-                    <text x={20} y={138} textAnchor="middle" className="fill-stone-600 text-xs">{k.replace(/_/g, ' ')}</text>
-                    <text x={20} y={112 - v * 8} textAnchor="middle" className="fill-stone-700 text-sm font-semibold">{v}</text>
-                  </g>
-                ))}
-              </svg>
-            </div>
+            {loading ? <p className="text-sm text-stone-400">Loading...</p> : stats && (
+              <div className="h-48">
+                <svg viewBox="0 0 500 160" className="w-full h-full" aria-hidden>
+                  {[
+                    { label: "Farmers", value: stats.byRole.farmers, color: "#10b981" },
+                    { label: "Coop Mgrs", value: stats.byRole.cooperativeManagers, color: "#3b82f6" },
+                    { label: "Institutions", value: stats.byRole.institutions, color: "#f59e0b" },
+                    { label: "Gov", value: stats.byRole.governmentPartners, color: "#8b5cf6" },
+                  ].map((item, i) => {
+                    const maxVal = Math.max(stats.byRole.farmers, 1);
+                    const barH = Math.max((item.value / maxVal) * 100, 4);
+                    return (
+                      <g key={item.label} transform={`translate(${40 + i * 110}, 0)`}>
+                        <rect x={0} y={120 - barH} width={60} height={barH} fill={item.color} rx={6} />
+                        <text x={30} y={138} textAnchor="middle" fontSize="11" fill="#78716c">{item.label}</text>
+                        <text x={30} y={112 - barH} textAnchor="middle" fontSize="12" fill="#1c1917" fontWeight="600">{item.value}</text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            )}
           </div>
 
+          {/* Recent audit logs */}
           <aside className="space-y-4">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Total Loan Volume (from sample apps)</div>
-              <div className="mt-2 text-2xl font-semibold text-stone-900">RWF {totalLoans.toLocaleString()}</div>
-            </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Recent Activity</div>
-              <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <div>New cooperative registered: Abahinzi Farmers Group</div>
-                <div>Loan application submitted: APP-4096</div>
-                <div>Platform backup completed</div>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-semibold text-stone-900">Recent Activity</div>
+                <button onClick={() => navigate("/admin/users")} className="text-xs text-emerald-600 hover:underline">View all →</button>
               </div>
+              {loading ? <p className="text-sm text-stone-400">Loading...</p> : logs.length === 0 ? (
+                <p className="text-sm text-stone-400">No recent activity.</p>
+              ) : (
+                <div className="space-y-3">
+                  {logs.map((log) => (
+                    <div key={log.id} className="text-sm">
+                      <span className="font-medium text-stone-700">{log.action}</span>
+                      <span className="text-stone-500"> — {log.description}</span>
+                      <div className="text-xs text-stone-400">{new Date(log.createdAt).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </aside>
         </div>

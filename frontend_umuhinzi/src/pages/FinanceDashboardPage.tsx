@@ -1,54 +1,60 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { applications as defaultApplications } from "./CooperativeApplicationsPage";
-import { loadApplications, saveApplications, updateApplicationStatus, disburseApplication, exportApplicationsCSV, Application } from "../utils/localStorage";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
 
-const metricsFromApps = (apps: Application[]) => {
-  const total = apps.length;
-  const approved = apps.filter((a) => a.status === "Approved").length;
-  const disbursed = apps.filter((a) => a.status === "Disbursed").length;
-  const value = apps.reduce((s, a) => s + Number(a.amount.replace(/,/g, "")), 0);
-  return {
-    total,
-    approved,
-    disbursed,
-    value: `RWF ${Number(value).toLocaleString()}`,
-  };
-};
+type PortfolioStats = { totalPortfolio: number; totalFarmers: number; nplRatio: number; recoveryRate: number };
+type LoanApp = { id: string; amount: number; purpose: string; status: string; createdAt: string; farmer?: { fullName: string; district?: string } };
 
 export const FinanceDashboardPage = () => {
-  const [apps, setApps] = useState<Application[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<PortfolioStats | null>(null);
+  const [apps, setApps] = useState<LoanApp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    const loaded = loadApplications(defaultApplications as Application[]);
-    setApps(loaded);
+    const load = async () => {
+      try {
+        const [statsRes, appsRes] = await Promise.allSettled([
+          api.get("/v1/analytics/portfolio-stats"),
+          api.get("/v1/loan-applications?limit=5&status=PENDING"),
+        ]);
+        if (statsRes.status === "fulfilled") setStats(statsRes.value.data.data);
+        if (appsRes.status === "fulfilled") setApps(appsRes.value.data.data ?? []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  useEffect(() => {
-    saveApplications(apps);
-  }, [apps]);
+  const handleAction = async (id: string, status: "APPROVED" | "REJECTED") => {
+    setActionLoading(id + status);
+    try {
+      await api.patch(`/v1/loan-applications/${id}/status`, { status });
+      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+    } catch {}
+    finally { setActionLoading(null); }
+  };
 
-  const metrics = useMemo(() => metricsFromApps(apps), [apps]);
+  const handleExport = async () => {
+    try {
+      const res = await api.get("/v1/exports/loan-applications", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = "applications.csv"; a.click();
+      URL.revokeObjectURL(url);
+    } catch {}
+  };
 
-  function handleUpdateStatus(id: string, status: string) {
-    const updated = updateApplicationStatus(id, status);
-    if (updated) setApps((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
-  }
-
-  function handleDisburse(id: string) {
-    disburseApplication(id);
-    setApps((prev) => prev.map((p) => (p.id === id ? { ...p, status: "Disbursed" } : p)));
-  }
-
-  function handleExportCSV() {
-    const csv = exportApplicationsCSV(apps);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "applications.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const metricCards = [
+    { label: "Active Portfolio", value: stats ? `RWF ${(stats.totalPortfolio / 1_000_000).toFixed(1)}M` : "—" },
+    { label: "Active Farmers", value: stats?.totalFarmers?.toLocaleString() ?? "—" },
+    { label: "NPL Ratio", value: stats ? `${stats.nplRatio?.toFixed(1)}%` : "—" },
+    { label: "Loan Recovery", value: stats ? `${stats.recoveryRate?.toFixed(1)}%` : "—" },
+  ];
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -56,109 +62,49 @@ export const FinanceDashboardPage = () => {
         <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Financial Dashboard</h1>
-            <p className="mt-1 text-sm text-stone-500">Welcome back. Here is the overview of the loan portfolio for Q3 2024.</p>
+            <p className="mt-1 text-sm text-stone-500">Welcome back, {user?.fullName ?? "—"}. Loan portfolio overview.</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleExportCSV} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
-            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">New Review Process</button>
+            <button onClick={handleExport} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
+            <button onClick={() => navigate("/finance/applications")} className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">View All Applications</button>
           </div>
         </div>
 
+        {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Active Portfolio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.value}</div>
-            <div className="mt-1 text-xs text-stone-400">Portfolio value</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Active Farmers</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.total}</div>
-            <div className="mt-1 text-xs text-stone-400">Active applications</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">NPL Ratio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">3.1%</div>
-            <div className="mt-1 text-xs text-stone-400">Non-performing loans</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Loan Recovery</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">96.4%</div>
-            <div className="mt-1 text-xs text-stone-400">Recovery rate</div>
-          </div>
+          {metricCards.map((m) => (
+            <div key={m.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">{m.label}</div>
+              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : m.value}</div>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-[1.6fr_0.9fr]">
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Financial Performance</h2>
-              <div className="text-sm text-stone-500">Monthly</div>
-            </div>
-            <div className="h-60 w-full bg-gradient-to-b from-emerald-50 to-white rounded-lg" />
+        {/* Recent applications */}
+        <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-stone-900">Pending Applications</h3>
+            <button onClick={() => navigate("/finance/applications")} className="text-sm text-emerald-600 hover:underline">View all →</button>
           </div>
-
-          <aside className="space-y-4">
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Portfolio by Sector</div>
-              <div className="mt-3 flex items-center gap-4">
-                <div className="h-28 w-28 rounded-full bg-emerald-50" />
-                <div className="flex-1">
-                  <div className="text-sm">Coffee</div>
-                  <div className="text-sm">Maize</div>
-                  <div className="text-sm">Tea</div>
-                  <div className="text-sm">Livestock</div>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Regional Risk Index</div>
-              <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <div className="flex items-center justify-between"><span>Northern Province</span><span>LOW</span></div>
-                <div className="flex items-center justify-between"><span>Southern Province</span><span>MEDIUM</span></div>
-                <div className="flex items-center justify-between"><span>Western Province</span><span>HIGH</span></div>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.45fr]">
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-stone-900">Recent Applications</h3>
-              <a className="text-sm text-emerald-600">View All</a>
-            </div>
-
+          {loading ? <p className="text-sm text-stone-400">Loading...</p> : apps.length === 0 ? (
+            <p className="text-sm text-stone-400">No pending applications.</p>
+          ) : (
             <div className="space-y-3">
-              {apps.slice(0, 5).map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-4 border-b border-stone-100 py-3">
+              {apps.map((a) => (
+                <div key={a.id} className="flex items-center justify-between gap-4 rounded-xl border border-stone-100 p-4">
                   <div>
-                    <div className="font-semibold text-stone-900">{a.farmer}</div>
-                    <div className="text-xs text-stone-500">{a.amount} • {a.crop} • {a.location}</div>
+                    <div className="font-semibold text-stone-900">{a.farmer?.fullName ?? "—"}</div>
+                    <div className="text-xs text-stone-500">RWF {a.amount?.toLocaleString()} • {a.purpose} • {a.farmer?.district ?? ""}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="text-sm text-stone-500">{a.status}</div>
-                    {a.status !== "Approved" && a.status !== "Disbursed" && (
-                      <>
-                        <button onClick={() => handleUpdateStatus(a.id, "Approved")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-emerald-700">Approve</button>
-                        <button onClick={() => handleUpdateStatus(a.id, "Rejected")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-rose-700">Reject</button>
-                      </>
-                    )}
-                    {a.status === "Approved" && (
-                      <button onClick={() => handleDisburse(a.id)} className="rounded-full bg-emerald-600 px-3 py-1 text-sm text-white">Disburse</button>
-                    )}
+                    <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{a.status}</span>
+                    <button onClick={() => handleAction(a.id, "APPROVED")} disabled={actionLoading === a.id + "APPROVED"} className="rounded-full border border-emerald-200 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve</button>
+                    <button onClick={() => handleAction(a.id, "REJECTED")} disabled={actionLoading === a.id + "REJECTED"} className="rounded-full border border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">Reject</button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="text-sm text-stone-500">Notifications</div>
-            <div className="mt-3 space-y-2 text-sm text-stone-600">
-              <div>5 high-priority requests awaiting your review</div>
-              <div>2 loans ready for disbursement</div>
-              <div>3 institutions requested updated reports</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
