@@ -78,11 +78,9 @@ export const registerUserSchema = z.object({
 /* ================= LOGIN ================= */
 
 export const loginUserSchema = z.object({
-  body: z.object({
-    email: z.email("Invalid email").trim().toLowerCase(),
+  email: z.email("Invalid email").trim().toLowerCase(),
 
-    password: z.string().min(1, "Password is required"),
-  }),
+  password: z.string().min(1, "Password is required"),
 });
 
 /* ================= PROFILE UPDATE ================= */

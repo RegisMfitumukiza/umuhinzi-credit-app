@@ -41,6 +41,7 @@ import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
 import AccountNotifications from "./pages/AccountNotifications";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const App = () => {
   return (
