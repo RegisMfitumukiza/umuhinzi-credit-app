@@ -4,7 +4,7 @@ import { api } from "../api/http";
 
 const termOptions = ["3", "6", "12", "18"];
 
-type LoanApplication = { id: string; amount: number; purpose: string; status: string; createdAt: string };
+type LoanApplication = { id: string; requestedAmount: number; purpose: string; status: string; createdAt: string };
 type CreditScore = { score: number; tier: string; maxLoanAmount: number };
 
 export const LoansPage = () => {
@@ -23,8 +23,8 @@ export const LoansPage = () => {
     const load = async () => {
       try {
         const [appsRes, scoreRes] = await Promise.allSettled([
-          api.get("/v1/loan-applications/me"),
-          api.get("/v1/credit-scores/me"),
+          api.get("/v1/loan-applications"),
+          api.get("/v1/credit-scores/latest"),
         ]);
         if (appsRes.status === "fulfilled") setApplications(appsRes.value.data.data ?? []);
         if (scoreRes.status === "fulfilled") setCreditScore(scoreRes.value.data.data ?? null);
@@ -43,16 +43,14 @@ export const LoansPage = () => {
     setSubmitting(true);
     try {
       await api.post("/v1/loan-applications", {
-        amount: Number(amount),
+        requestedAmount: Number(amount),
         purpose,
-        repaymentPeriodMonths: Number(term),
       });
       setSuccess("Loan application submitted successfully!");
       setAmount("");
       setPurpose("");
       setTerm("6");
-      // refresh applications list
-      const res = await api.get("/v1/loan-applications/me");
+      const res = await api.get("/v1/loan-applications");
       setApplications(res.data.data ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Failed to submit application.");
@@ -98,12 +96,12 @@ export const LoansPage = () => {
 
             <label className="block">
               <span className="text-sm font-medium text-stone-700">Loan Purpose</span>
-              <input
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
-                placeholder="e.g. irrigation expansion, fertilizer, livestock feed"
-              />
+              <select value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500">
+                <option value="">Select purpose...</option>
+                {["SEEDS","FERTILIZER","EQUIPMENT","IRRIGATION","LIVESTOCK","LAND_RENT","LABOR","TRANSPORT","STORAGE","OTHER"].map((p) => (
+                  <option key={p} value={p}>{p.replace("_", " ")}</option>
+                ))}
+              </select>
             </label>
 
             <div>
@@ -136,7 +134,7 @@ export const LoansPage = () => {
                   <div key={app.id} onClick={() => navigate(`/loans/${app.id}`)}
                     className="flex items-center justify-between rounded-2xl border border-stone-200 p-4 cursor-pointer hover:bg-stone-50 transition">
                     <div>
-                      <p className="font-semibold text-stone-900">RWF {app.amount?.toLocaleString()}</p>
+                      <p className="font-semibold text-stone-900">RWF {app.requestedAmount?.toLocaleString()}</p>
                       <p className="text-sm text-stone-500">{app.purpose}</p>
                     </div>
                     <div className="text-right">
