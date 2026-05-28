@@ -39,8 +39,7 @@ export const Sidebar = () => {
             <NavLink to="/farms" className={secondaryNavClass}>Farm List</NavLink>
             <NavLink to="/products" className={secondaryNavClass}>Products</NavLink>
             <NavLink to="/recommendations" className={secondaryNavClass}>Recommendations</NavLink> */}
-            <NavLink to="/notifications" className={secondaryNavClass}>Notifications</NavLink>
-            <NavLink to="/profile" className={secondaryNavClass}>Profile</NavLink>
+            <NavLink to="/account" className={secondaryNavClass}>Notifications & Profile</NavLink>
             <NavLink to="/settings" className={secondaryNavClass}>Settings</NavLink>
           </div>
         </div>

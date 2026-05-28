@@ -41,6 +41,9 @@ export const CooperativeSidebar = () => {
         <NavLink to="/cooperatives/reports" className={navClass}>
           Reports
         </NavLink>
+        <NavLink to="/account" className={navClass}>
+          Account & Notifications
+        </NavLink>
 
         {/* <div className="mt-6 border-t border-stone-200 pt-4">
           <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-stone-400">Pages</p>

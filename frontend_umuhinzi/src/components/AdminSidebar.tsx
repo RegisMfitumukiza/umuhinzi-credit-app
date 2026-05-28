@@ -26,8 +26,8 @@ export const AdminSidebar = () => {
         <NavLink to="/admin/users" className={navClass}>
           User Management
         </NavLink>
-        <NavLink to="/admin/profile" className={navClass}>
-          Profile
+        <NavLink to="/account" className={navClass}>
+          Account & Notifications
         </NavLink>
       </nav>
     </aside>
