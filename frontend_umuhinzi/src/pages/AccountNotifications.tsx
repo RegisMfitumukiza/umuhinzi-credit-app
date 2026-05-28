@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
@@ -452,7 +452,16 @@ export default function AccountNotifications() {
           </div>
           
           <div className="flex items-center gap-5">
-            <button onClick={() => navigate("/account")} className="relative text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-50">
+            <button onClick={() => {
+  const feed = document.getElementById("activity-feed");
+  if (feed) {
+    feed.scrollIntoView({ behavior: "smooth", block: "start" });
+    feed.classList.add("ring-2", "ring-green-400");
+    setTimeout(() => feed.classList.remove("ring-2", "ring-green-400"), 1500);
+  } else {
+    navigate("/account");
+  }
+}} className="relative text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-50">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
@@ -462,7 +471,7 @@ export default function AccountNotifications() {
             </button>
             <div className="flex items-center gap-3 border-l border-gray-200 pl-5">
               <div className="text-right">
-                <p className="text-sm font-bold text-gray-800 tracking-tight">{profile.fullName || "—"}</p>
+                <p className="text-sm font-bold text-gray-800 tracking-tight">{profile.fullName || "â€”"}</p>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{profile.role ?? "User"}</p>
               </div>
               {profile.profileImageUrl ? (
@@ -518,7 +527,7 @@ export default function AccountNotifications() {
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 shrink-0 flex flex-col gap-6">
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
+              <div id="activity-feed" className="bg-white rounded-2xl border border-gray-200 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-extrabold text-gray-800 tracking-tight text-base">Activity Feed</h2>
                   <button onClick={handleMarkAllRead} className="text-xs text-green-600 font-bold hover:text-green-700 hover:underline">
@@ -760,10 +769,11 @@ export default function AccountNotifications() {
         </div>
         
         <div className="px-8 py-5 border-t border-gray-200 bg-white">
-          <p className="text-[11px] text-gray-400 font-semibold text-center">© 2026 Umuhinzi Credit. All Rights Reserved. Built for Financial Inclusion in Rwanda.</p>
+          <p className="text-[11px] text-gray-400 font-semibold text-center">Â© 2026 Umuhinzi Credit. All Rights Reserved. Built for Financial Inclusion in Rwanda.</p>
         </div>
       </main>
     </div>
   );
 }
+
 

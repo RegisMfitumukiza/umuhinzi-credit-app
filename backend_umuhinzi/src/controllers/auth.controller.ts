@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+﻿import type { Request, Response } from "express";
 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { APIError } from "../utils/ApiError.js";
@@ -30,7 +30,11 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     role: result.user.role,
   });
 
-  res.status(201).json({
+  if (result.user.role === "FARMER") {
+    const { createFarmerProfileService } = await import("../services/farmer.service.js");
+    await createFarmerProfileService(result.user.id, {}, getRequestContext(req));
+  }
+    res.status(201).json({
     success: true,
     message:
       "User registered successfully. Please check your email for verification.",
