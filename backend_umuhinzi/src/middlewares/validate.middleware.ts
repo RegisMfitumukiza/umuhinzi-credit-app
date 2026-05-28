@@ -6,7 +6,7 @@ export const validate =
   (schema: z.ZodType) =>
   (req: Request, res: Response, next: NextFunction): void => {
     // First try to validate the request body directly (flat schema).
-    let result = schema.safeParse(req.body);
+    let result = schema.safeParse(req.body ?? {});
     // If that fails, fall back to the historic wrapper that validates body, params and query.
     if (!result.success) {
       result = schema.safeParse({
@@ -14,6 +14,16 @@ export const validate =
         params: req.params,
         query: req.query,
       });
+    }
+
+    // Flatten the validated payload so downstream handlers receive a plain object.
+    if (result.success) {
+      // If the schema wrapped data under a "body" key, extract it.
+      // Otherwise keep the parsed data as‑is.
+      // @ts-ignore – we augment the request object.
+      req.body = result.data && typeof result.data === "object" && "body" in result.data
+        ? result.data.body
+        : result.data;
     }
 
     if (!result.success) {
