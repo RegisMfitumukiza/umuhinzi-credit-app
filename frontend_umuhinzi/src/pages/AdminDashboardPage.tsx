@@ -1,23 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { applications } from "./CooperativeApplicationsPage";
-
-const seedUsers = () => {
-  const existing = localStorage.getItem("umuhinzi_users");
-  if (existing) return JSON.parse(existing);
-  const sample = [
-    { id: "u1", fullName: "Alice Mutoni", email: "alice@example.com", role: "FARMER", enabled: true },
-    { id: "u2", fullName: "Jean Gakweya", email: "jean@example.com", role: "FARMER", enabled: true },
-    { id: "u3", fullName: "Grace Uwimana", email: "grace@coop.example", role: "COOPERATIVE_MANAGER", enabled: true },
-    { id: "u4", fullName: "Finance Ops", email: "finance@bank.example", role: "FINANCE", enabled: true },
-    { id: "u5", fullName: "Gov Inspector", email: "gov@example", role: "GOVERNMENT", enabled: false },
-  ];
-  localStorage.setItem("umuhinzi_users", JSON.stringify(sample));
-  return sample;
-};
+import { getUsers, type AdminUser } from "../api/users";
+import { useToast } from "../context/ToastContext";
 
 export const AdminDashboardPage = () => {
   const [adminName, setAdminName] = useState("Admin");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const { showToast } = useToast();
 
   useEffect(() => {
     try {
@@ -26,9 +15,16 @@ export const AdminDashboardPage = () => {
         const u = JSON.parse(raw);
         setAdminName(u.fullName || u.email || "Admin");
       }
-    } catch (e) {}
-    const seeded = seedUsers();
-    setUsers(seeded);
+    } catch {}
+
+    void (async () => {
+      try {
+        const list = await getUsers();
+        setUsers(list);
+      } catch {
+        showToast("Unable to fetch user stats", "error");
+      }
+    })();
   }, []);
 
   const counts = useMemo(() => {

@@ -1,5 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { registerRequest } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { homeRouteByRole } from "../utils/auth";
+import type { BackendRole } from "../types/auth";
 
 export const RegisterFarmPage = () => {
   const navigate = useNavigate();
@@ -7,13 +12,49 @@ export const RegisterFarmPage = () => {
   const [landSize, setLandSize] = useState("");
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
+  const { showToast } = useToast();
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const reg = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
     const next = { ...reg, farm: { name: farmName, landSize, province, district } };
-    // save the combined registration and go to OTP verification step
     localStorage.setItem("umuhinzi_registration", JSON.stringify(next));
-    navigate("/register/verify");
+
+    const fullName = String(next.fullName || "").trim();
+    const email = String(next.email || "").trim();
+    const password = String(next.password || "").trim();
+    const phone = String(next.phone || "").trim();
+
+    if (!fullName || !email || !password) {
+      showToast("Complete your personal information first.", "error");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const session = await registerRequest({
+        fullName,
+        email,
+        phone: phone || undefined,
+        password,
+        role: (next.role || "FARMER") as BackendRole,
+      });
+
+      login(session);
+      if (session.refreshToken) {
+        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
+      }
+
+      localStorage.removeItem("umuhinzi_registration");
+      showToast("Registration successful", "success");
+      navigate(homeRouteByRole(session.user.role), { replace: true });
+    } catch {
+      showToast("Registration failed. Please check your details.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,7 +104,9 @@ export const RegisterFarmPage = () => {
           </div>
 
           <div className="flex justify-center pt-2">
-            <button onClick={handleFinish} className="rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white">Register</button>
+            <button onClick={() => void handleFinish()} disabled={isSubmitting} className="rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-70">
+              {isSubmitting ? "Creating account..." : "Register"}
+            </button>
           </div>
         </div>
       </div>

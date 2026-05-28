@@ -1,26 +1,40 @@
 import { useEffect, useState } from "react";
-
-const loadUsers = () => {
-  try {
-    const raw = localStorage.getItem("umuhinzi_users");
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return [];
-};
+import { getUsers, updateUserStatus, type AdminUser } from "../api/users";
+import { useToast } from "../context/ToastContext";
 
 export const AdminUsersPage = () => {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    const u = loadUsers();
-    setUsers(u);
+    void (async () => {
+      try {
+        const u = await getUsers();
+        setUsers(u);
+      } catch {
+        showToast("Unable to fetch users", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
-  const toggleEnable = (id: string) => {
-    const updated = users.map((u) => (u.id === id ? { ...u, enabled: !u.enabled } : u));
-    setUsers(updated);
-    localStorage.setItem("umuhinzi_users", JSON.stringify(updated));
+  const toggleEnable = async (id: string, enabled: boolean) => {
+    const nextStatus = enabled ? "SUSPENDED" : "ACTIVE";
+
+    try {
+      const updatedUser = await updateUserStatus(id, nextStatus);
+      setUsers((prev) => prev.map((u) => (u.id === id ? updatedUser : u)));
+      showToast("User status updated", "success");
+    } catch {
+      showToast("Unable to update user status", "error");
+    }
   };
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-stone-500">Loading users...</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -49,7 +63,7 @@ export const AdminUsersPage = () => {
                   <td className="px-3 py-3 text-stone-600">{u.email}</td>
                   <td className="px-3 py-3 text-stone-600">{u.role}</td>
                   <td className="px-3 py-3 text-right">
-                    <button onClick={() => toggleEnable(u.id)} className={`rounded-full px-3 py-2 text-sm ${u.enabled ? 'bg-emerald-500 text-white' : 'border border-stone-200 text-stone-700'}`}>
+                    <button onClick={() => void toggleEnable(u.id, u.enabled)} className={`rounded-full px-3 py-2 text-sm ${u.enabled ? 'bg-emerald-500 text-white' : 'border border-stone-200 text-stone-700'}`}>
                       {u.enabled ? 'Enabled' : 'Disabled'}
                     </button>
                   </td>

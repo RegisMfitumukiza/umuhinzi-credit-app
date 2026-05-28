@@ -1,11 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { applications as defaultApplications } from "./CooperativeApplicationsPage";
-import { loadApplications, saveApplications, updateApplicationStatus, disburseApplication, exportApplicationsCSV, Application } from "../utils/localStorage";
+import {
+  getLoanApplications,
+  type LoanApplicationUi,
+  updateLoanApplicationStatus,
+} from "../api/loanApplications";
+import { useToast } from "../context/ToastContext";
 
-const metricsFromApps = (apps: Application[]) => {
+const exportApplicationsCSV = (apps: LoanApplicationUi[]) => {
+  const header = ["id", "farmer", "location", "crop", "amount", "score", "date", "status"];
+  const rows = apps.map((a) => [a.id, a.farmer, a.location, a.crop, a.amount, a.scoreValue, a.date, a.status]);
+  return [header, ...rows]
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+};
+
+const metricsFromApps = (apps: LoanApplicationUi[]) => {
   const total = apps.length;
   const approved = apps.filter((a) => a.status === "Approved").length;
-  const disbursed = apps.filter((a) => a.status === "Disbursed").length;
+  const disbursed = 0;
   const value = apps.reduce((s, a) => s + Number(a.amount.replace(/,/g, "")), 0);
   return {
     total,
@@ -16,27 +28,33 @@ const metricsFromApps = (apps: Application[]) => {
 };
 
 export const FinanceDashboardPage = () => {
-  const [apps, setApps] = useState<Application[]>([]);
+  const [apps, setApps] = useState<LoanApplicationUi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    const loaded = loadApplications(defaultApplications as Application[]);
-    setApps(loaded);
+    void (async () => {
+      try {
+        const loaded = await getLoanApplications();
+        setApps(loaded);
+      } catch {
+        showToast("Unable to load applications", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
-
-  useEffect(() => {
-    saveApplications(apps);
-  }, [apps]);
 
   const metrics = useMemo(() => metricsFromApps(apps), [apps]);
 
-  function handleUpdateStatus(id: string, status: string) {
-    const updated = updateApplicationStatus(id, status);
-    if (updated) setApps((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
-  }
-
-  function handleDisburse(id: string) {
-    disburseApplication(id);
-    setApps((prev) => prev.map((p) => (p.id === id ? { ...p, status: "Disbursed" } : p)));
+  async function handleUpdateStatus(id: string, status: "APPROVED" | "REJECTED") {
+    try {
+      const updated = await updateLoanApplicationStatus(id, status);
+      setApps((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      showToast(`Application ${status.toLowerCase()} successfully`, "success");
+    } catch {
+      showToast("Unable to update application status", "error");
+    }
   }
 
   function handleExportCSV() {
@@ -48,6 +66,10 @@ export const FinanceDashboardPage = () => {
     a.download = "applications.csv";
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-stone-500">Loading finance dashboard...</div>;
   }
 
   return (
@@ -136,14 +158,11 @@ export const FinanceDashboardPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-stone-500">{a.status}</div>
-                    {a.status !== "Approved" && a.status !== "Disbursed" && (
+                    {a.status !== "Approved" && a.status !== "Rejected" && a.status !== "Cancelled" && (
                       <>
-                        <button onClick={() => handleUpdateStatus(a.id, "Approved")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-emerald-700">Approve</button>
-                        <button onClick={() => handleUpdateStatus(a.id, "Rejected")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-rose-700">Reject</button>
+                        <button onClick={() => void handleUpdateStatus(a.id, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-emerald-700">Approve</button>
+                        <button onClick={() => void handleUpdateStatus(a.id, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-rose-700">Reject</button>
                       </>
-                    )}
-                    {a.status === "Approved" && (
-                      <button onClick={() => handleDisburse(a.id)} className="rounded-full bg-emerald-600 px-3 py-1 text-sm text-white">Disburse</button>
                     )}
                   </div>
                 </div>

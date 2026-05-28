@@ -1,27 +1,45 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { loginRequest } from "../api/auth";
+import { useToast } from "../context/ToastContext";
+import { homeRouteByRole } from "../utils/auth";
 
 export const AdminLoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Fake admin credentials
-    const validEmail = "admin@umuhinzi.test";
-    const validPassword = "Admin123!";
+    setIsSubmitting(true);
 
-    if (email === validEmail && password === validPassword) {
-      const adminUser = { fullName: "Platform Admin", email, role: "admin" };
-      localStorage.setItem("umuhinzi_user", JSON.stringify(adminUser));
-      localStorage.setItem("umuhinzi_token", "admin-demo-token");
-      localStorage.setItem("umuhinzi_last_role", "admin");
+    try {
+      const session = await loginRequest({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (session.user.role !== "ADMIN") {
+        setError("This login page is only for admin accounts.");
+        return;
+      }
+
+      login(session);
+      if (session.refreshToken) {
+        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
+      }
       setError("");
-      navigate("/admin");
-    } else {
-      setError("Invalid credentials. Use admin@umuhinzi.test / Admin123!");
+      showToast("Welcome admin", "success");
+      navigate(homeRouteByRole(session.user.role));
+    } catch {
+      setError("Invalid credentials or account status.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -44,11 +62,11 @@ export const AdminLoginPage = () => {
           {error ? <div className="text-sm text-rose-600">{error}</div> : null}
 
           <div className="flex items-center justify-between">
-            <button type="submit" className="w-full rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Sign in</button>
+            <button type="submit" disabled={isSubmitting} className="w-full rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-70">
+              {isSubmitting ? "Signing in..." : "Sign in"}
+            </button>
           </div>
         </form>
-
-        <div className="mt-4 text-xs text-stone-500">Demo admin credentials: <strong>admin@umuhinzi.test</strong> / <strong>Admin123!</strong></div>
       </div>
     </div>
   );

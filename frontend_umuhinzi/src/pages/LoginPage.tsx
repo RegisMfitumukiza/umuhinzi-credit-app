@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { loginRequest } from "../api/auth";
+import { homeRouteByRole } from "../utils/auth";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const autoLoginTriggered = useRef(false);
   const { login } = useAuth();
   const { showToast } = useToast();
@@ -25,95 +28,44 @@ export const LoginPage = () => {
     if (shouldAutoLogin && nextEmail && nextPassword && !autoLoginTriggered.current) {
       autoLoginTriggered.current = true;
       window.setTimeout(() => {
-        performLogin(nextEmail, nextPassword);
+        void performLogin(nextEmail, nextPassword);
         localStorage.removeItem("umuhinzi_post_register_login");
       }, 0);
     }
   }, [location.state]);
 
-  const performLogin = (loginEmail: string, loginPassword: string) => {
-    const storedAccount = JSON.parse(localStorage.getItem("umuhinzi_account") || "null");
-    const storedRole = localStorage.getItem("umuhinzi_last_role");
-
+  const performLogin = async (loginEmail: string, loginPassword: string) => {
     if (!loginEmail.trim() || !loginPassword.trim()) {
       showToast("Enter your email and password", "error");
       return;
     }
 
-    const trimmedEmail = loginEmail.trim();
-    const trimmedPassword = loginPassword.trim();
+    setIsSubmitting(true);
 
-    // Admin shortcut: accept admin credentials via normal login page
-    if (trimmedEmail.toLowerCase() === "admin@umuhinzi.test" && trimmedPassword === "Admin123!") {
-      const adminAccount = { role: "ADMIN", email: trimmedEmail, password: trimmedPassword };
-      localStorage.setItem("umuhinzi_account", JSON.stringify(adminAccount));
-      localStorage.setItem("umuhinzi_user", JSON.stringify({ id: `admin-1`, fullName: "Platform Admin", email: trimmedEmail, role: "admin" }));
-      localStorage.setItem("umuhinzi_last_role", "admin");
-      login("admin-demo-token");
-      showToast("Welcome admin", "success");
-      navigate("/admin");
-      return;
+    try {
+      const session = await loginRequest({
+        email: loginEmail.trim(),
+        password: loginPassword.trim(),
+      });
+
+      login(session);
+      if (session.refreshToken) {
+        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
+      }
+
+      showToast("Welcome back", "success");
+      navigate(homeRouteByRole(session.user.role));
+    } catch {
+      showToast("Login failed. Check your credentials and account status.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const accountMatches = storedAccount && storedAccount.email === trimmedEmail && storedAccount.password === trimmedPassword;
-    const fallbackRole = storedRole === "COOPERATIVE_MANAGER" ? "COOPERATIVE_MANAGER" : "FARMER";
-    const emailLower = trimmedEmail.toLowerCase();
-    const account = accountMatches
-      ? storedAccount
-      : {
-          role: emailLower.includes("coop") || emailLower.includes("manager")
-            ? "COOPERATIVE_MANAGER"
-            : emailLower.includes("finance") || emailLower.includes("bank") || emailLower.includes("institution")
-              ? "FINANCE_INSTITUTION"
-              : emailLower.includes("gov") || emailLower.includes("government")
-                ? "GOVERNMENT"
-                : fallbackRole,
-          email: trimmedEmail,
-          password: trimmedPassword,
-        };
-
-    localStorage.setItem("umuhinzi_account", JSON.stringify(account));
-    localStorage.setItem("umuhinzi_user", JSON.stringify({
-      id: `user-${Date.now()}`,
-      fullName: account.fullName || "Demo User",
-      email: account.email,
-      phone: account.phone || "",
-      password: account.password,
-      role: account.role,
-      farm: account.farm || { name: "Demo Farm" },
-    }));
-
-    login("demo");
-    showToast("Welcome back", "success");
-    if (account.role === "COOPERATIVE_MANAGER") {
-      navigate("/cooperatives");
-      return;
-    }
-
-    if (account.role === "FINANCE_INSTITUTION") {
-      navigate("/finance");
-      return;
-    }
-
-    if (account.role === "GOVERNMENT") {
-      navigate("/government");
-      return;
-    }
-
-    navigate("/farms");
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
-    performLogin(email, password);
-  };
-
-  const handleDemo = () => {
-    // Start a demo session using local storage (not a JWT)
-    login("demo");
-    showToast("Demo session started", "success");
-    navigate("/farms");
+    void performLogin(email, password);
   };
 
   return (
@@ -157,8 +109,11 @@ export const LoginPage = () => {
           <div>Need help?</div>
         </div>
 
-        <button className="mt-6 w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 flex items-center justify-center gap-2">
-          Login to Dashboard <span aria-hidden>→</span>
+        <button
+          disabled={isSubmitting}
+          className="mt-6 w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-70 flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? "Signing in..." : "Login to Dashboard"} <span aria-hidden>→</span>
         </button>
 
         <div className="my-4 flex items-center">

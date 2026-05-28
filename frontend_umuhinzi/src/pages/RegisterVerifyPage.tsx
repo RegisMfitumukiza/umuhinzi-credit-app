@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { registerRequest } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { homeRouteByRole, normalizeRole } from "../utils/auth";
+import type { BackendRole } from "../types/auth";
 
 const maskPhone = (phone?: string) => {
   if (!phone) return "+250 788 ••• ••89";
@@ -12,39 +17,56 @@ const maskPhone = (phone?: string) => {
 export const RegisterVerifyPage = () => {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
-  const [reg, setReg] = useState<any>(null);
+  const [reg, setReg] = useState<Record<string, unknown> | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("umuhinzi_registration") || "null");
     setReg(stored);
   }, []);
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     // In a real app we'd verify the OTP. For now accept any 4-6 digit code.
     if (!code || code.trim().length < 4) return;
 
     const r = reg || {};
-    const user = {
-      id: `user-${Date.now()}`,
-      fullName: r.fullName || "Demo User",
-      email: r.email || "demo@example.com",
-      phone: r.phone || "+250788001189",
-      password: r.password || "123456",
-      role: r.role || "FARMER",
-      farm: r.farm || { name: "Demo Farm" },
-    };
+    const fullName = String(r.fullName || "").trim();
+    const email = String(r.email || "").trim();
+    const password = String(r.password || "").trim();
+    const phone = String(r.phone || "").trim();
+    const role = normalizeRole(String(r.role || "FARMER")) as BackendRole;
 
-    localStorage.setItem("umuhinzi_account", JSON.stringify(user));
-    localStorage.setItem("umuhinzi_user", JSON.stringify(user));
-    localStorage.setItem("umuhinzi_token", "demo");
-    localStorage.setItem("umuhinzi_last_role", user.role);
-    localStorage.setItem(
-      "umuhinzi_post_register_login",
-      JSON.stringify({ email: user.email, password: user.password, autoLogin: true }),
-    );
-    localStorage.removeItem("umuhinzi_registration");
+    if (!fullName || !email || !password) {
+      showToast("Complete all required registration steps first.", "error");
+      return;
+    }
 
-    navigate("/login", { replace: true, state: { email: user.email, password: user.password, autoLogin: true } });
+    setIsSubmitting(true);
+
+    try {
+      const session = await registerRequest({
+        fullName,
+        email,
+        password,
+        phone: phone || undefined,
+        role,
+      });
+
+      login(session);
+      if (session.refreshToken) {
+        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
+      }
+
+      localStorage.removeItem("umuhinzi_registration");
+      showToast("Registration successful", "success");
+      navigate(homeRouteByRole(session.user.role), { replace: true });
+    } catch {
+      showToast("Registration failed. Please check your details.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -70,7 +92,9 @@ export const RegisterVerifyPage = () => {
         </div>
 
         <div className="mt-6">
-          <button onClick={handleVerify} className="w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white">Verify & Continue</button>
+          <button disabled={isSubmitting} onClick={() => void handleVerify()} className="w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-70">
+            {isSubmitting ? "Creating account..." : "Verify & Continue"}
+          </button>
         </div>
 
         <div className="mt-4 text-center text-sm text-stone-500">

@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
 import React, { useEffect, useState } from "react";
-import { loadApplications, saveApplications, updateApplicationStatus, disburseApplication, Application } from "../utils/localStorage";
+import {
+  getLoanApplications,
+  type LoanApplicationUi,
+  updateLoanApplicationStatus,
+} from "../api/loanApplications";
+import { useToast } from "../context/ToastContext";
 
 export const applications = [
   {
@@ -62,8 +67,10 @@ export const applications = [
 
 const statusStyles: Record<string, string> = {
   Pending: "bg-stone-100 text-stone-700",
+  "Under Review": "bg-amber-100 text-amber-700",
   Approved: "bg-emerald-100 text-emerald-700",
   Rejected: "bg-rose-100 text-rose-700",
+  Cancelled: "bg-stone-200 text-stone-700",
 };
 
 const cropStyles: Record<string, string> = {
@@ -82,20 +89,35 @@ const stats = [
 ];
 
 export const CooperativeApplicationsPage = ({ showActions = false }: { showActions?: boolean }) => {
-  const [appsState, setAppsState] = useState<Application[]>(() => loadApplications(applications as Application[]));
+  const [appsState, setAppsState] = useState<LoanApplicationUi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    saveApplications(appsState);
-  }, [appsState]);
+    void (async () => {
+      try {
+        const data = await getLoanApplications();
+        setAppsState(data);
+      } catch {
+        setAppsState(applications as LoanApplicationUi[]);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
 
-  function handleUpdate(id: string, status: string) {
-    updateApplicationStatus(id, status);
-    setAppsState((p) => p.map((x) => (x.id === id ? { ...x, status } : x)));
+  async function handleUpdate(id: string, status: "APPROVED" | "REJECTED") {
+    try {
+      const updated = await updateLoanApplicationStatus(id, status);
+      setAppsState((p) => p.map((x) => (x.id === id ? updated : x)));
+      showToast(`Application ${status.toLowerCase()} successfully`, "success");
+    } catch {
+      showToast("Unable to update application status", "error");
+    }
   }
 
-  function handleDisburseClick(id: string) {
-    disburseApplication(id);
-    setAppsState((p) => p.map((x) => (x.id === id ? { ...x, status: "Disbursed" } : x)));
+  if (isLoading) {
+    return <div className="p-6 text-sm text-stone-500">Loading applications...</div>;
   }
 
   return (
@@ -194,14 +216,11 @@ export const CooperativeApplicationsPage = ({ showActions = false }: { showActio
                     <td className="px-3 py-5 text-right">
                       {showActions ? (
                         <div className="flex items-center gap-2 justify-end">
-                          {application.status !== "Approved" && application.status !== "Disbursed" && (
+                          {application.status !== "Approved" && application.status !== "Rejected" && application.status !== "Cancelled" && (
                             <>
-                              <button onClick={() => handleUpdate(application.id, "Approved")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
-                              <button onClick={() => handleUpdate(application.id, "Rejected")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
+                              <button onClick={() => void handleUpdate(application.id, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
+                              <button onClick={() => void handleUpdate(application.id, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
                             </>
-                          )}
-                          {application.status === "Approved" && (
-                            <button onClick={() => handleDisburseClick(application.id)} className="rounded-full bg-emerald-600 px-3 py-2 text-sm text-white">Disburse</button>
                           )}
                         </div>
                       ) : (
