@@ -18,19 +18,7 @@ app.use(compression());
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, postman, etc.)
-      if (!origin) return callback(null, true);
-      
-      const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
-      const allowedOrigins = [process.env.FRONTEND_URL].filter(Boolean);
-      
-      if (isLocalhost || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: true,
     credentials: true,
   })
 );
