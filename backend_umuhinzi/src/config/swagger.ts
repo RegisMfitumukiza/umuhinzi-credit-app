@@ -13,9 +13,11 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Airbnb API",
-      version: "1.0.0",
-      description: "REST API for Airbnb listings, users, and authentication",
+      title: "Umuhinzi Credit API",
+      version: "2.0.0",
+      description:
+        "Agricultural Credit Scoring & Rural Financial Inclusion Platform for Rwanda. " +
+        "Enables farmers to build credit profiles, apply for loans, and track repayments.",
     },
     servers: [
       {

@@ -12,6 +12,8 @@ model User {
   emailVerificationTokenExpiry DateTime?
   resetToken                   String?             @unique
   resetTokenExpiry             DateTime?
+  refreshToken                 String?             @unique
+  refreshTokenExpiry           DateTime?
   profileImageUrl              String?
   profileImagePublicId         String?
   lastLoginAt                  DateTime?
