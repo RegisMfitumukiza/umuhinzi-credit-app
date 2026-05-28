@@ -67,9 +67,7 @@ export const registerUserService = async (
         ...(input.phone ? [{ phone: input.phone }] : []),
       ],
     },
-    select: {
-      id: true,
-    },
+    select: { id: true },
   });
 
   if (existingUser) {
@@ -77,17 +75,13 @@ export const registerUserService = async (
   }
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
-
   const emailVerificationToken = crypto.randomBytes(32).toString("hex");
-
   const emailVerificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const createUserData = {
     fullName: input.fullName,
     email: input.email,
-    ...(input.phone && {
-      phone: input.phone,
-    }),
+    ...(input.phone && { phone: input.phone }),
     password: hashedPassword,
     role: input.role ?? "FARMER",
     status: "ACTIVE",
@@ -117,10 +111,7 @@ export const registerUserService = async (
     resource: "USER",
     resourceId: user.id,
     description: "User account registered",
-    metadata: {
-      email: user.email,
-      role: user.role,
-    },
+    metadata: { email: user.email, role: user.role },
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
@@ -128,44 +119,25 @@ export const registerUserService = async (
   const accessToken = signAccessToken(user.id);
   const refreshToken = await saveRefreshToken(user.id);
 
-  return {
-    user,
-    accessToken,
-    refreshToken,
-  };
+  return { user, accessToken, refreshToken };
 };
 
 export const loginUserService = async (
   input: LoginUserInput,
   context: RequestContext = {}
 ) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      email: input.email,
-    },
-  });
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
 
-  if (!user) {
-    throw new APIError("Invalid email or password", 401);
-  }
+  if (!user) throw new APIError("Invalid email or password", 401);
 
   const passwordMatches = await bcrypt.compare(input.password, user.password);
+  if (!passwordMatches) throw new APIError("Invalid email or password", 401);
 
-  if (!passwordMatches) {
-    throw new APIError("Invalid email or password", 401);
-  }
-
-  if (user.status !== "ACTIVE") {
-    throw new APIError("Account is not active", 403);
-  }
+  if (user.status !== "ACTIVE") throw new APIError("Account is not active", 403);
 
   const updatedUser = await prisma.user.update({
-    where: {
-      id: user.id,
-    },
-    data: {
-      lastLoginAt: new Date(),
-    },
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
     select: safeUserSelect,
   });
 
@@ -182,11 +154,7 @@ export const loginUserService = async (
   const accessToken = signAccessToken(user.id);
   const refreshToken = await saveRefreshToken(user.id);
 
-  return {
-    user: updatedUser,
-    accessToken,
-    refreshToken,
-  };
+  return { user: updatedUser, accessToken, refreshToken };
 };
 
 export const forgotPasswordService = async (
@@ -194,34 +162,20 @@ export const forgotPasswordService = async (
   context: RequestContext = {}
 ) => {
   const user = await prisma.user.findUnique({
-    where: {
-      email: input.email,
-    },
-    select: {
-      id: true,
-      email: true,
-    },
+    where: { email: input.email },
+    select: { id: true, email: true },
   });
 
   if (!user) {
-    return {
-      message:
-        "If the email exists, password reset instructions have been sent.",
-    };
+    return { message: "If the email exists, password reset instructions have been sent." };
   }
 
   const resetToken = crypto.randomBytes(32).toString("hex");
-
   const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
   await prisma.user.update({
-    where: {
-      id: user.id,
-    },
-    data: {
-      resetToken,
-      resetTokenExpiry,
-    },
+    where: { id: user.id },
+    data: { resetToken, resetTokenExpiry },
   });
 
   const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
@@ -242,10 +196,7 @@ export const forgotPasswordService = async (
     userAgent: context.userAgent,
   });
 
-  return {
-    message:
-      "If the email exists, password reset instructions have been sent.",
-  };
+  return { message: "If the email exists, password reset instructions have been sent." };
 };
 
 export const resetPasswordService = async (
@@ -255,22 +206,16 @@ export const resetPasswordService = async (
   const user = await prisma.user.findFirst({
     where: {
       resetToken: input.token,
-      resetTokenExpiry: {
-        gt: new Date(),
-      },
+      resetTokenExpiry: { gt: new Date() },
     },
   });
 
-  if (!user) {
-    throw new APIError("Invalid or expired reset token", 400);
-  }
+  if (!user) throw new APIError("Invalid or expired reset token", 400);
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
 
   await prisma.user.update({
-    where: {
-      id: user.id,
-    },
+    where: { id: user.id },
     data: {
       password: hashedPassword,
       resetToken: null,
@@ -289,9 +234,7 @@ export const resetPasswordService = async (
     userAgent: context.userAgent,
   });
 
-  return {
-    message: "Password reset successfully.",
-  };
+  return { message: "Password reset successfully." };
 };
 
 export const verifyEmailService = async (
@@ -301,28 +244,16 @@ export const verifyEmailService = async (
   const user = await prisma.user.findFirst({
     where: {
       emailVerificationToken: input.token,
-      emailVerificationTokenExpiry: {
-        gt: new Date(),
-      },
+      emailVerificationTokenExpiry: { gt: new Date() },
     },
-    select: {
-      id: true,
-      isEmailVerified: true,
-    },
+    select: { id: true, isEmailVerified: true },
   });
 
-  if (!user) {
-    throw new APIError("Invalid or expired verification token", 400);
-  }
-
-  if (user.isEmailVerified) {
-    throw new APIError("Email is already verified", 400);
-  }
+  if (!user) throw new APIError("Invalid or expired verification token", 400);
+  if (user.isEmailVerified) throw new APIError("Email is already verified", 400);
 
   const verifiedUser = await prisma.user.update({
-    where: {
-      id: user.id,
-    },
+    where: { id: user.id },
     data: {
       isEmailVerified: true,
       emailVerificationToken: null,
@@ -346,22 +277,14 @@ export const verifyEmailService = async (
 
 export const getAuthUserService = async (userId: string) => {
   const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+    where: { id: userId },
     select: safeUserSelect,
   });
 
-  if (!user) {
-    throw new APIError("User not found", 404);
-  }
+  if (!user) throw new APIError("User not found", 404);
 
   return user;
 };
-
-/* ─────────────────────────────────────────
-   REFRESH TOKEN
-───────────────────────────────────────── */
 
 export const refreshAccessTokenService = async (token: string) => {
   const user = await prisma.user.findUnique({
@@ -382,20 +305,13 @@ export const refreshAccessTokenService = async (token: string) => {
     throw new APIError("Refresh token has expired. Please log in again.", 401);
   }
 
-  if (user.status !== "ACTIVE") {
-    throw new APIError("Account is not active", 403);
-  }
+  if (user.status !== "ACTIVE") throw new APIError("Account is not active", 403);
 
   const accessToken = signAccessToken(user.id);
-  // Rotate refresh token on each use
   const newRefreshToken = await saveRefreshToken(user.id);
 
   return { accessToken, refreshToken: newRefreshToken };
 };
-
-/* ─────────────────────────────────────────
-   LOGOUT
-───────────────────────────────────────── */
 
 export const logoutService = async (
   userId: string,

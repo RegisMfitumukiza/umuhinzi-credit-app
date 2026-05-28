@@ -22,7 +22,6 @@ export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
 
   const recipient = isDev && devRedirect ? devRedirect : to;
 
-  // In dev, add a note to the subject so you know who it was originally for
   const finalSubject =
     isDev && devRedirect && devRedirect !== to
       ? `[DEV → ${to}] ${subject}`
