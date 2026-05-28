@@ -1,31 +1,85 @@
-const factorCards = [
-  {
-    title: "Repayment Reliability",
-    level: "Strong",
-    description: "Consistency of on-time loan repayments over the last 24 months.",
-    impact: "High",
-  },
-  {
-    title: "Agricultural Productivity",
-    level: "Strong",
-    description: "Yield performance relative to regional climate and crop standards.",
-    impact: "High",
-  },
-  {
-    title: "Tenure & Stability",
-    level: "Fair",
-    description: "Duration of farming activities on the same registered land parcels.",
-    impact: "Medium",
-  },
-  {
-    title: "Market Engagement",
-    level: "Improving",
-    description: "Active participation in cooperatives and formal market contracts.",
-    impact: "Medium",
-  },
-];
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
+
+type CreditScore = {
+  id: string;
+  score: number;
+  tier: string;
+  riskLevel: string;
+  maxLoanAmount: number;
+  repaymentScore: number;
+  farmStabilityScore: number;
+  productivityScore: number;
+  creditUtilizationScore: number;
+  createdAt: string;
+};
+
+type FarmerAnalytics = {
+  totalLoans: number;
+  activeLoans: number;
+  totalRepaid: number;
+  repaymentRate: number;
+  totalFarms: number;
+  totalLandSize: number;
+};
+
+const ScoreBar = ({ label, value }: { label: string; value: number }) => (
+  <div>
+    <div className="flex justify-between text-xs text-stone-600 mb-1">
+      <span>{label}</span>
+      <span className="font-semibold">{value ?? 0}/100</span>
+    </div>
+    <div className="h-2 rounded-full bg-stone-100">
+      <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${Math.min(value ?? 0, 100)}%` }} />
+    </div>
+  </div>
+);
 
 export const AnalyticsPage = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [latest, setLatest] = useState<CreditScore | null>(null);
+  const [history, setHistory] = useState<CreditScore[]>([]);
+  const [analytics, setAnalytics] = useState<FarmerAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [latestRes, historyRes, analyticsRes] = await Promise.allSettled([
+          api.get("/v1/credit-scores/latest"),
+          api.get("/v1/credit-scores?limit=6"),
+          user?.id ? api.get(`/v1/analytics/farmer/${user.id}`) : Promise.reject(),
+        ]);
+        if (latestRes.status === "fulfilled") setLatest(latestRes.value.data.data ?? null);
+        if (historyRes.status === "fulfilled") setHistory(historyRes.value.data.data ?? []);
+        if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data.data ?? null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [user?.id]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post("/v1/credit-scores/generate");
+      const newScore = res.data.data;
+      setLatest(newScore);
+      setHistory((prev) => [newScore, ...prev].slice(0, 6));
+    } catch {} finally {
+      setGenerating(false);
+    }
+  };
+
+  const scoreColor = !latest ? "text-stone-400" : latest.score >= 700 ? "text-green-600" : latest.score >= 500 ? "text-amber-500" : "text-red-500";
+  const riskBadge = !latest ? "bg-stone-100 text-stone-500" : latest.riskLevel === "LOW" ? "bg-green-50 text-green-700" : latest.riskLevel === "MEDIUM" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700";
+  const maxScore = history.length > 0 ? Math.max(...history.map((s) => s.score)) : 1;
+
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -34,164 +88,111 @@ export const AnalyticsPage = () => {
           <p className="mt-2 text-sm text-stone-500">Detailed breakdown of your financial trust and agricultural reputation.</p>
         </div>
         <div className="flex gap-3">
-          <button className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">View History</button>
-          <button className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20">Apply for Credit</button>
+          <button onClick={handleGenerate} disabled={generating} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm disabled:opacity-60">
+            {generating ? "Calculating..." : "Recalculate Score"}
+          </button>
+          <button onClick={() => navigate("/loans")} className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20">Apply for Credit</button>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.65fr)]">
         <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1fr)]">
-            <article className="rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-panel">
-              <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative flex h-44 w-44 items-center justify-center rounded-full border-[14px] border-stone-100 border-t-stone-800 bg-white">
-                  <div className="text-center">
-                    <p className="text-4xl font-semibold text-stone-900">742</p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Trust Score</p>
-                  </div>
-                </div>
 
-                <div className="max-w-md">
-                  <h3 className="text-2xl font-semibold text-stone-900">You&apos;re in the top 5%!</h3>
-                  <p className="mt-3 text-sm text-stone-600">Your high score is driven by consistent yields and a perfect 12-month repayment history. You qualify for our Elite Farmer interest rates.</p>
-                  <div className="mt-4 space-y-2 text-sm text-stone-700">
-                    <p><span className="font-semibold">Repayment Reliability:</span> Excellent</p>
-                    <p><span className="font-semibold">Farm Stability:</span> High</p>
-                    <p><span className="font-semibold">Credit Utilization:</span> Moderate</p>
+          {/* Score card */}
+          <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1fr)]">
+            <article className="rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-panel flex flex-col items-center justify-center gap-4">
+              {loading ? (
+                <p className="text-sm text-stone-400">Loading...</p>
+              ) : latest ? (
+                <>
+                  <div className="relative flex h-44 w-44 items-center justify-center rounded-full border-[14px] border-stone-100 border-t-stone-800 bg-white">
+                    <div className="text-center">
+                      <p className={`text-4xl font-semibold ${scoreColor}`}>{latest.score}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Trust Score</p>
+                    </div>
                   </div>
-                  <button className="mt-5 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm">Excellent Status</button>
+                  <div className="text-center">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${riskBadge}`}>{latest.riskLevel} RISK</span>
+                    <p className="mt-2 text-sm font-semibold text-stone-700">Tier: {latest.tier}</p>
+                    <p className="mt-1 text-xs text-stone-400">Max Loan: RWF {latest.maxLoanAmount?.toLocaleString()}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center">
+                  <p className="text-stone-400 text-sm mb-4">No credit score yet.</p>
+                  <button onClick={handleGenerate} disabled={generating} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    {generating ? "Generating..." : "Generate Score"}
+                  </button>
                 </div>
-              </div>
+              )}
             </article>
 
-            <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-stone-900">Instant Insights</h3>
-                  <p className="mt-1 text-sm text-stone-500">Recommendations based on your profile</p>
+            <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel space-y-4">
+              <h3 className="text-lg font-semibold text-stone-900">Score Factors</h3>
+              {loading ? <p className="text-sm text-stone-400">Loading...</p> : latest ? (
+                <div className="space-y-3">
+                  <ScoreBar label="Repayment Reliability" value={latest.repaymentScore} />
+                  <ScoreBar label="Farm Stability" value={latest.farmStabilityScore} />
+                  <ScoreBar label="Productivity" value={latest.productivityScore} />
+                  <ScoreBar label="Credit Utilization" value={latest.creditUtilizationScore} />
                 </div>
-                <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">Update Records</span>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Recommended action</p>
-                <p className="mt-2 text-sm text-stone-700">Increase your score by 15 points by updating your latest Baseline vaccination records.</p>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-sm font-semibold text-stone-900">Your Benefits</p>
-                <ul className="mt-3 space-y-2 text-sm text-stone-600">
-                  <li>Access to loans up to 2.5M RWF</li>
-                  <li>Interest rate capped at 8.5%</li>
-                  <li>Priority support line</li>
-                </ul>
-              </div>
+              ) : <p className="text-sm text-stone-400">Generate a score to see factor breakdown.</p>}
             </article>
           </div>
 
-          <section>
-            <h3 className="mb-4 text-lg font-semibold text-stone-900">Score Factor Analysis</h3>
-            <div className="grid gap-4 lg:grid-cols-2">
-              {factorCards.map((card) => (
-                <article key={card.title} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h4 className="font-semibold text-stone-900">{card.title}</h4>
-                      <p className="mt-2 text-sm text-stone-500">{card.description}</p>
-                    </div>
-                    <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{card.level}</span>
-                  </div>
-                  <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4 text-sm">
-                    <span className="text-stone-500">Impact: <span className="font-semibold text-stone-700">{card.impact}</span></span>
-                    <button className="font-semibold text-brand-600">Learn More →</button>
-                  </div>
+          {/* Loan & repayment stats */}
+          {analytics && (
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                { label: "Total Loans", value: analytics.totalLoans },
+                { label: "Repayment Rate", value: `${analytics.repaymentRate?.toFixed(1)}%` },
+                { label: "Total Repaid", value: `RWF ${analytics.totalRepaid?.toLocaleString()}` },
+              ].map((s) => (
+                <article key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">{s.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-stone-900">{s.value}</p>
                 </article>
               ))}
             </div>
-          </section>
+          )}
 
-          <section className="grid gap-4 lg:grid-cols-2">
+          {/* Score history chart */}
+          {history.length > 1 && (
             <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-stone-900">Productivity Analytics</h3>
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Yield vs Regional</span>
-              </div>
-              <div className="mt-5 flex h-64 items-end gap-4 rounded-2xl bg-stone-50 p-4">
-                <div className="flex flex-1 items-end justify-center gap-3">
-                  <div className="w-8 rounded-t-lg bg-brand-500" style={{ height: "62%" }} />
-                  <div className="w-8 rounded-t-lg bg-stone-600" style={{ height: "54%" }} />
-                </div>
-                <div className="flex flex-1 items-end justify-center gap-3">
-                  <div className="w-8 rounded-t-lg bg-brand-500" style={{ height: "70%" }} />
-                  <div className="w-8 rounded-t-lg bg-stone-600" style={{ height: "56%" }} />
-                </div>
-                <div className="flex flex-1 items-end justify-center gap-3">
-                  <div className="w-8 rounded-t-lg bg-brand-500" style={{ height: "58%" }} />
-                  <div className="w-8 rounded-t-lg bg-stone-600" style={{ height: "52%" }} />
-                </div>
-                <div className="flex flex-1 items-end justify-center gap-3">
-                  <div className="w-8 rounded-t-lg bg-brand-500" style={{ height: "82%" }} />
-                  <div className="w-8 rounded-t-lg bg-stone-600" style={{ height: "57%" }} />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-center gap-6 text-xs text-stone-500">
-                <span><span className="mr-2 inline-block h-2 w-2 rounded-full bg-brand-500" />Your Yield</span>
-                <span><span className="mr-2 inline-block h-2 w-2 rounded-full bg-stone-600" />Regional Average</span>
+              <h3 className="text-lg font-semibold text-stone-900 mb-4">Score History</h3>
+              <div className="flex items-end gap-3 h-32">
+                {[...history].reverse().map((s, i) => (
+                  <div key={s.id} className="flex flex-1 flex-col items-center gap-1">
+                    <span className="text-xs font-semibold text-stone-700">{s.score}</span>
+                    <div className="w-full rounded-t-lg bg-brand-500" style={{ height: `${Math.max((s.score / maxScore) * 100, 8)}%` }} />
+                    <span className="text-[10px] text-stone-400">{new Date(s.createdAt).toLocaleDateString("en-RW", { month: "short", day: "numeric" })}</span>
+                  </div>
+                ))}
               </div>
             </article>
-
-            <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-stone-900">Repayment Consistency</h3>
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Last 6 months</span>
-              </div>
-              <div className="mt-5 rounded-2xl bg-stone-50 p-4">
-                <svg viewBox="0 0 300 180" className="h-64 w-full">
-                  <path d="M10 140 L60 100 L110 58 L160 135 L210 95 L260 45 L290 20" fill="none" stroke="#22c55e" strokeWidth="3" />
-                  <path d="M10 160 L60 125 L110 96 L160 100 L210 92 L260 80 L290 48" fill="none" stroke="#fb923c" strokeWidth="3" />
-                  {[10, 60, 110, 160, 210, 260, 290].map((x) => (
-                    <circle key={x} cx={x} cy={x === 10 ? 140 : x === 60 ? 100 : x === 110 ? 58 : x === 160 ? 135 : x === 210 ? 95 : x === 260 ? 45 : 20} r="3" fill="#22c55e" />
-                  ))}
-                </svg>
-              </div>
-              <div className="mt-4 flex justify-center gap-6 text-xs text-stone-500">
-                <span><span className="mr-2 inline-block h-2 w-2 rounded-full bg-brand-500" />Repayment Rate (%)</span>
-              </div>
-            </article>
-          </section>
-
-          <section className="rounded-[1.75rem] border border-brand-500 bg-brand-500 p-6 text-white shadow-panel">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h3 className="text-2xl font-semibold">Unlock the Next Tier</h3>
-                <p className="mt-2 max-w-2xl text-sm text-brand-50">By maintaining your current productivity and repaying your upcoming seasonal loan by December 15th, you are projected to reach a score of 780. This will unlock our 0% processing fee tier.</p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-brand-700">View Payment Schedule</button>
-                  <button className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white">Learn About Training</button>
-                </div>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/20 bg-white/10 px-6 py-4 text-center">
-                <div className="text-4xl font-semibold">+38 pts</div>
-                <p className="mt-1 text-xs uppercase tracking-[0.25em] text-brand-50">Projected Growth</p>
-              </div>
-            </div>
-          </section>
+          )}
         </div>
 
+        {/* Sidebar */}
         <aside className="space-y-4">
           <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel">
-            <h3 className="text-lg font-semibold text-stone-900">Key Takeaways</h3>
-            <ul className="mt-4 space-y-3 text-sm text-stone-600">
-              <li className="rounded-2xl bg-stone-50 p-4">Consistent repayment history remains your strongest score driver.</li>
-              <li className="rounded-2xl bg-stone-50 p-4">Add recent yield and livestock records to strengthen your profile.</li>
-              <li className="rounded-2xl bg-stone-50 p-4">Maintain on-time payments to keep access to the Elite Farmer tier.</li>
-            </ul>
+            <h3 className="text-lg font-semibold text-stone-900">Farm Overview</h3>
+            {loading ? <p className="mt-3 text-sm text-stone-400">Loading...</p> : analytics ? (
+              <div className="mt-4 space-y-3 text-sm text-stone-600">
+                <div className="flex justify-between"><span>Registered Farms</span><span className="font-semibold text-stone-900">{analytics.totalFarms}</span></div>
+                <div className="flex justify-between"><span>Total Land</span><span className="font-semibold text-stone-900">{analytics.totalLandSize?.toFixed(1)} Ha</span></div>
+                <div className="flex justify-between"><span>Active Loans</span><span className="font-semibold text-stone-900">{analytics.activeLoans}</span></div>
+              </div>
+            ) : <p className="mt-3 text-sm text-stone-400">No data available.</p>}
           </article>
 
           <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-panel">
             <h3 className="text-lg font-semibold text-stone-900">Need Help?</h3>
             <p className="mt-2 text-sm text-stone-500">A support team member can explain how this score affects your loan eligibility and rates.</p>
-            <button className="mt-4 w-full rounded-full border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">Contact Support</button>
+            <div className="mt-4 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-center">
+              <p className="text-lg font-semibold text-brand-700">0800 123 456</p>
+              <p className="mt-1 text-xs text-stone-500">(Toll-Free in Rwanda)</p>
+            </div>
           </article>
         </aside>
       </section>
