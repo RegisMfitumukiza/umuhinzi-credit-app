@@ -127,6 +127,7 @@ export const App = () => {
       {/* Shared authenticated */}
       <Route element={<ProtectedRoute />}>
         <Route path="/account" element={<AccountNotifications />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

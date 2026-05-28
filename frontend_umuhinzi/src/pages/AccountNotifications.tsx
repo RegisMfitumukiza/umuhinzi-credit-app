@@ -3,14 +3,33 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 
-const navItems = [
-  { label: "Dashboard", path: "/" },
-  { label: "Applications", path: "/applications" },
-  { label: "Risk Analytics", path: "/risk-analytics" },
-  { label: "Cooperatives", path: "/cooperatives" },
-  { label: "Regional Map", path: "/cooperatives/regional-map" },
-  { label: "Reports", path: "/cooperatives/reports" },
-];
+const NAV_BY_ROLE: Record<string, { label: string; path: string }[]> = {
+  FARMER: [
+    { label: "Dashboard", path: "/dashboard" },
+    { label: "Farms", path: "/farms" },
+    { label: "Loans", path: "/loans" },
+    { label: "Payments", path: "/payments" },
+  ],
+  COOPERATIVE_MANAGER: [
+    { label: "Dashboard", path: "/cooperatives" },
+    { label: "Applications", path: "/cooperatives/applications" },
+    { label: "Risk Analytics", path: "/cooperatives/risk-analytics" },
+    { label: "Reports", path: "/cooperatives/reports" },
+  ],
+  INSTITUTION: [
+    { label: "Dashboard", path: "/finance" },
+    { label: "Applications", path: "/finance/applications" },
+  ],
+  ADMIN: [
+    { label: "Dashboard", path: "/admin" },
+    { label: "Users", path: "/admin/users" },
+  ],
+  GOVERNMENT_PARTNER: [
+    { label: "Dashboard", path: "/government" },
+    { label: "Regions", path: "/government/regions" },
+    { label: "Reports", path: "/government/reports" },
+  ],
+};
 
 type Notification = {
   id: string;
@@ -45,6 +64,8 @@ export default function AccountNotifications() {
   const tabs = ["Profile", "Security", "Permissions"];
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { user: authUser } = useAuth();
+  const navItems = NAV_BY_ROLE[authUser?.role ?? ""] ?? [];
 
   useEffect(() => {
     api.get("/v1/users/me").then((res) => {
