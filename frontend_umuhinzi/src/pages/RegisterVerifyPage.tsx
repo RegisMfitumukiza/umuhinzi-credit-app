@@ -38,9 +38,13 @@ export const RegisterVerifyPage = () => {
     localStorage.setItem("umuhinzi_user", JSON.stringify(user));
     localStorage.setItem("umuhinzi_token", "demo");
     localStorage.setItem("umuhinzi_last_role", user.role);
+    localStorage.setItem(
+      "umuhinzi_post_register_login",
+      JSON.stringify({ email: user.email, password: user.password, autoLogin: true }),
+    );
     localStorage.removeItem("umuhinzi_registration");
 
-    navigate("/login");
+    navigate("/login", { replace: true, state: { email: user.email, password: user.password, autoLogin: true } });
   };
 
   return (

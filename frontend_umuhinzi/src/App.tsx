@@ -35,6 +35,11 @@ import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminLayout } from "./layout/AdminLayout";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminProfilePage } from "./pages/AdminProfilePage";
+import { FinanceLayout } from "./layout/FinanceLayout";
+import { FinanceDashboardPage } from "./pages/FinanceDashboardPage";
+import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
+import { GovernmentLayout } from "./layout/GovernmentLayout";
+import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
 
 export const App = () => {
   return (
@@ -51,6 +56,21 @@ export const App = () => {
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/admin/profile" element={<AdminProfilePage />} />
+      </Route>
+
+      <Route element={<FinanceLayout />}>
+        <Route path="/finance" element={<FinanceDashboardPage />} />
+        <Route path="/finance/applications" element={<FinanceApplicationsPage />} />
+        <Route path="/finance/portfolio" element={<FinanceDashboardPage />} />
+        <Route path="/finance/reports" element={<FinanceDashboardPage />} />
+        <Route path="/finance/profile" element={<FinanceDashboardPage />} />
+      </Route>
+
+      <Route element={<GovernmentLayout />}>
+        <Route path="/government" element={<GovernmentDashboardPage />} />
+        <Route path="/government/regions" element={<GovernmentDashboardPage />} />
+        <Route path="/government/reports" element={<GovernmentDashboardPage />} />
+        <Route path="/government/profile" element={<GovernmentDashboardPage />} />
       </Route>
 
       <Route element={<AppLayout />}>

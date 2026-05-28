@@ -35,10 +35,10 @@ export const Sidebar = () => {
         <div className="mt-6 border-t border-stone-200 pt-4">
           <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-stone-400">Pages</p>
           <div className="flex flex-col gap-1">
-            <NavLink to="/farms/new" className={secondaryNavClass}>Create Farm</NavLink>
+            {/* <NavLink to="/farms/new" className={secondaryNavClass}>Create Farm</NavLink>
             <NavLink to="/farms" className={secondaryNavClass}>Farm List</NavLink>
             <NavLink to="/products" className={secondaryNavClass}>Products</NavLink>
-            <NavLink to="/recommendations" className={secondaryNavClass}>Recommendations</NavLink>
+            <NavLink to="/recommendations" className={secondaryNavClass}>Recommendations</NavLink> */}
             <NavLink to="/notifications" className={secondaryNavClass}>Notifications</NavLink>
             <NavLink to="/profile" className={secondaryNavClass}>Profile</NavLink>
             <NavLink to="/settings" className={secondaryNavClass}>Settings</NavLink>

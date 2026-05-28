@@ -1,28 +1,47 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const autoLoginTriggered = useRef(false);
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
+  useEffect(() => {
+    const routeState = (location.state || {}) as { email?: string; password?: string; autoLogin?: boolean };
+    const cached = JSON.parse(localStorage.getItem("umuhinzi_post_register_login") || "null") as { email?: string; password?: string; autoLogin?: boolean } | null;
+    const nextEmail = routeState.email || cached?.email;
+    const nextPassword = routeState.password || cached?.password;
+    const shouldAutoLogin = Boolean(routeState.autoLogin || cached?.autoLogin);
 
+    if (nextEmail) setEmail(nextEmail);
+    if (nextPassword) setPassword(nextPassword);
+
+    if (shouldAutoLogin && nextEmail && nextPassword && !autoLoginTriggered.current) {
+      autoLoginTriggered.current = true;
+      window.setTimeout(() => {
+        performLogin(nextEmail, nextPassword);
+        localStorage.removeItem("umuhinzi_post_register_login");
+      }, 0);
+    }
+  }, [location.state]);
+
+  const performLogin = (loginEmail: string, loginPassword: string) => {
     const storedAccount = JSON.parse(localStorage.getItem("umuhinzi_account") || "null");
     const storedRole = localStorage.getItem("umuhinzi_last_role");
 
-    if (!email.trim() || !password.trim()) {
+    if (!loginEmail.trim() || !loginPassword.trim()) {
       showToast("Enter your email and password", "error");
       return;
     }
 
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+    const trimmedEmail = loginEmail.trim();
+    const trimmedPassword = loginPassword.trim();
 
     // Admin shortcut: accept admin credentials via normal login page
     if (trimmedEmail.toLowerCase() === "admin@umuhinzi.test" && trimmedPassword === "Admin123!") {
@@ -38,10 +57,17 @@ export const LoginPage = () => {
 
     const accountMatches = storedAccount && storedAccount.email === trimmedEmail && storedAccount.password === trimmedPassword;
     const fallbackRole = storedRole === "COOPERATIVE_MANAGER" ? "COOPERATIVE_MANAGER" : "FARMER";
+    const emailLower = trimmedEmail.toLowerCase();
     const account = accountMatches
       ? storedAccount
       : {
-          role: trimmedEmail.toLowerCase().includes("coop") || trimmedEmail.toLowerCase().includes("manager") ? "COOPERATIVE_MANAGER" : fallbackRole,
+          role: emailLower.includes("coop") || emailLower.includes("manager")
+            ? "COOPERATIVE_MANAGER"
+            : emailLower.includes("finance") || emailLower.includes("bank") || emailLower.includes("institution")
+              ? "FINANCE_INSTITUTION"
+              : emailLower.includes("gov") || emailLower.includes("government")
+                ? "GOVERNMENT"
+                : fallbackRole,
           email: trimmedEmail,
           password: trimmedPassword,
         };
@@ -64,7 +90,23 @@ export const LoginPage = () => {
       return;
     }
 
+    if (account.role === "FINANCE_INSTITUTION") {
+      navigate("/finance");
+      return;
+    }
+
+    if (account.role === "GOVERNMENT") {
+      navigate("/government");
+      return;
+    }
+
     navigate("/farms");
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    performLogin(email, password);
   };
 
   const handleDemo = () => {

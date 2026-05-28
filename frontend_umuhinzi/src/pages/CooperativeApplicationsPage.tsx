@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { loadApplications, saveApplications, updateApplicationStatus, disburseApplication, Application } from "../utils/localStorage";
 
 export const applications = [
   {
@@ -79,7 +81,23 @@ const stats = [
   { label: "Avg. Credit Score", value: "742", tone: "B+ Grade" },
 ];
 
-export const CooperativeApplicationsPage = () => {
+export const CooperativeApplicationsPage = ({ showActions = false }: { showActions?: boolean }) => {
+  const [appsState, setAppsState] = useState<Application[]>(() => loadApplications(applications as Application[]));
+
+  useEffect(() => {
+    saveApplications(appsState);
+  }, [appsState]);
+
+  function handleUpdate(id: string, status: string) {
+    updateApplicationStatus(id, status);
+    setAppsState((p) => p.map((x) => (x.id === id ? { ...x, status } : x)));
+  }
+
+  function handleDisburseClick(id: string) {
+    disburseApplication(id);
+    setAppsState((p) => p.map((x) => (x.id === id ? { ...x, status: "Disbursed" } : x)));
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-[1400px]">
@@ -90,7 +108,7 @@ export const CooperativeApplicationsPage = () => {
           </div>
 
           <div className="flex gap-3">
-            <button className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export Data</button>
+            <button onClick={() => { const csv = window.confirm("Export CSV?"); if (csv) { const blob = new Blob([JSON.stringify(appsState)], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "applications.json"; a.click(); URL.revokeObjectURL(url); } }} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export Data</button>
             <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">New Application</button>
           </div>
         </div>
@@ -140,8 +158,8 @@ export const CooperativeApplicationsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {applications.map((application, index) => (
-                  <tr key={application.id} className={`rounded-2xl border ${index === applications.length - 1 ? "border-violet-300 ring-1 ring-violet-200" : "border-stone-200"} bg-white shadow-sm`}>
+                {appsState.map((application, index) => (
+                  <tr key={application.id} className={`rounded-2xl border ${index === appsState.length - 1 ? "border-violet-300 ring-1 ring-violet-200" : "border-stone-200"} bg-white shadow-sm`}>
                     <td className="px-3 py-5"><input type="checkbox" /></td>
                     <td className="px-3 py-5 font-medium text-stone-500">
                       <div>{application.id.split("-")[0]}.</div>
@@ -174,9 +192,23 @@ export const CooperativeApplicationsPage = () => {
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[application.status]}`}>{application.status}</span>
                     </td>
                     <td className="px-3 py-5 text-right">
-                      <Link to={`/cooperatives/applications/${application.id}`}>
-                        <button className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700">Review</button>
-                      </Link>
+                      {showActions ? (
+                        <div className="flex items-center gap-2 justify-end">
+                          {application.status !== "Approved" && application.status !== "Disbursed" && (
+                            <>
+                              <button onClick={() => handleUpdate(application.id, "Approved")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
+                              <button onClick={() => handleUpdate(application.id, "Rejected")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
+                            </>
+                          )}
+                          {application.status === "Approved" && (
+                            <button onClick={() => handleDisburseClick(application.id)} className="rounded-full bg-emerald-600 px-3 py-2 text-sm text-white">Disburse</button>
+                          )}
+                        </div>
+                      ) : (
+                        <Link to={`/cooperatives/applications/${application.id}`}>
+                          <button className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700">Review</button>
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -185,7 +217,7 @@ export const CooperativeApplicationsPage = () => {
           </div>
 
           <div className="mt-4 flex flex-col gap-3 border-t border-stone-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
-            <p className="text-sm text-stone-500">Showing 1-5 of 248 applications</p>
+            <p className="text-sm text-stone-500">Showing 1-5 of {appsState.length} applications</p>
             <div className="flex items-center gap-2 text-sm text-stone-500">
               <span>Rows per page:</span>
               <button className="rounded-lg border border-stone-200 px-3 py-2">10</button>
