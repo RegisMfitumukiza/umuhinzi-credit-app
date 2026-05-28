@@ -78,9 +78,11 @@ export const registerUserSchema = z.object({
 /* ================= LOGIN ================= */
 
 export const loginUserSchema = z.object({
-  email: z.email("Invalid email").trim().toLowerCase(),
+  body: z.object({
+    email: z.email("Invalid email").trim().toLowerCase(),
 
-  password: z.string().min(1, "Password is required"),
+    password: z.string().min(1, "Password is required"),
+  }),
 });
 
 /* ================= PROFILE UPDATE ================= */
@@ -181,7 +183,7 @@ registry.register("VerifyEmailInput", verifyEmailSchema);
 /* ================= TYPES ================= */
 
 export type RegisterUserInput = z.infer<typeof registerUserSchema>["body"]
-export type LoginUserInput = z.infer<typeof loginUserSchema>["body"];
+export type LoginUserInput = z.infer<typeof loginUserSchema>["body"]
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
 export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>["body"];
 
