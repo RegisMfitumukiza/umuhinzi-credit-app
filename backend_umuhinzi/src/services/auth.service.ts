@@ -16,7 +16,9 @@ import type { Prisma } from "../generated/prisma/client.js";
 import type {
   ForgotPasswordInput,
   LoginUserInput,
+  RefreshTokenInput,
   RegisterUserInput,
+  ResendVerificationEmailInput,
   ResetPasswordInput,
   VerifyEmailInput,
 } from "../validators/user.schema.js";
@@ -26,35 +28,47 @@ type RequestContext = {
   userAgent?: string;
 };
 
+type JwtPayload = {
+  id: string;
+};
+
 const getFrontendUrl = () =>
   process.env.FRONTEND_URL || "http://localhost:5173";
+
+const hashToken = (token: string): string => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
 
 const signAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
 
-  if (!secret) throw new APIError("JWT_SECRET is missing", 500);
+  if (!secret) {
+    throw new APIError("JWT_SECRET is missing", 500);
+  }
 
-  const expiresIn = (process.env.JWT_EXPIRES_IN || "15m") as SignOptions["expiresIn"];
+  const expiresIn = (process.env.JWT_EXPIRES_IN ||
+    "15m") as SignOptions["expiresIn"];
 
   return jwt.sign({ id: userId }, secret, { expiresIn });
 };
 
-const generateRefreshToken = (): string => crypto.randomBytes(64).toString("hex");
+const signRefreshToken = (userId: string): string => {
+  const secret = process.env.JWT_REFRESH_SECRET;
 
-const REFRESH_TOKEN_TTL_DAYS = 30;
+  if (!secret) {
+    throw new APIError("JWT_REFRESH_SECRET is missing", 500);
+  }
 
-const saveRefreshToken = async (userId: string): Promise<string> => {
-  const token = generateRefreshToken();
-  const expiry = new Date();
-  expiry.setDate(expiry.getDate() + REFRESH_TOKEN_TTL_DAYS);
+  const expiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ||
+    "7d") as SignOptions["expiresIn"];
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { refreshToken: token, refreshTokenExpiry: expiry },
-  });
-
-  return token;
+  return jwt.sign({ id: userId }, secret, { expiresIn });
 };
+
+const createEmailVerificationToken = () => ({
+  token: crypto.randomBytes(32).toString("hex"),
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+});
 
 export const registerUserService = async (
   input: RegisterUserInput,
@@ -75,8 +89,7 @@ export const registerUserService = async (
   }
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
-  const emailVerificationToken = crypto.randomBytes(32).toString("hex");
-  const emailVerificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const verification = createEmailVerificationToken();
 
   const createUserData = {
     fullName: input.fullName,
@@ -84,11 +97,11 @@ export const registerUserService = async (
     ...(input.phone && { phone: input.phone }),
     password: hashedPassword,
     role: input.role ?? "FARMER",
-    status: "ACTIVE",
+    status: "PENDING",
     isEmailVerified: false,
     isPhoneVerified: false,
-    emailVerificationToken,
-    emailVerificationTokenExpiry
+    emailVerificationToken: verification.token,
+    emailVerificationTokenExpiry: verification.expiresAt,
   } satisfies Prisma.UserCreateInput;
 
   const user = await prisma.user.create({
@@ -96,48 +109,66 @@ export const registerUserService = async (
     select: safeUserSelect,
   });
 
-  // Only send verification email if not skipping
-  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
+  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${verification.token}`;
 
   await sendEmail({
-      to: user.email,
-      subject: "Verify your Umuhinzi Credit email",
-      html: emailVerificationTemplate(verifyUrl),
+    to: user.email,
+    subject: "Verify your Umuhinzi Credit email",
+    html: emailVerificationTemplate(verifyUrl),
   });
-  
+
   await writeAuditLog({
     actorId: user.id,
     action: "CREATE",
     resource: "USER",
     resourceId: user.id,
     description: "User account registered",
-    metadata: { email: user.email, role: user.role },
+    metadata: {
+      email: user.email,
+      role: user.role,
+    },
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
 
-  const accessToken = signAccessToken(user.id);
-  const refreshToken = await saveRefreshToken(user.id);
-
-  return { user, accessToken, refreshToken };
+  return { user };
 };
 
 export const loginUserService = async (
   input: LoginUserInput,
   context: RequestContext = {}
 ) => {
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
 
-  if (!user) throw new APIError("Invalid email or password", 401);
+  if (!user) {
+    throw new APIError("Invalid email or password", 401);
+  }
 
   const passwordMatches = await bcrypt.compare(input.password, user.password);
-  if (!passwordMatches) throw new APIError("Invalid email or password", 401);
 
-  if (user.status !== "ACTIVE") throw new APIError("Account is not active", 403);
+  if (!passwordMatches) {
+    throw new APIError("Invalid email or password", 401);
+  }
+
+  if (!user.isEmailVerified || user.status === "PENDING") {
+    throw new APIError("Please verify your email before logging in", 403);
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new APIError("Account is not active", 403);
+  }
+
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = signRefreshToken(user.id);
 
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: {
+      lastLoginAt: new Date(),
+      refreshToken: hashToken(refreshToken),
+    },
     select: safeUserSelect,
   });
 
@@ -151,10 +182,103 @@ export const loginUserService = async (
     userAgent: context.userAgent,
   });
 
-  const accessToken = signAccessToken(user.id);
-  const refreshToken = await saveRefreshToken(user.id);
+  return {
+    user: updatedUser,
+    accessToken,
+    refreshToken,
+  };
+};
 
-  return { user: updatedUser, accessToken, refreshToken };
+export const refreshTokenService = async (
+  input: RefreshTokenInput,
+  context: RequestContext = {}
+) => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+
+  if (!secret) {
+    throw new APIError("JWT_REFRESH_SECRET is missing", 500);
+  }
+
+  let decoded: JwtPayload;
+
+  try {
+    decoded = jwt.verify(input.refreshToken, secret) as JwtPayload;
+  } catch {
+    throw new APIError("Invalid or expired refresh token", 401);
+  }
+
+  const hashedRefreshToken = hashToken(input.refreshToken);
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: decoded.id,
+      refreshToken: hashedRefreshToken,
+    },
+    select: {
+      id: true,
+      status: true,
+      isEmailVerified: true,
+    },
+  });
+
+  if (!user) {
+    throw new APIError("Invalid refresh token", 401);
+  }
+
+  if (!user.isEmailVerified || user.status !== "ACTIVE") {
+    throw new APIError("Account is not allowed to refresh token", 403);
+  }
+
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = signRefreshToken(user.id);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      refreshToken: hashToken(refreshToken),
+    },
+  });
+
+  await writeAuditLog({
+    actorId: user.id,
+    action: "UPDATE",
+    resource: "AUTH",
+    resourceId: user.id,
+    description: "Refresh token rotated",
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const logoutUserService = async (
+  userId: string,
+  context: RequestContext = {}
+) => {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      refreshToken: null,
+    },
+  });
+
+  await writeAuditLog({
+    actorId: userId,
+    action: "LOGOUT",
+    resource: "AUTH",
+    resourceId: userId,
+    description: "User logged out",
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return {
+    message: "Logged out successfully.",
+  };
 };
 
 export const forgotPasswordService = async (
@@ -163,11 +287,16 @@ export const forgotPasswordService = async (
 ) => {
   const user = await prisma.user.findUnique({
     where: { email: input.email },
-    select: { id: true, email: true },
+    select: {
+      id: true,
+      email: true,
+    },
   });
 
   if (!user) {
-    return { message: "If the email exists, password reset instructions have been sent." };
+    return {
+      message: "If the email exists, password reset instructions have been sent.",
+    };
   }
 
   const resetToken = crypto.randomBytes(32).toString("hex");
@@ -175,7 +304,10 @@ export const forgotPasswordService = async (
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { resetToken, resetTokenExpiry },
+    data: {
+      resetToken,
+      resetTokenExpiry,
+    },
   });
 
   const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
@@ -196,7 +328,9 @@ export const forgotPasswordService = async (
     userAgent: context.userAgent,
   });
 
-  return { message: "If the email exists, password reset instructions have been sent." };
+  return {
+    message: "If the email exists, password reset instructions have been sent.",
+  };
 };
 
 export const resetPasswordService = async (
@@ -206,11 +340,15 @@ export const resetPasswordService = async (
   const user = await prisma.user.findFirst({
     where: {
       resetToken: input.token,
-      resetTokenExpiry: { gt: new Date() },
+      resetTokenExpiry: {
+        gt: new Date(),
+      },
     },
   });
 
-  if (!user) throw new APIError("Invalid or expired reset token", 400);
+  if (!user) {
+    throw new APIError("Invalid or expired reset token", 400);
+  }
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
 
@@ -220,6 +358,7 @@ export const resetPasswordService = async (
       password: hashedPassword,
       resetToken: null,
       resetTokenExpiry: null,
+      refreshToken: null,
       passwordChangedAt: new Date(),
     },
   });
@@ -234,7 +373,9 @@ export const resetPasswordService = async (
     userAgent: context.userAgent,
   });
 
-  return { message: "Password reset successfully." };
+  return {
+    message: "Password reset successfully.",
+  };
 };
 
 export const verifyEmailService = async (
@@ -244,18 +385,29 @@ export const verifyEmailService = async (
   const user = await prisma.user.findFirst({
     where: {
       emailVerificationToken: input.token,
-      emailVerificationTokenExpiry: { gt: new Date() },
+      emailVerificationTokenExpiry: {
+        gt: new Date(),
+      },
     },
-    select: { id: true, isEmailVerified: true },
+    select: {
+      id: true,
+      isEmailVerified: true,
+    },
   });
 
-  if (!user) throw new APIError("Invalid or expired verification token", 400);
-  if (user.isEmailVerified) throw new APIError("Email is already verified", 400);
+  if (!user) {
+    throw new APIError("Invalid or expired verification token", 400);
+  }
+
+  if (user.isEmailVerified) {
+    throw new APIError("Email is already verified", 400);
+  }
 
   const verifiedUser = await prisma.user.update({
     where: { id: user.id },
     data: {
       isEmailVerified: true,
+      status: "ACTIVE",
       emailVerificationToken: null,
       emailVerificationTokenExpiry: null,
     },
@@ -267,12 +419,69 @@ export const verifyEmailService = async (
     action: "UPDATE",
     resource: "AUTH",
     resourceId: verifiedUser.id,
-    description: "Email verified",
+    description: "Email verified and account activated",
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
 
   return verifiedUser;
+};
+
+export const resendVerificationEmailService = async (
+  input: ResendVerificationEmailInput,
+  context: RequestContext = {}
+) => {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+    select: {
+      id: true,
+      email: true,
+      isEmailVerified: true,
+    },
+  });
+
+  if (!user) {
+    return {
+      message: "If the email exists, a verification link has been sent.",
+    };
+  }
+
+  if (user.isEmailVerified) {
+    throw new APIError("Email is already verified", 400);
+  }
+
+  const verification = createEmailVerificationToken();
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      status: "PENDING",
+      emailVerificationToken: verification.token,
+      emailVerificationTokenExpiry: verification.expiresAt,
+    },
+  });
+
+  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${verification.token}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Verify your Umuhinzi Credit email",
+    html: emailVerificationTemplate(verifyUrl),
+  });
+
+  await writeAuditLog({
+    actorId: user.id,
+    action: "UPDATE",
+    resource: "AUTH",
+    resourceId: user.id,
+    description: "Verification email resent",
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return {
+    message: "If the email exists, a verification link has been sent.",
+  };
 };
 
 export const getAuthUserService = async (userId: string) => {
@@ -281,56 +490,9 @@ export const getAuthUserService = async (userId: string) => {
     select: safeUserSelect,
   });
 
-  if (!user) throw new APIError("User not found", 404);
+  if (!user) {
+    throw new APIError("User not found", 404);
+  }
 
   return user;
-};
-
-export const refreshAccessTokenService = async (token: string) => {
-  const user = await prisma.user.findUnique({
-    where: { refreshToken: token },
-    select: {
-      id: true,
-      status: true,
-      refreshToken: true,
-      refreshTokenExpiry: true,
-    },
-  });
-
-  if (!user || !user.refreshToken || !user.refreshTokenExpiry) {
-    throw new APIError("Invalid refresh token", 401);
-  }
-
-  if (user.refreshTokenExpiry < new Date()) {
-    throw new APIError("Refresh token has expired. Please log in again.", 401);
-  }
-
-  if (user.status !== "ACTIVE") throw new APIError("Account is not active", 403);
-
-  const accessToken = signAccessToken(user.id);
-  const newRefreshToken = await saveRefreshToken(user.id);
-
-  return { accessToken, refreshToken: newRefreshToken };
-};
-
-export const logoutService = async (
-  userId: string,
-  context: RequestContext = {}
-) => {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { refreshToken: null, refreshTokenExpiry: null },
-  });
-
-  await writeAuditLog({
-    actorId: userId,
-    action: "LOGOUT",
-    resource: "AUTH",
-    resourceId: userId,
-    description: "User logged out",
-    ipAddress: context.ipAddress,
-    userAgent: context.userAgent,
-  });
-
-  return { message: "Logged out successfully." };
 };

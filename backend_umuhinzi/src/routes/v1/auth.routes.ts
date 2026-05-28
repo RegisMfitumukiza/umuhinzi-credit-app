@@ -4,11 +4,12 @@ import {
   forgotPassword,
   getAuthUser,
   loginUser,
+  logoutUser,
+  refreshToken,
   registerUser,
+  resendVerificationEmail,
   resetPassword,
   verifyEmail,
-  refreshToken,
-  logoutUser,
 } from "../../controllers/auth.controller.js";
 
 import { authenticate } from "../../middlewares/auth.middleware.js";
@@ -18,7 +19,9 @@ import { validate } from "../../middlewares/validate.middleware.js";
 import {
   forgotPasswordSchema,
   loginUserSchema,
+  refreshTokenSchema,
   registerUserSchema,
+  resendVerificationEmailSchema,
   resetPasswordSchema,
   verifyEmailSchema,
 } from "../../validators/user.schema.js";
@@ -30,7 +33,7 @@ const router = Router();
  * /api/v1/auth/register:
  *   post:
  *     summary: Register a new user
- *     description: Creates a new user account and sends an email verification link.
+ *     description: Creates a new pending user account and sends an email verification link.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -73,7 +76,7 @@ router.post("/register", authLimiter, validate(registerUserSchema), registerUser
  * /api/v1/auth/login:
  *   post:
  *     summary: Login user
- *     description: Authenticates a user and returns an access token.
+ *     description: Authenticates an active verified user and returns access and refresh tokens.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -97,11 +100,63 @@ router.post("/register", authLimiter, validate(registerUserSchema), registerUser
  *       401:
  *         description: Invalid email or password
  *       403:
- *         description: Account is not active
+ *         description: Email not verified or account not active
  *       429:
  *         description: Too many authentication attempts
  */
 router.post("/login", authLimiter, validate(loginUserSchema), loginUser);
+
+/**
+ * @swagger
+ * /api/v1/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     description: Rotates refresh token and returns a new access token and refresh token.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Invalid or expired refresh token
+ *       403:
+ *         description: Account is not allowed to refresh token
+ */
+router.post(
+  "/refresh-token",
+  authLimiter,
+  validate(refreshTokenSchema),
+  refreshToken
+);
+
+/**
+ * @swagger
+ * /api/v1/auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     description: Logs out the authenticated user by clearing stored refresh token.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/logout", authenticate, logoutUser);
 
 /**
  * @swagger
@@ -129,7 +184,12 @@ router.post("/login", authLimiter, validate(loginUserSchema), loginUser);
  *       429:
  *         description: Too many authentication attempts
  */
-router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post(
+  "/forgot-password",
+  authLimiter,
+  validate(forgotPasswordSchema),
+  forgotPassword
+);
 
 /**
  * @swagger
@@ -163,14 +223,19 @@ router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), for
  *       429:
  *         description: Too many authentication attempts
  */
-router.post("/reset-password", authLimiter, validate(resetPasswordSchema), resetPassword);
+router.post(
+  "/reset-password",
+  authLimiter,
+  validate(resetPasswordSchema),
+  resetPassword
+);
 
 /**
  * @swagger
  * /api/v1/auth/verify-email:
  *   post:
  *     summary: Verify email
- *     description: Verifies user email using token from email link.
+ *     description: Verifies user email using token from email link and activates the account.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -191,7 +256,45 @@ router.post("/reset-password", authLimiter, validate(resetPasswordSchema), reset
  *       429:
  *         description: Too many authentication attempts
  */
-router.post("/verify-email", authLimiter, validate(verifyEmailSchema), verifyEmail);
+router.post(
+  "/verify-email",
+  authLimiter,
+  validate(verifyEmailSchema),
+  verifyEmail
+);
+
+/**
+ * @swagger
+ * /api/v1/auth/resend-verification-email:
+ *   post:
+ *     summary: Resend verification email
+ *     description: Sends a new verification email if the account exists and is not verified.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: sam@example.com
+ *     responses:
+ *       200:
+ *         description: Verification email sent if account exists
+ *       400:
+ *         description: Email already verified or validation error
+ *       429:
+ *         description: Too many authentication attempts
+ */
+router.post(
+  "/resend-verification-email",
+  authLimiter,
+  validate(resendVerificationEmailSchema),
+  resendVerificationEmail
+);
 
 /**
  * @swagger
@@ -209,47 +312,5 @@ router.post("/verify-email", authLimiter, validate(verifyEmailSchema), verifyEma
  *         description: Unauthorized
  */
 router.get("/me", authenticate, getAuthUser);
-
-/**
- * @swagger
- * /api/v1/auth/refresh:
- *   post:
- *     summary: Refresh access token
- *     description: Issues a new access token using a valid refresh token. The refresh token is rotated on each use.
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [refreshToken]
- *             properties:
- *               refreshToken:
- *                 type: string
- *     responses:
- *       200:
- *         description: New access token issued
- *       401:
- *         description: Invalid or expired refresh token
- */
-router.post("/refresh", refreshToken);
-
-/**
- * @swagger
- * /api/v1/auth/logout:
- *   post:
- *     summary: Logout user
- *     description: Invalidates the user's refresh token.
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Logged out successfully
- *       401:
- *         description: Unauthorized
- */
-router.post("/logout", authenticate, logoutUser);
 
 export default router;
