@@ -31,8 +31,11 @@ const getFrontendUrl = () =>
 
 const signAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
+
   if (!secret) throw new APIError("JWT_SECRET is missing", 500);
+
   const expiresIn = (process.env.JWT_EXPIRES_IN || "15m") as SignOptions["expiresIn"];
+
   return jwt.sign({ id: userId }, secret, { expiresIn });
 };
 
@@ -88,10 +91,10 @@ export const registerUserService = async (
     password: hashedPassword,
     role: input.role ?? "FARMER",
     status: "ACTIVE",
-    isEmailVerified: process.env.SKIP_EMAIL_VERIFICATION === "true",
+    isEmailVerified: false,
     isPhoneVerified: false,
-    emailVerificationToken: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationToken,
-    emailVerificationTokenExpiry: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationTokenExpiry,
+    emailVerificationToken,
+    emailVerificationTokenExpiry
   } satisfies Prisma.UserCreateInput;
 
   const user = await prisma.user.create({
@@ -100,15 +103,14 @@ export const registerUserService = async (
   });
 
   // Only send verification email if not skipping
-  if (process.env.SKIP_EMAIL_VERIFICATION !== "true") {
-    const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
-    await sendEmail({
+  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
+
+  await sendEmail({
       to: user.email,
       subject: "Verify your Umuhinzi Credit email",
       html: emailVerificationTemplate(verifyUrl),
-    });
-  }
-
+  });
+  
   await writeAuditLog({
     actorId: user.id,
     action: "CREATE",
