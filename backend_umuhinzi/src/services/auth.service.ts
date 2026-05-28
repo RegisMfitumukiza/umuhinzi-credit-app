@@ -31,6 +31,7 @@ const getFrontendUrl = () =>
 
 const signAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
+<<<<<<< HEAD
   if (!secret) throw new APIError("JWT_SECRET is missing", 500);
   const expiresIn = (process.env.JWT_EXPIRES_IN || "15m") as SignOptions["expiresIn"];
   return jwt.sign({ id: userId }, secret, { expiresIn });
@@ -51,6 +52,19 @@ const saveRefreshToken = async (userId: string): Promise<string> => {
   });
 
   return token;
+=======
+
+  if (!secret) {
+    throw new APIError("JWT_SECRET is missing", 500);
+  }
+
+  const expiresIn = (process.env.JWT_EXPIRES_IN ||
+    "7d") as SignOptions["expiresIn"];
+
+  return jwt.sign({ id: userId }, secret, {
+    expiresIn,
+  });
+>>>>>>> origin/clarisse-farmermanagement
 };
 
 export const registerUserService = async (
@@ -88,10 +102,17 @@ export const registerUserService = async (
     password: hashedPassword,
     role: input.role ?? "FARMER",
     status: "ACTIVE",
+<<<<<<< HEAD
     isEmailVerified: process.env.SKIP_EMAIL_VERIFICATION === "true",
     isPhoneVerified: false,
     emailVerificationToken: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationToken,
     emailVerificationTokenExpiry: process.env.SKIP_EMAIL_VERIFICATION === "true" ? undefined : emailVerificationTokenExpiry,
+=======
+    isEmailVerified: false,
+    isPhoneVerified: false,
+    emailVerificationToken,
+    emailVerificationTokenExpiry,
+>>>>>>> origin/clarisse-farmermanagement
   } satisfies Prisma.UserCreateInput;
 
   const user = await prisma.user.create({
@@ -99,6 +120,7 @@ export const registerUserService = async (
     select: safeUserSelect,
   });
 
+<<<<<<< HEAD
   // Only send verification email if not skipping
   if (process.env.SKIP_EMAIL_VERIFICATION !== "true") {
     const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
@@ -108,6 +130,15 @@ export const registerUserService = async (
       html: emailVerificationTemplate(verifyUrl),
     });
   }
+=======
+  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Verify your Umuhinzi Credit email",
+    html: emailVerificationTemplate(verifyUrl),
+  });
+>>>>>>> origin/clarisse-farmermanagement
 
   await writeAuditLog({
     actorId: user.id,
@@ -123,6 +154,7 @@ export const registerUserService = async (
     userAgent: context.userAgent,
   });
 
+<<<<<<< HEAD
   const accessToken = signAccessToken(user.id);
   const refreshToken = await saveRefreshToken(user.id);
 
@@ -130,6 +162,13 @@ export const registerUserService = async (
     user,
     accessToken,
     refreshToken,
+=======
+  const token = signAccessToken(user.id);
+
+  return {
+    user,
+    token,
+>>>>>>> origin/clarisse-farmermanagement
   };
 };
 
@@ -177,6 +216,7 @@ export const loginUserService = async (
     userAgent: context.userAgent,
   });
 
+<<<<<<< HEAD
   const accessToken = signAccessToken(user.id);
   const refreshToken = await saveRefreshToken(user.id);
 
@@ -184,6 +224,13 @@ export const loginUserService = async (
     user: updatedUser,
     accessToken,
     refreshToken,
+=======
+  const token = signAccessToken(user.id);
+
+  return {
+    user: updatedUser,
+    token,
+>>>>>>> origin/clarisse-farmermanagement
   };
 };
 
@@ -355,6 +402,7 @@ export const getAuthUserService = async (userId: string) => {
   }
 
   return user;
+<<<<<<< HEAD
 };
 
 /* ─────────────────────────────────────────
@@ -416,3 +464,6 @@ export const logoutService = async (
 
   return { message: "Logged out successfully." };
 };
+=======
+};
+>>>>>>> origin/clarisse-farmermanagement

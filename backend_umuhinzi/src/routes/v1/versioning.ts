@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import authRoutes from "./auth.routes.js";
 import userRoutes from "./user.routes.js";
+<<<<<<< HEAD
 import farmerRoutes from "./farmer.routes.js";
 import farmRoutes from "./farm.routes.js";
 import { cropRouter, seasonRouter } from "./crop.routes.js";
@@ -31,11 +32,14 @@ import { analyticsRouter } from "./analytics.routes.js";
 import { auditLogRouter } from "./audit-log.routes.js";
 import { uploadRouter } from "./upload.routes.js";
 import { exportRouter } from "./export.routes.js";
+=======
+>>>>>>> origin/clarisse-farmermanagement
 
 const router = Router();
 
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
+<<<<<<< HEAD
 router.use("/farmers", farmerRoutes);
 router.use("/farms", farmRoutes);
 router.use("/crops", cropRouter);
@@ -63,3 +67,7 @@ router.use("/uploads", uploadRouter);
 router.use("/exports", exportRouter);
 
 export default router;
+=======
+
+export default router;
+>>>>>>> origin/clarisse-farmermanagement

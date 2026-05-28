@@ -7,8 +7,11 @@ import {
   registerUser,
   resetPassword,
   verifyEmail,
+<<<<<<< HEAD
   refreshToken,
   logoutUser,
+=======
+>>>>>>> origin/clarisse-farmermanagement
 } from "../../controllers/auth.controller.js";
 
 import { authenticate } from "../../middlewares/auth.middleware.js";
@@ -225,6 +228,7 @@ router.post(
  */
 router.get("/me", authenticate, getAuthUser);
 
+<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/auth/refresh:
@@ -267,4 +271,6 @@ router.post("/refresh", refreshToken);
  */
 router.post("/logout", authenticate, logoutUser);
 
+=======
+>>>>>>> origin/clarisse-farmermanagement
 export default router;

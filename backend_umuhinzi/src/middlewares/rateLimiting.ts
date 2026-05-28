@@ -7,10 +7,19 @@ const safeIpKey = (req: Request): string =>
 
 /* ─── Global IP-based limiter (applied to all /api/v1 routes) ─── */
 export const apiLimiter = rateLimit({
+<<<<<<< HEAD
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+=======
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+
+  standardHeaders: true,
+  legacyHeaders: false,
+
+>>>>>>> origin/clarisse-farmermanagement
   message: {
     success: false,
     message: "Too many requests from this IP. Please try again later.",
@@ -20,6 +29,7 @@ export const apiLimiter = rateLimit({
 /* ─── Auth limiter (login, register, forgot-password) ─── */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+<<<<<<< HEAD
   max: process.env.NODE_ENV === "production" ? 5 : 100,
   standardHeaders: true,
   legacyHeaders: false,
@@ -66,3 +76,19 @@ export const sensitiveActionLimiter = rateLimit({
     message: "Too many requests for this action. Please try again later.",
   },
 });
+=======
+
+  max: 5,
+
+  standardHeaders: true,
+  legacyHeaders: false,
+
+  message: {
+    success: false,
+    message:
+      "Too many authentication attempts from this IP. Please try again later.",
+  },
+
+  skipSuccessfulRequests: false,
+});
+>>>>>>> origin/clarisse-farmermanagement

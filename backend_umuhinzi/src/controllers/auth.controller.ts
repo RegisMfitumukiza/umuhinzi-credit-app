@@ -11,8 +11,11 @@ import {
   registerUserService,
   resetPasswordService,
   verifyEmailService,
+<<<<<<< HEAD
   refreshAccessTokenService,
   logoutService,
+=======
+>>>>>>> origin/clarisse-farmermanagement
 } from "../services/auth.service.js";
 
 const getRequestContext = (req: Request) => ({
@@ -31,11 +34,19 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
 
   res.status(201).json({
     success: true,
+<<<<<<< HEAD
     message: "User registered successfully. Please check your email for verification.",
     data: {
       user: result.user,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
+=======
+    message:
+      "User registered successfully. Please check your email for verification.",
+    data: {
+      user: result.user,
+      token: result.token,
+>>>>>>> origin/clarisse-farmermanagement
     },
   });
 });
@@ -54,12 +65,17 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
     message: "Login successful",
     data: {
       user: result.user,
+<<<<<<< HEAD
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
+=======
+      token: result.token,
+>>>>>>> origin/clarisse-farmermanagement
     },
   });
 });
 
+<<<<<<< HEAD
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
   const { refreshToken: token } = req.body as { refreshToken?: string };
   if (!token) throw new APIError("Refresh token is required", 400);
@@ -114,6 +130,57 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
 
 export const getAuthUser = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new APIError("User not authenticated", 401);
+=======
+export const forgotPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await forgotPasswordService(req.body, getRequestContext(req));
+
+    logger.info("Password reset requested", {
+      email: req.body.email,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  }
+);
+
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await resetPasswordService(req.body, getRequestContext(req));
+
+    logger.info("Password reset completed");
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  }
+);
+
+export const verifyEmail = asyncHandler(
+  async (req: Request, res: Response) => {
+    const user = await verifyEmailService(req.body, getRequestContext(req));
+
+    logger.info("Email verified", {
+      userId: user.id,
+      email: user.email,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      data: user,
+    });
+  }
+);
+
+export const getAuthUser = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new APIError("User not authenticated", 401);
+  }
+>>>>>>> origin/clarisse-farmermanagement
 
   const user = await getAuthUserService(req.user.id);
 
@@ -122,4 +189,8 @@ export const getAuthUser = asyncHandler(async (req: Request, res: Response) => {
     message: "Authenticated user fetched successfully",
     data: user,
   });
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> origin/clarisse-farmermanagement
