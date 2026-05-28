@@ -1,81 +1,86 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const maskPhone = (phone?: string) => {
-  if (!phone) return "+250 788 ••• ••89";
-  // naive mask: keep last 2 digits
-  const digits = phone.replace(/\D/g, "");
-  const last = digits.slice(-2);
-  return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ••• ••${last}`;
-};
+import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
 
 export const RegisterVerifyPage = () => {
   const navigate = useNavigate();
-  const [code, setCode] = useState("");
-  const [reg, setReg] = useState<any>(null);
+  const { user } = useAuth();
+  const [token, setToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [resent, setResent] = useState(false);
 
-  useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("umuhinzi_registration") || "null");
-    setReg(stored);
-  }, []);
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!token.trim()) { setError("Enter the verification token from your email."); return; }
+    setLoading(true);
+    try {
+      await api.post("/v1/auth/verify-email", { token: token.trim() });
+      // redirect based on role
+      const role = user?.role ?? "FARMER";
+      const redirectMap: Record<string, string> = {
+        ADMIN: "/admin",
+        COOPERATIVE_MANAGER: "/cooperatives",
+        INSTITUTION: "/finance",
+        GOVERNMENT_PARTNER: "/government",
+        FARMER: "/farms",
+      };
+      navigate(redirectMap[role] ?? "/farms");
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? "Invalid or expired token.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleVerify = () => {
-    // In a real app we'd verify the OTP. For now accept any 4-6 digit code.
-    if (!code || code.trim().length < 4) return;
+  const handleResend = async () => {
+    if (!user?.email) return;
+    try {
+      await api.post("/v1/auth/forgot-password", { email: user.email });
+      setResent(true);
+    } catch {}
+  };
 
-    const r = reg || {};
-    const user = {
-      id: `user-${Date.now()}`,
-      fullName: r.fullName || "Demo User",
-      email: r.email || "demo@example.com",
-      phone: r.phone || "+250788001189",
-      password: r.password || "123456",
-      role: r.role || "FARMER",
-      farm: r.farm || { name: "Demo Farm" },
+  const handleSkip = () => {
+    const role = user?.role ?? "FARMER";
+    const redirectMap: Record<string, string> = {
+      ADMIN: "/admin", COOPERATIVE_MANAGER: "/cooperatives",
+      INSTITUTION: "/finance", GOVERNMENT_PARTNER: "/government", FARMER: "/farms",
     };
-
-    localStorage.setItem("umuhinzi_account", JSON.stringify(user));
-    localStorage.setItem("umuhinzi_user", JSON.stringify(user));
-    localStorage.setItem("umuhinzi_token", "demo");
-    localStorage.setItem("umuhinzi_last_role", user.role);
-    localStorage.setItem(
-      "umuhinzi_post_register_login",
-      JSON.stringify({ email: user.email, password: user.password, autoLogin: true }),
-    );
-    localStorage.removeItem("umuhinzi_registration");
-
-    navigate("/login", { replace: true, state: { email: user.email, password: user.password, autoLogin: true } });
+    navigate(redirectMap[role] ?? "/farms");
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#f0faf0_0%,#f8faf7_50%,#fff_100%)] p-6">
       <div className="w-full max-w-md rounded-xl border border-stone-100 bg-white p-8 shadow-lg">
-        <button onClick={() => navigate('/register')} className="mb-4 text-sm text-stone-500">← Back to Registration</button>
-
         <div className="flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xl">📱</div>
-          <h2 className="mt-4 text-xl font-semibold text-stone-900">Verify Your Identity</h2>
-          <p className="mt-2 text-sm text-stone-600 text-center">We've sent a 6-digit verification code to</p>
-          <p className="mt-1 font-medium text-stone-900">{maskPhone(reg?.phone)}</p>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xl">📧</div>
+          <h2 className="mt-4 text-xl font-semibold text-stone-900">Verify Your Email</h2>
+          <p className="mt-2 text-sm text-stone-600 text-center">
+            We sent a verification link to <span className="font-medium text-stone-900">{user?.email ?? "your email"}</span>. Paste the token from the link below.
+          </p>
         </div>
 
-        <div className="mt-6 flex justify-center">
+        {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
+        {resent && <p className="mt-4 rounded-lg bg-green-50 px-4 py-2 text-sm text-green-600">Verification email resent!</p>}
+
+        <form onSubmit={handleVerify} className="mt-6 space-y-4">
           <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="w-60 rounded-2xl border border-stone-200 px-4 py-3 text-center text-lg tracking-[0.35em]"
-            maxLength={6}
-            placeholder="______"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            placeholder="Paste verification token here"
           />
-        </div>
+          <button type="submit" disabled={loading} className="w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-60 hover:bg-emerald-600 transition">
+            {loading ? "Verifying..." : "Verify & Continue"}
+          </button>
+        </form>
 
-        <div className="mt-6">
-          <button onClick={handleVerify} className="w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white">Verify & Continue</button>
-        </div>
-
-        <div className="mt-4 text-center text-sm text-stone-500">
-          Resend code in 0:59
-          <div className="mt-2"><button onClick={() => { /* noop */ }} className="text-emerald-500">Use a different phone number</button></div>
+        <div className="mt-4 flex flex-col items-center gap-2 text-sm text-stone-500">
+          <button onClick={handleResend} className="text-emerald-600 hover:underline">Resend verification email</button>
+          <button onClick={handleSkip} className="text-stone-400 hover:underline">Skip for now →</button>
         </div>
       </div>
     </div>

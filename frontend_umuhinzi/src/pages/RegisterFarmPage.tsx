@@ -9,10 +9,7 @@ export const RegisterFarmPage = () => {
   const [district, setDistrict] = useState("");
 
   const handleFinish = () => {
-    const reg = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
-    const next = { ...reg, farm: { name: farmName, landSize, province, district } };
-    // save the combined registration and go to OTP verification step
-    localStorage.setItem("umuhinzi_registration", JSON.stringify(next));
+    // Farm details will be created after account verification via /farms
     navigate("/register/verify");
   };
 

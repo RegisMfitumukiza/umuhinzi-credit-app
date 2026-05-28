@@ -40,72 +40,95 @@ import { FinanceDashboardPage } from "./pages/FinanceDashboardPage";
 import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
+import AccountNotifications from "./pages/AccountNotifications";
 
 export const App = () => {
   return (
     <Routes>
+      {/* Public */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterRolePage />} />
       <Route path="/register/personal" element={<RegisterPersonalPage />} />
       <Route path="/register/farm" element={<RegisterFarmPage />} />
       <Route path="/register/verify" element={<RegisterVerifyPage />} />
-
       <Route path="/admin/login" element={<AdminLoginPage />} />
-      <Route element={<AdminLayout />}>
-        <Route path="/admin" element={<AdminDashboardPage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
-        <Route path="/admin/profile" element={<AdminProfilePage />} />
+
+      {/* Admin */}
+      <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/profile" element={<AdminProfilePage />} />
+        </Route>
       </Route>
 
-      <Route element={<FinanceLayout />}>
-        <Route path="/finance" element={<FinanceDashboardPage />} />
-        <Route path="/finance/applications" element={<FinanceApplicationsPage />} />
-        <Route path="/finance/portfolio" element={<FinanceDashboardPage />} />
-        <Route path="/finance/reports" element={<FinanceDashboardPage />} />
-        <Route path="/finance/profile" element={<FinanceDashboardPage />} />
+      {/* Finance Institution */}
+      <Route element={<ProtectedRoute allowedRoles={["INSTITUTION"]} />}>
+        <Route element={<FinanceLayout />}>
+          <Route path="/finance" element={<FinanceDashboardPage />} />
+          <Route path="/finance/applications" element={<FinanceApplicationsPage />} />
+          <Route path="/finance/portfolio" element={<FinanceDashboardPage />} />
+          <Route path="/finance/reports" element={<FinanceDashboardPage />} />
+          <Route path="/finance/profile" element={<FinanceDashboardPage />} />
+        </Route>
       </Route>
 
-      <Route element={<GovernmentLayout />}>
-        <Route path="/government" element={<GovernmentDashboardPage />} />
-        <Route path="/government/regions" element={<GovernmentDashboardPage />} />
-        <Route path="/government/reports" element={<GovernmentDashboardPage />} />
-        <Route path="/government/profile" element={<GovernmentDashboardPage />} />
+      {/* Government */}
+      <Route element={<ProtectedRoute allowedRoles={["GOVERNMENT_PARTNER"]} />}>
+        <Route element={<GovernmentLayout />}>
+          <Route path="/government" element={<GovernmentDashboardPage />} />
+          <Route path="/government/regions" element={<GovernmentDashboardPage />} />
+          <Route path="/government/reports" element={<GovernmentDashboardPage />} />
+          <Route path="/government/profile" element={<GovernmentDashboardPage />} />
+        </Route>
       </Route>
 
-      <Route element={<AppLayout />}>
-        <Route path="/dashboard" element={<FinancialDashboardPage />} />
-        <Route path="/farms" element={<FarmDashboardPage />} />
-        <Route path="/farms/new" element={<FarmCreatePage />} />
-        <Route path="/farms/:id" element={<FarmDetailsPage />} />
-        <Route path="/farms/:id/edit" element={<FarmEditPage />} />
-        <Route path="/loans" element={<LoansPage />} />
-        <Route path="/loans/:id" element={<LoanDetailsPage />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/recommendations" element={<RecommendationsPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/institutions" element={<InstitutionsPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/input-costs" element={<InputCostsPage />} />
-        <Route path="/livestock" element={<LivestockPage />} />
+      {/* Farmer */}
+      <Route element={<ProtectedRoute allowedRoles={["FARMER"]} />}>
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<FinancialDashboardPage />} />
+          <Route path="/farms" element={<FarmDashboardPage />} />
+          <Route path="/farms/new" element={<FarmCreatePage />} />
+          <Route path="/farms/:id" element={<FarmDetailsPage />} />
+          <Route path="/farms/:id/edit" element={<FarmEditPage />} />
+          <Route path="/loans" element={<LoansPage />} />
+          <Route path="/loans/:id" element={<LoanDetailsPage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/recommendations" element={<RecommendationsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/institutions" element={<InstitutionsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/input-costs" element={<InputCostsPage />} />
+          <Route path="/livestock" element={<LivestockPage />} />
+        </Route>
       </Route>
 
-      <Route element={<CooperativeLayout />}>
-        <Route path="/cooperatives" element={<CooperativesPage />} />
-        <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
-        <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
-        <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />
-        <Route path="/cooperatives/groups" element={<CooperativesPage />} />
-        <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
-        <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
-        <Route path="/cooperatives/member-list" element={<CooperativesPage />} />
-        <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
-        <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
-        <Route path="/cooperatives/settings" element={<CooperativesPage />} />
+      {/* Cooperative Manager */}
+      <Route element={<ProtectedRoute allowedRoles={["COOPERATIVE_MANAGER"]} />}>
+        <Route element={<CooperativeLayout />}>
+          <Route path="/cooperatives" element={<CooperativesPage />} />
+          <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
+          <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
+          <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />
+          <Route path="/cooperatives/groups" element={<CooperativesPage />} />
+          <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
+          <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
+          <Route path="/cooperatives/member-list" element={<CooperativesPage />} />
+          <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
+          <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
+          <Route path="/cooperatives/settings" element={<CooperativesPage />} />
+        </Route>
       </Route>
+
+      {/* Shared authenticated */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/account" element={<AccountNotifications />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
