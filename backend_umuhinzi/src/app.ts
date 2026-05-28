@@ -26,7 +26,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
 app.use(requestLogger);
 
 /* ================= ROOT ================= */
@@ -41,11 +40,7 @@ setupSwagger(app);
 
 /* ================= ROUTES ================= */
 
-<<<<<<< HEAD
 app.use("/api/v1", apiLimiter, perUserLimiter, apiV1);
-=======
-app.use("/api/v1", apiLimiter, apiV1);
->>>>>>> origin/clarisse-farmermanagement
 
 /* ================= ERROR HANDLING ================= */
 

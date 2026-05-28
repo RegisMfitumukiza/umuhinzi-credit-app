@@ -10,7 +10,6 @@ type SendEmailInput = {
 
 export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
   if (!isEmailEnabled || !resend) {
-<<<<<<< HEAD
     logger.warn("Email sending skipped: RESEND_API_KEY missing", { to, subject });
     return null;
   }
@@ -23,7 +22,6 @@ export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
 
   const recipient = isDev && devRedirect ? devRedirect : to;
 
-  // In dev, add a note to the subject so you know who it was originally for
   const finalSubject =
     isDev && devRedirect && devRedirect !== to
       ? `[DEV → ${to}] ${subject}`
@@ -34,50 +32,18 @@ export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
       from: EMAIL_FROM,
       to: recipient,
       subject: finalSubject,
-=======
-    logger.warn("Email sending skipped: RESEND_API_KEY missing", {
-      to,
-      subject,
-    });
-
-    return null;
-  }
-
-  try {
-    const result = await resend.emails.send({
-      from: EMAIL_FROM,
-      to,
-      subject,
->>>>>>> origin/clarisse-farmermanagement
       html,
     });
 
     logger.info("Email sent", {
-<<<<<<< HEAD
       originalTo: to,
       deliveredTo: recipient,
       subject: finalSubject,
-=======
-      to,
-      subject,
->>>>>>> origin/clarisse-farmermanagement
     });
 
     return result;
   } catch (error) {
-<<<<<<< HEAD
     logger.error("Failed to send email", { to: recipient, subject: finalSubject, error });
     throw new APIError("Failed to send email", 500);
   }
 };
-=======
-    logger.error("Failed to send email", {
-      to,
-      subject,
-      error,
-    });
-
-    throw new APIError("Failed to send email", 500);
-  }
-};
->>>>>>> origin/clarisse-farmermanagement

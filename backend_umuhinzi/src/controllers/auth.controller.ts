@@ -54,7 +54,8 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
     message: "Login successful",
     data: {
       user: result.user,
-      token: result.token,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     },
   });
 });

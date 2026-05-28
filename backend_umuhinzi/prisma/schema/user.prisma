@@ -12,11 +12,8 @@ model User {
   emailVerificationTokenExpiry DateTime?
   resetToken                   String?             @unique
   resetTokenExpiry             DateTime?
-<<<<<<< HEAD
   refreshToken                 String?             @unique
   refreshTokenExpiry           DateTime?
-=======
->>>>>>> origin/clarisse-farmermanagement
   profileImageUrl              String?
   profileImagePublicId         String?
   lastLoginAt                  DateTime?
