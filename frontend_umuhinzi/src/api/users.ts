@@ -37,3 +37,18 @@ export const updateUserStatus = async (
   const response = await api.patch<ApiResponse<AuthUser & { status?: string }>>(`/users/${id}/status`, { status });
   return toAdminUser(response.data.data);
 };
+
+export type UpdateMyProfilePayload = {
+  fullName?: string;
+  phone?: string;
+  province?: string;
+  district?: string;
+  sector?: string;
+  cell?: string;
+  village?: string;
+};
+
+export const updateMyProfile = async (payload: UpdateMyProfilePayload): Promise<AuthUser> => {
+  const response = await api.patch<ApiResponse<AuthUser>>("/users/me", payload);
+  return response.data.data;
+};

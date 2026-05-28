@@ -2,16 +2,33 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import axios from "axios";
 import { registerRequest } from "../api/auth";
+import { updateMyProfile } from "../api/users";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { homeRouteByRole } from "../utils/auth";
 import type { BackendRole } from "../types/auth";
+
+const roleOptions: Array<{ value: BackendRole; label: string }> = [
+  { value: "FARMER", label: "Farmer" },
+  { value: "COOPERATIVE_MANAGER", label: "Cooperative Manager" },
+  { value: "INSTITUTION", label: "Institution" },
+  { value: "GOVERNMENT_PARTNER", label: "Government Partner" },
+];
 
 export const RegisterPersonalPage = () => {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<BackendRole>(() => {
+    const prev = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
+    return (prev.role as BackendRole) || "FARMER";
+  });
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [sector, setSector] = useState("");
+  const [cell, setCell] = useState("");
+  const [village, setVillage] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
@@ -28,14 +45,19 @@ export const RegisterPersonalPage = () => {
 
   const handleNext = async () => {
     const prev = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
-    const role = (prev.role || "FARMER") as BackendRole;
+    const nextRole = (role || prev.role || "FARMER") as BackendRole;
     const next = {
       ...prev,
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       password,
-      role,
+      role: nextRole,
+      province: province.trim(),
+      district: district.trim(),
+      sector: sector.trim(),
+      cell: cell.trim(),
+      village: village.trim(),
     };
 
     if (next.fullName.length < 2 || next.fullName.length > 100) {
@@ -50,6 +72,11 @@ export const RegisterPersonalPage = () => {
 
     if (next.phone && !isValidPhone(next.phone)) {
       showToast("Phone must be 10 to 15 digits, optionally starting with +", "error");
+      return;
+    }
+
+    if (!next.province || !next.district || !next.sector || !next.village) {
+      showToast("Province, district, sector, and village are required", "error");
       return;
     }
 
@@ -71,10 +98,22 @@ export const RegisterPersonalPage = () => {
         role: next.role,
       });
 
-      login(session);
+      localStorage.setItem("umuhinzi_token", session.accessToken);
       if (session.refreshToken) {
         localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
       }
+
+      login(session);
+
+      await updateMyProfile({
+        fullName: next.fullName,
+        phone: next.phone,
+        province: next.province,
+        district: next.district,
+        sector: next.sector,
+        cell: next.cell || undefined,
+        village: next.village,
+      });
 
       localStorage.removeItem("umuhinzi_registration");
       showToast("Registration successful", "success");
@@ -101,6 +140,21 @@ export const RegisterPersonalPage = () => {
         </div>
 
         <div className="mt-8 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-stone-900">Role</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as BackendRole)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            >
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Full name</span>
             <input
@@ -137,6 +191,53 @@ export const RegisterPersonalPage = () => {
               className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Province</span>
+              <input
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">District</span>
+              <input
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Sector</span>
+              <input
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Cell</span>
+              <input
+                value={cell}
+                onChange={(e) => setCell(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-sm font-medium text-stone-900">Village</span>
+              <input
+                value={village}
+                onChange={(e) => setVillage(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+          </div>
 
           <div className="flex justify-center pt-2">
               <button onClick={() => void handleNext()} disabled={isSubmitting} className="rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-70">
