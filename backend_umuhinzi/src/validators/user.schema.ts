@@ -147,14 +147,8 @@ export type LoginUserInput = z.infer<typeof loginUserSchema>["body"];
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>["body"];
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>["body"];
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>["body"];
-export type ResendVerificationEmailInput = z.infer<
-  typeof resendVerificationEmailSchema
->["body"];
+export type ResendVerificationEmailInput = z.infer<typeof resendVerificationEmailSchema>["body"];
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>["body"];
-export type UpdateUserProfileInput = z.infer<
-  typeof updateUserProfileSchema
->["body"];
-export type UpdateUserStatusInput = z.infer<
-  typeof updateUserStatusSchema
->["body"];
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
+export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>["body"];
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>["body"];
