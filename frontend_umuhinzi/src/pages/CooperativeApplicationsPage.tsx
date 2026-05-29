@@ -81,17 +81,31 @@ const cropStyles: Record<string, string> = {
   Wheat: "bg-emerald-100 text-emerald-700",
 };
 
-const stats = [
-  { label: "Total Requests", value: "248", tone: "+12%" },
-  { label: "Pending Review", value: "34", tone: "8 Urgent" },
-  { label: "Approved (MTD)", value: "112", tone: "+5.4%" },
-  { label: "Avg. Credit Score", value: "742", tone: "B+ Grade" },
-];
+const parseAmount = (value: string) => Number(value.replace(/,/g, "")) || 0;
+
+const getStats = (apps: LoanApplicationUi[]) => {
+  const totalRequests = apps.length;
+  const pendingReview = apps.filter((application) => application.status === "Pending" || application.status === "Under Review").length;
+  const approvedThisList = apps.filter((application) => application.status === "Approved").length;
+  const scores = apps
+    .map((application) => Number(application.scoreValue))
+    .filter((score) => Number.isFinite(score) && score > 0);
+  const averageScore = scores.length > 0 ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
+
+  return [
+    { label: "Total Requests", value: String(totalRequests), tone: `${totalRequests} total` },
+    { label: "Pending Review", value: String(pendingReview), tone: pendingReview > 0 ? `${pendingReview} Urgent` : "No pending" },
+    { label: "Approved (MTD)", value: String(approvedThisList), tone: `${approvedThisList} approved` },
+    { label: "Avg. Credit Score", value: averageScore ? String(averageScore) : "N/A", tone: averageScore ? "Live data" : "No score yet" },
+  ];
+};
 
 export const CooperativeApplicationsPage = ({ showActions = false }: { showActions?: boolean }) => {
   const [appsState, setAppsState] = useState<LoanApplicationUi[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
+
+  const stats = getStats(appsState);
 
   useEffect(() => {
     void (async () => {
@@ -106,9 +120,12 @@ export const CooperativeApplicationsPage = ({ showActions = false }: { showActio
     })();
   }, []);
 
-  async function handleUpdate(id: string, status: "APPROVED" | "REJECTED") {
+  async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
     try {
-      const updated = await updateLoanApplicationStatus(id, status);
+      const needsReviewStep = currentStatus === "Pending" || currentStatus === "PENDING";
+      const updated = needsReviewStep
+        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status))
+        : await updateLoanApplicationStatus(id, status);
       setAppsState((p) => p.map((x) => (x.id === id ? updated : x)));
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch {
@@ -216,10 +233,13 @@ export const CooperativeApplicationsPage = ({ showActions = false }: { showActio
                     <td className="px-3 py-5 text-right">
                       {showActions ? (
                         <div className="flex items-center gap-2 justify-end">
+                          <Link to={`/finance/applications/${application.id}`} state={{ application }}>
+                            <button className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700">View</button>
+                          </Link>
                           {application.status !== "Approved" && application.status !== "Rejected" && application.status !== "Cancelled" && (
                             <>
-                              <button onClick={() => void handleUpdate(application.id, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
-                              <button onClick={() => void handleUpdate(application.id, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
+                              <button onClick={() => void handleUpdate(application.id, "APPROVED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
+                              <button onClick={() => void handleUpdate(application.id, "REJECTED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
                             </>
                           )}
                         </div>

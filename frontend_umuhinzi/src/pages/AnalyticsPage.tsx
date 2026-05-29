@@ -27,16 +27,27 @@ const factorCards = [
 export const AnalyticsPage = () => {
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
-        setCreditScore(await farmerApi.getLatestCreditScore());
+        setCreditScore(await farmerApi.getLatestCreditScore().catch(() => null));
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  const handleGenerateCreditScore = async () => {
+    setGenerating(true);
+    try {
+      const score = await farmerApi.generateCreditScore();
+      setCreditScore(score);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (loading) {
     return <div className="p-6 text-sm text-stone-500">Loading credit score...</div>;
@@ -44,6 +55,7 @@ export const AnalyticsPage = () => {
 
   const score = creditScore?.score ?? 0;
   const risk = creditScore?.riskLevel || creditScore?.grade || "Pending";
+  const hasCreditScore = creditScore !== null;
 
   return (
     <div className="space-y-6">
@@ -65,7 +77,7 @@ export const AnalyticsPage = () => {
               <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative flex h-44 w-44 items-center justify-center rounded-full border-[14px] border-stone-100 border-t-stone-800 bg-white">
                   <div className="text-center">
-                    <p className="text-4xl font-semibold text-stone-900">{score || "-"}</p>
+                    <p className="text-4xl font-semibold text-stone-900">{hasCreditScore ? score : "No score yet"}</p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Trust Score</p>
                   </div>
                 </div>
@@ -78,7 +90,16 @@ export const AnalyticsPage = () => {
                     <p><span className="font-semibold">Generated:</span> {creditScore?.createdAt ? new Date(creditScore.createdAt).toLocaleDateString() : "-"}</p>
                     <p><span className="font-semibold">Summary:</span> {creditScore?.summary || "No summary available"}</p>
                   </div>
-                  <button className="mt-5 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm">Live score from backend</button>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm"
+                      onClick={() => void handleGenerateCreditScore()}
+                      disabled={generating}
+                    >
+                      {generating ? "Generating..." : creditScore ? "Refresh credit score" : "Generate credit score"}
+                    </button>
+                    <button className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm">Live score from backend</button>
+                  </div>
                 </div>
               </div>
             </article>

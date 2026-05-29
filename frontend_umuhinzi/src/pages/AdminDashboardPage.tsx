@@ -24,7 +24,7 @@ export const AdminDashboardPage = () => {
   }, [showToast, user?.email, user?.fullName]);
 
   const counts = useMemo(() => {
-    const map: Record<string, number> = { FARMER: 0, COOPERATIVE_MANAGER: 0, FINANCE: 0, GOVERNMENT: 0 };
+    const map: Record<string, number> = { FARMER: 0, COOPERATIVE_MANAGER: 0, INSTITUTION: 0, GOVERNMENT_PARTNER: 0 };
     users.forEach((u) => {
       if (map[u.role] !== undefined) map[u.role]++;
     });
@@ -54,11 +54,11 @@ export const AdminDashboardPage = () => {
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="text-sm text-stone-500">Finance Institutions</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.FINANCE}</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.INSTITUTION}</div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="text-sm text-stone-500">Government Accounts</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.GOVERNMENT}</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.GOVERNMENT_PARTNER}</div>
           </div>
         </div>
 

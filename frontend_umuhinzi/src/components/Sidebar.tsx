@@ -27,6 +27,7 @@ export const Sidebar = () => {
 
       <nav className="flex flex-1 flex-col gap-1">
         <NavLink to="/farmer/dashboard" className={navClass}>Dashboard</NavLink>
+        <NavLink to="/farms" className={navClass}>Farms</NavLink>
         <NavLink to="/crops" className={navClass}>Record Crops</NavLink>
         <NavLink to="/harvests" className={navClass}>Track Harvests</NavLink>
         <NavLink to="/recommendations" className={navClass}>Recommendations</NavLink>

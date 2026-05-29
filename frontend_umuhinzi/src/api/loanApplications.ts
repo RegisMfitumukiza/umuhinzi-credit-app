@@ -16,6 +16,7 @@ type FarmerLike = {
 
 type LoanApplicationRaw = {
   id: string;
+  farmerId?: string;
   requestedAmount?: number;
   approvedAmount?: number;
   recommendedAmount?: number;
@@ -23,16 +24,22 @@ type LoanApplicationRaw = {
   purpose?: string;
   createdAt?: string;
   farmer?: FarmerLike;
+  creditScore?: {
+    score?: number;
+    riskLevel?: string;
+  };
 };
 
 export type LoanApplicationUi = {
   id: string;
+  farmerId?: string;
   farmer: string;
   location: string;
   crop: string;
   amount: string;
   scoreLabel: string;
   scoreValue: string;
+  riskLevel?: string;
   date: string;
   status: string;
 };
@@ -53,15 +60,19 @@ const toUiStatus = (status?: string): string => {
 const toUiModel = (row: LoanApplicationRaw): LoanApplicationUi => {
   const amount = row.approvedAmount ?? row.recommendedAmount ?? row.requestedAmount ?? 0;
   const date = row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "-";
+  const scoreValue = row.creditScore?.score != null ? String(row.creditScore.score) : "-";
+  const scoreLabel = row.creditScore?.riskLevel?.charAt(0) || scoreValue;
 
   return {
     id: row.id,
+    farmerId: row.farmerId,
     farmer: row.farmer?.user?.fullName || "Farmer",
     location: "Rwanda",
     crop: row.purpose || "General",
     amount: formatCurrencyAmount(amount),
-    scoreLabel: "-",
-    scoreValue: "-",
+    scoreLabel,
+    scoreValue,
+    riskLevel: row.creditScore?.riskLevel,
     date,
     status: toUiStatus(row.status),
   };

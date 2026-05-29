@@ -16,6 +16,7 @@ export type FarmerDashboardProfile = {
   id: string;
   fullName: string;
   email: string;
+  status?: "PENDING" | "VERIFIED" | "SUSPENDED";
   nationalId?: string | null;
   dateOfBirth?: string | null;
   gender?: string | null;
@@ -143,6 +144,29 @@ export type FarmerSeason = {
   endDate?: string;
 };
 
+export type CreateSeasonPayload = {
+  name: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+};
+
+const toIsoDateTime = (value: string): string => {
+  if (value.includes("T")) {
+    return value;
+  }
+
+  return new Date(`${value}T00:00:00.000Z`).toISOString();
+};
+
+const normalizeDateField = (value: unknown): unknown => {
+  if (typeof value !== "string" || !value.trim()) {
+    return value;
+  }
+
+  return toIsoDateTime(value);
+};
+
 export const farmerApi = {
   getProfile: async () => {
     const response = await api.get<ApiResponse<FarmerDashboardProfile>>("/farmers/me");
@@ -166,6 +190,10 @@ export const farmerApi = {
     const response = await api.get<ApiResponse<FarmerCreditScore>>("/credit-scores/latest");
     return response.data.data;
   },
+  generateCreditScore: async () => {
+    const response = await api.post<ApiResponse<FarmerCreditScore>>("/credit-scores/generate", {});
+    return response.data.data;
+  },
   getNotifications: async (limit = 5) => {
     const response = await api.get<ApiResponse<FarmerNotification[]>>(`/notifications?limit=${limit}`);
     return response.data.data || [];
@@ -178,6 +206,14 @@ export const farmerApi = {
     const response = await api.get<ApiResponse<FarmerSeason[]>>("/seasons");
     return response.data.data || [];
   },
+  createSeason: async (payload: CreateSeasonPayload) => {
+    const response = await api.post<ApiResponse<FarmerSeason>>("/seasons", {
+      ...payload,
+      startDate: toIsoDateTime(payload.startDate),
+      endDate: toIsoDateTime(payload.endDate),
+    });
+    return response.data.data;
+  },
   getProductivityRecords: async () => getListData<FarmerProductivityRecord>("/productivity"),
   createLoanApplication: async (payload: Record<string, unknown>) => {
     const response = await api.post<ApiResponse<unknown>>("/loan-applications", payload);
@@ -188,11 +224,19 @@ export const farmerApi = {
     return response.data.data;
   },
   createCrop: async (payload: Record<string, unknown>) => {
-    const response = await api.post<ApiResponse<unknown>>("/crops", payload);
+    const response = await api.post<ApiResponse<unknown>>("/crops", {
+      ...payload,
+      plantingDate: normalizeDateField(payload.plantingDate),
+      expectedHarvestDate: normalizeDateField(payload.expectedHarvestDate),
+      actualHarvestDate: normalizeDateField(payload.actualHarvestDate),
+    });
     return response.data.data;
   },
   createYield: async (payload: Record<string, unknown>) => {
-    const response = await api.post<ApiResponse<unknown>>("/yields", payload);
+    const response = await api.post<ApiResponse<unknown>>("/yields", {
+      ...payload,
+      harvestDate: normalizeDateField(payload.harvestDate),
+    });
     return response.data.data;
   },
 };

@@ -3,10 +3,10 @@ import { AppLayout } from "./layout/AppLayout";
 import { CooperativeLayout } from "./layout/CooperativeLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { FarmDashboardPage } from "./pages/FarmDashboardPage";
+import { FarmListPage } from "./pages/FarmListPage";
 import { CropRecordsPage } from "./pages/CropRecordsPage";
 import { HarvestsPage } from "./pages/HarvestsPage";
 import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
-import { FarmCreatePage } from "./pages/FarmCreatePage";
 import { FarmEditPage } from "./pages/FarmEditPage";
 import { FarmDetailsPage } from "./pages/FarmDetailsPage";
 import { LoansPage } from "./pages/LoansPage";
@@ -35,9 +35,12 @@ import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminLayout } from "./layout/AdminLayout";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminProfilePage } from "./pages/AdminProfilePage";
+import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
+import { AdminInstitutionsPage } from "./pages/AdminInstitutionsPage";
 import { FinanceLayout } from "./layout/FinanceLayout";
 import { FinanceDashboardPage } from "./pages/FinanceDashboardPage";
 import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
+import { FinanceApplicationDetailsPage } from "./pages/FinanceApplicationDetailsPage";
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
 import { RequireAuth, RedirectAuthenticated } from "./components/RouteGuards";
@@ -63,6 +66,8 @@ export const App = () => {
       <Route element={<RequireAuth roles={["ADMIN"]} />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/institutions" element={<AdminInstitutionsPage />} />
+          <Route path="/admin/seasons" element={<AdminSeasonsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/profile" element={<AdminProfilePage />} />
         </Route>
@@ -72,9 +77,10 @@ export const App = () => {
         <Route element={<FinanceLayout />}>
           <Route path="/finance" element={<FinanceDashboardPage />} />
           <Route path="/finance/applications" element={<FinanceApplicationsPage />} />
+          <Route path="/finance/applications/:id" element={<FinanceApplicationDetailsPage />} />
           <Route path="/finance/portfolio" element={<FinanceDashboardPage />} />
           <Route path="/finance/reports" element={<FinanceDashboardPage />} />
-          <Route path="/finance/profile" element={<FinanceDashboardPage />} />
+          <Route path="/finance/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
@@ -91,8 +97,8 @@ export const App = () => {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Navigate to="/farmer/dashboard" replace />} />
           <Route path="/farmer/dashboard" element={<FarmDashboardPage />} />
-          <Route path="/farms" element={<FarmDashboardPage />} />
-          <Route path="/farms/new" element={<FarmCreatePage />} />
+          <Route path="/farms" element={<FarmListPage />} />
+          <Route path="/farms/new" element={<Navigate to="/farms?new=1" replace />} />
           <Route path="/farms/:id" element={<FarmDetailsPage />} />
           <Route path="/farms/:id/edit" element={<FarmEditPage />} />
           <Route path="/crops" element={<CropRecordsPage />} />

@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useToast } from "../context/ToastContext";
+import {
+  getPendingFarmerRequests,
+  markFarmerApproved,
+  markFarmerDeclined,
+} from "../utils/farmerApprovalQueue";
 
 type PendingMember = {
   id: string;
@@ -16,20 +22,28 @@ type CooperativeMember = {
   role: string;
 };
 
-const initialPendingMembers: PendingMember[] = [
-  { id: "REQ-001", name: "Emile Karemera", phone: "+250788111222", village: "Kacyiru", status: "Pending" },
-  { id: "REQ-002", name: "Grace Uwera", phone: "+250788333444", village: "Gatsata", status: "Pending" },
-  { id: "REQ-003", name: "Pascal Nkurunziza", phone: "+250788555666", village: "Remera", status: "Pending" },
-];
-
 const initialMembers: CooperativeMember[] = [
   { id: "MEM-101", name: "Alice Mutoni", phone: "+250788777888", village: "Kimironko", role: "Treasurer" },
   { id: "MEM-102", name: "Jean Gakweya", phone: "+250788999000", village: "Nyamirambo", role: "Member" },
 ];
 
 export const CooperativeMemberManagementPage = () => {
-  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>(initialPendingMembers);
+  const { showToast } = useToast();
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
   const [members, setMembers] = useState<CooperativeMember[]>(initialMembers);
+    useEffect(() => {
+      const requests = getPendingFarmerRequests();
+      setPendingMembers(
+        requests.map((request) => ({
+          id: request.userId,
+          name: request.fullName,
+          phone: request.phone || "-",
+          village: request.village || "-",
+          status: "Pending",
+        }))
+      );
+    }, []);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [newMember, setNewMember] = useState({
     name: "",
@@ -48,6 +62,7 @@ export const CooperativeMemberManagementPage = () => {
   );
 
   const acceptMember = (member: PendingMember) => {
+    markFarmerApproved(member.id);
     setPendingMembers((prev) => prev.filter((item) => item.id !== member.id));
     setMembers((prev) => [
       {
@@ -59,7 +74,14 @@ export const CooperativeMemberManagementPage = () => {
       },
       ...prev,
     ]);
+    showToast("Farmer approved. Pending restrictions removed.", "success");
   };
+  const declineMember = (memberId: string) => {
+    markFarmerDeclined(memberId);
+    setPendingMembers((prev) => prev.filter((item) => item.id !== memberId));
+    showToast("Farmer request declined.", "success");
+  };
+
 
   const handleAddMember = () => {
     if (!newMember.name.trim() || !newMember.phone.trim() || !newMember.village.trim()) {
@@ -157,6 +179,9 @@ export const CooperativeMemberManagementPage = () => {
             </div>
 
             <div className="space-y-3">
+              {pendingMembers.length === 0 && (
+                <p className="text-sm text-stone-500">No pending farmer requests yet.</p>
+              )}
               {pendingMembers.map((member) => (
                 <div key={member.id} className="rounded-2xl border border-stone-100 p-4">
                   <div className="flex items-center justify-between gap-4">
@@ -172,7 +197,7 @@ export const CooperativeMemberManagementPage = () => {
                         Accept
                       </button>
                       <button
-                        onClick={() => setPendingMembers((prev) => prev.filter((item) => item.id !== member.id))}
+                        onClick={() => declineMember(member.id)}
                         className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700"
                       >
                         Decline

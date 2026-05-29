@@ -35,6 +35,7 @@ export const FarmDashboardPage = () => {
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
   const [productivity, setProductivity] = useState<FarmerProductivityRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [generatingScore, setGeneratingScore] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -74,6 +75,16 @@ export const FarmDashboardPage = () => {
     };
   }, []);
 
+  const handleGenerateCreditScore = async () => {
+    setGeneratingScore(true);
+    try {
+      const score = await farmerApi.generateCreditScore();
+      setCreditScore(score);
+    } finally {
+      setGeneratingScore(false);
+    }
+  };
+
   const displayName = profile?.fullName || user?.fullName || "Farmer";
   const location = [profile?.district || user?.district, profile?.province || user?.province].filter(Boolean).join(", ") || "Your registered location";
   const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
@@ -82,6 +93,7 @@ export const FarmDashboardPage = () => {
   const estimatedIncome = getEstimatedIncome(productivity);
   const scoreValue = creditScore?.score ?? 0;
   const scoreRisk = creditScore?.riskLevel || creditScore?.grade || "Pending";
+  const hasCreditScore = creditScore !== null;
 
   const topCrops = useMemo(() => crops.slice(0, 3), [crops]);
   const topRecommendations = useMemo(() => recommendations.slice(0, 3), [recommendations]);
@@ -112,12 +124,14 @@ export const FarmDashboardPage = () => {
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-stone-500">
                 <span>{location}</span>
                 <span>{profile?.sector || user?.sector || "Registered farmer"}</span>
-                <span className="font-medium text-brand-600">Credit Score: {scoreValue || "-"}</span>
+                <span className="font-medium text-brand-600">Credit Score: {hasCreditScore ? scoreValue : "No score yet"}</span>
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <button onClick={() => navigate("/farms")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">View all farms</button>
+            <button onClick={() => navigate("/farms?new=1")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Add farm</button>
             <button onClick={() => navigate("/analytics")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">View analytics</button>
             <button onClick={() => navigate("/recommendations")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Open recommendations</button>
             <button onClick={() => navigate("/loans")} className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20">Apply for loan</button>
@@ -125,11 +139,39 @@ export const FarmDashboardPage = () => {
         </div>
       </section>
 
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Farm records</p>
+          <h3 className="mt-2 text-3xl font-semibold text-stone-900">{farms.length}</h3>
+          <p className="mt-1 text-sm text-stone-500">Total farms in your account</p>
+        </article>
+        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Manage farms</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={() => navigate("/farms?new=1")} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white">Create farm</button>
+            <button onClick={() => navigate("/farms")} className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700">View farms</button>
+          </div>
+        </article>
+        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Latest farm</p>
+          <h3 className="mt-2 text-xl font-semibold text-stone-900">{farms[0]?.name || "No farms yet"}</h3>
+          <p className="mt-1 text-sm text-stone-500">Open a farm to edit or delete it</p>
+        </article>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-4">
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Credit score</p>
-          <h3 className="mt-2 text-3xl font-semibold text-stone-900">{scoreValue || "-"}</h3>
+          <h3 className="mt-2 text-3xl font-semibold text-stone-900">{hasCreditScore ? scoreValue : "No score yet"}</h3>
           <p className="mt-1 text-sm text-stone-500">{scoreRisk}</p>
+          <button
+            type="button"
+            onClick={() => void handleGenerateCreditScore()}
+            disabled={generatingScore}
+            className="mt-4 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-70"
+          >
+            {generatingScore ? "Generating..." : creditScore ? "Refresh score" : "Generate score"}
+          </button>
         </article>
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Active crops</p>
