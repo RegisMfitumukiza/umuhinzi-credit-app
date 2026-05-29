@@ -3,6 +3,8 @@ import { AppLayout } from "./layout/AppLayout";
 import { CooperativeLayout } from "./layout/CooperativeLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { FarmDashboardPage } from "./pages/FarmDashboardPage";
+import { CropRecordsPage } from "./pages/CropRecordsPage";
+import { HarvestsPage } from "./pages/HarvestsPage";
 import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
 import { FarmCreatePage } from "./pages/FarmCreatePage";
 import { FarmEditPage } from "./pages/FarmEditPage";
@@ -20,6 +22,7 @@ import { CooperativeApplicationsPage } from "./pages/CooperativeApplicationsPage
 import { CooperativeRiskAnalyticsPage } from "./pages/CooperativeRiskAnalyticsPage";
 import { CooperativeReportsPage } from "./pages/CooperativeReportsPage";
 import { CooperativeApplicationDetailsPage } from "./pages/CooperativeApplicationDetailsPage";
+import { CooperativeMemberManagementPage } from "./pages/CooperativeMemberManagementPage";
 import { InstitutionsPage } from "./pages/InstitutionsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { InputCostsPage } from "./pages/InputCostsPage";
@@ -86,11 +89,14 @@ export const App = () => {
 
       <Route element={<RequireAuth roles={["FARMER"]} />}>
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<FinancialDashboardPage />} />
+          <Route path="/dashboard" element={<Navigate to="/farmer/dashboard" replace />} />
+          <Route path="/farmer/dashboard" element={<FarmDashboardPage />} />
           <Route path="/farms" element={<FarmDashboardPage />} />
           <Route path="/farms/new" element={<FarmCreatePage />} />
           <Route path="/farms/:id" element={<FarmDetailsPage />} />
           <Route path="/farms/:id/edit" element={<FarmEditPage />} />
+          <Route path="/crops" element={<CropRecordsPage />} />
+          <Route path="/harvests" element={<HarvestsPage />} />
           <Route path="/loans" element={<LoansPage />} />
           <Route path="/loans/:id" element={<LoanDetailsPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
@@ -115,7 +121,8 @@ export const App = () => {
           <Route path="/cooperatives/groups" element={<CooperativesPage />} />
           <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
           <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
-          <Route path="/cooperatives/member-list" element={<CooperativesPage />} />
+          <Route path="/cooperatives/member-list" element={<CooperativeMemberManagementPage />} />
+          <Route path="/cooperatives/members" element={<CooperativeMemberManagementPage />} />
           <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
           <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
           <Route path="/cooperatives/settings" element={<CooperativesPage />} />

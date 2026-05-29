@@ -1,37 +1,56 @@
+import { useEffect, useState } from "react";
+import { farmerApi, type FarmerCreditScore } from "../api/farmer";
+
 const factorCards = [
   {
     title: "Repayment Reliability",
-    level: "Strong",
-    description: "Consistency of on-time loan repayments over the last 24 months.",
+    description: "Consistency of on-time loan repayments over time.",
     impact: "High",
   },
   {
     title: "Agricultural Productivity",
-    level: "Strong",
-    description: "Yield performance relative to regional climate and crop standards.",
+    description: "Yield performance relative to your farm records.",
     impact: "High",
   },
   {
     title: "Tenure & Stability",
-    level: "Fair",
-    description: "Duration of farming activities on the same registered land parcels.",
+    description: "Duration of farming activities on registered land parcels.",
     impact: "Medium",
   },
   {
     title: "Market Engagement",
-    level: "Improving",
-    description: "Active participation in cooperatives and formal market contracts.",
+    description: "Active participation in cooperatives and markets.",
     impact: "Medium",
   },
 ];
 
 export const AnalyticsPage = () => {
+  const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setCreditScore(await farmerApi.getLatestCreditScore());
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-stone-500">Loading credit score...</div>;
+  }
+
+  const score = creditScore?.score ?? 0;
+  const risk = creditScore?.riskLevel || creditScore?.grade || "Pending";
+
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-stone-900">Credit Analysis</h2>
-          <p className="mt-2 text-sm text-stone-500">Detailed breakdown of your financial trust and agricultural reputation.</p>
+          <p className="mt-2 text-sm text-stone-500">Detailed breakdown of your live backend credit score and agricultural reputation.</p>
         </div>
         <div className="flex gap-3">
           <button className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">View History</button>
@@ -46,20 +65,20 @@ export const AnalyticsPage = () => {
               <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative flex h-44 w-44 items-center justify-center rounded-full border-[14px] border-stone-100 border-t-stone-800 bg-white">
                   <div className="text-center">
-                    <p className="text-4xl font-semibold text-stone-900">742</p>
+                    <p className="text-4xl font-semibold text-stone-900">{score || "-"}</p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Trust Score</p>
                   </div>
                 </div>
 
                 <div className="max-w-md">
-                  <h3 className="text-2xl font-semibold text-stone-900">You&apos;re in the top 5%!</h3>
-                  <p className="mt-3 text-sm text-stone-600">Your high score is driven by consistent yields and a perfect 12-month repayment history. You qualify for our Elite Farmer interest rates.</p>
+                  <h3 className="text-2xl font-semibold text-stone-900">{risk}</h3>
+                  <p className="mt-3 text-sm text-stone-600">This score is returned from the backend credit score service for your authenticated account.</p>
                   <div className="mt-4 space-y-2 text-sm text-stone-700">
-                    <p><span className="font-semibold">Repayment Reliability:</span> Excellent</p>
-                    <p><span className="font-semibold">Farm Stability:</span> High</p>
-                    <p><span className="font-semibold">Credit Utilization:</span> Moderate</p>
+                    <p><span className="font-semibold">Latest score ID:</span> {creditScore?.id || "-"}</p>
+                    <p><span className="font-semibold">Generated:</span> {creditScore?.createdAt ? new Date(creditScore.createdAt).toLocaleDateString() : "-"}</p>
+                    <p><span className="font-semibold">Summary:</span> {creditScore?.summary || "No summary available"}</p>
                   </div>
-                  <button className="mt-5 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm">Excellent Status</button>
+                  <button className="mt-5 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm">Live score from backend</button>
                 </div>
               </div>
             </article>
@@ -68,22 +87,22 @@ export const AnalyticsPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-stone-900">Instant Insights</h3>
-                  <p className="mt-1 text-sm text-stone-500">Recommendations based on your profile</p>
+                  <p className="mt-1 text-sm text-stone-500">Recommendations based on your backend profile</p>
                 </div>
                 <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">Update Records</span>
               </div>
 
               <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Recommended action</p>
-                <p className="mt-2 text-sm text-stone-700">Increase your score by 15 points by updating your latest Baseline vaccination records.</p>
+                <p className="mt-2 text-sm text-stone-700">Use the recommendations page to review the latest actions generated by the backend.</p>
               </div>
 
               <div className="mt-4">
                 <p className="text-sm font-semibold text-stone-900">Your Benefits</p>
                 <ul className="mt-3 space-y-2 text-sm text-stone-600">
-                  <li>Access to loans up to 2.5M RWF</li>
-                  <li>Interest rate capped at 8.5%</li>
-                  <li>Priority support line</li>
+                  <li>Live score returned from the credit-score API</li>
+                  <li>Recent backend score history can be loaded later</li>
+                  <li>Use analytics before applying for a loan</li>
                 </ul>
               </div>
             </article>

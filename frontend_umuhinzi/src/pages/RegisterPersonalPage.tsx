@@ -11,7 +11,7 @@ import type { BackendRole } from "../types/auth";
 const roleOptions: Array<{ value: BackendRole; label: string }> = [
   { value: "FARMER", label: "Farmer" },
   { value: "COOPERATIVE_MANAGER", label: "Cooperative Manager" },
-  { value: "INSTITUTION", label: "Institution" },
+  { value: "INSTITUTION", label: "Finance Institution" },
   { value: "GOVERNMENT_PARTNER", label: "Government Partner" },
 ];
 
@@ -31,7 +31,7 @@ export const RegisterPersonalPage = () => {
   const [village, setVillage] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, setUser } = useAuth();
   const { showToast } = useToast();
 
   const isValidEmail = (value: string) => /^(?:[^\s@]+)@(?:[^\s@]+)\.[^\s@]+$/.test(value);
@@ -105,7 +105,7 @@ export const RegisterPersonalPage = () => {
 
       login(session);
 
-      await updateMyProfile({
+      const updatedUser = await updateMyProfile({
         fullName: next.fullName,
         phone: next.phone,
         province: next.province,
@@ -114,6 +114,8 @@ export const RegisterPersonalPage = () => {
         cell: next.cell || undefined,
         village: next.village,
       });
+
+      setUser(updatedUser);
 
       localStorage.removeItem("umuhinzi_registration");
       showToast("Registration successful", "success");

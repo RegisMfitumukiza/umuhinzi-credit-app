@@ -20,7 +20,7 @@ export const homeRouteByRole = (role: BackendRole): string => {
   if (role === "INSTITUTION") return "/finance";
   if (role === "GOVERNMENT_PARTNER") return "/government";
   if (role === "ADMIN") return "/admin";
-  return "/farms";
+  return "/farmer/dashboard";
 };
 
 export const isRoleAllowed = (role: BackendRole, allowed?: BackendRole[]): boolean => {

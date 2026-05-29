@@ -10,8 +10,8 @@ const roles = [
   },
   {
     key: "INSTITUTION",
-    label: "Institution",
-    desc: "Banks or MFIs looking to invest in local agricultural projects.",
+    label: "Finance Institution",
+    desc: "Banks and microfinance institutions looking to invest in local agricultural projects.",
     icon: "🏢",
   },
   {

@@ -1,21 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { applications } from "./CooperativeApplicationsPage";
 import { getUsers, type AdminUser } from "../api/users";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export const AdminDashboardPage = () => {
   const [adminName, setAdminName] = useState("Admin");
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("umuhinzi_user");
-      if (raw) {
-        const u = JSON.parse(raw);
-        setAdminName(u.fullName || u.email || "Admin");
-      }
-    } catch {}
+    setAdminName(user?.fullName || user?.email || "Admin");
 
     void (async () => {
       try {
@@ -25,7 +21,7 @@ export const AdminDashboardPage = () => {
         showToast("Unable to fetch user stats", "error");
       }
     })();
-  }, []);
+  }, [showToast, user?.email, user?.fullName]);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { FARMER: 0, COOPERATIVE_MANAGER: 0, FINANCE: 0, GOVERNMENT: 0 };

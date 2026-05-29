@@ -26,6 +26,9 @@ export const CooperativeSidebar = () => {
         <NavLink to="/cooperatives/applications" className={navClass}>
           Applications
         </NavLink>
+        <NavLink to="/cooperatives/members" className={navClass}>
+          Members
+        </NavLink>
         <NavLink to="/cooperatives/risk-analytics" className={navClass}>
           Risk Analytics
         </NavLink>

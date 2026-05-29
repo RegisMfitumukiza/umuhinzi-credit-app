@@ -9,13 +9,22 @@ if (!connectionString) {
   throw new Error("DIRECT_URL missing. Please set it in .env");
 }
 
+// const pool = new Pool({
+//   connectionString,
+
+//   ssl: { 
+//     rejectUnauthorized: false 
+//   },
+
+//   max: Number(process.env.DB_POOL_MAX) || 5,
+//   idleTimeoutMillis: 30000,
+//   connectionTimeoutMillis: 15000,
+// });
+const useSsl = process.env.PGSSL === "true";
+
 const pool = new Pool({
   connectionString,
-
-  ssl: { 
-    rejectUnauthorized: false 
-  },
-
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   max: Number(process.env.DB_POOL_MAX) || 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,

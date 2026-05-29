@@ -8,7 +8,7 @@ const safeIpKey = (req: Request): string =>
 /* ─── Global IP-based limiter (applied to all /api/v1 routes) ─── */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -33,7 +33,7 @@ export const authLimiter = rateLimit({
 /* ─── Per-user limiter (keyed by authenticated user ID) ─── */
 export const perUserLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60,             // 60 requests per minute per user
+  max: 300,            // allow normal dashboard fan-out and farmer actions
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {

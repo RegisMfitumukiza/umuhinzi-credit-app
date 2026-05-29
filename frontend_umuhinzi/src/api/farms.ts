@@ -23,7 +23,7 @@ const toQueryString = (query: FarmQuery) => {
 
 export const farmApi = {
   listMine: async (query: FarmQuery = {}) => {
-    const response = await api.get<FarmListResponse>(`/farms/me${toQueryString(query)}`);
+    const response = await api.get<FarmListResponse>(`/farms${toQueryString(query)}`);
     return response.data;
   },
   listAll: async (query: FarmQuery = {}) => {
