@@ -114,13 +114,18 @@ export const getAllInstitutionsService = async (
     skip?: number;
     limit?: number;
     institutionUserId?: string;
+    status?: Prisma.InstitutionWhereInput["status"];
   } = {}
 ) => {
-  const { skip = 0, limit = 10, institutionUserId } = options;
+  const { skip = 0, limit = 10, institutionUserId, status } = options;
 
   const where: Prisma.InstitutionWhereInput = institutionUserId
     ? { userId: institutionUserId }
     : {};
+
+  if (status) {
+    where.status = status;
+  }
 
   const [institutions, total] = await Promise.all([
     prisma.institution.findMany({

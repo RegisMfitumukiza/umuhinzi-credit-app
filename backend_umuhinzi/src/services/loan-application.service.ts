@@ -97,10 +97,35 @@ export const createLoanApplicationService = async (
   context: RequestContext = {}
 ) => {
   const farmerId = await resolveFarmerIdFromUser(userId);
+  let institutionId = input.institutionId;
 
-  if (input.institutionId) {
+  if (!institutionId) {
+    const activeInstitutions = await prisma.institution.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+      take: 1,
+    });
+
+    if (activeInstitutions.length > 0) {
+      institutionId = activeInstitutions[0].id;
+    } else {
+      const anyInstitution = await prisma.institution.findFirst({
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (!anyInstitution) {
+        throw new APIError("No finance institution is available for loan applications.", 404);
+      }
+
+      institutionId = anyInstitution.id;
+    }
+  }
+
+  if (institutionId) {
     const institution = await prisma.institution.findUnique({
-      where: { id: input.institutionId },
+      where: { id: institutionId },
       select: { id: true, status: true },
     });
     if (!institution) throw new APIError("Institution not found", 404);
@@ -123,7 +148,7 @@ export const createLoanApplicationService = async (
   const application = await prisma.loanApplication.create({
     data: {
       farmerId,
-      institutionId: input.institutionId,
+      institutionId,
       creditScoreId: input.creditScoreId,
       requestedAmount: input.requestedAmount,
       purpose: input.purpose,
@@ -363,7 +388,14 @@ export const getAllLoanApplicationsService = async (
       select: { id: true },
     });
     if (institution) {
-      finalWhere = { ...where, institutionId: institution.id };
+      finalWhere = {
+        AND: [
+          where,
+          {
+            OR: [{ institutionId: institution.id }, { institutionId: null }],
+          },
+        ],
+      };
     }
   }
 

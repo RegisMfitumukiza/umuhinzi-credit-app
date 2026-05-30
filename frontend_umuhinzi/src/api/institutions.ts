@@ -56,6 +56,10 @@ export const institutionApi = {
     const response = await api.get<ApiResponse<InstitutionProfile[]>>("/institutions");
     return response.data.data || [];
   },
+  getActiveInstitutions: async (): Promise<InstitutionProfile[]> => {
+    const response = await api.get<ApiResponse<InstitutionProfile[]>>("/institutions");
+    return (response.data.data || []).filter((institution) => institution.status === "ACTIVE");
+  },
   createInstitution: async (payload: CreateInstitutionPayload): Promise<InstitutionProfile> => {
     const response = await api.post<ApiResponse<InstitutionProfile>>("/institutions", payload);
     return response.data.data;

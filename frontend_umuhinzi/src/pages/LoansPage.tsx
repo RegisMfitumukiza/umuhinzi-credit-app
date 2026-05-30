@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
+import { institutionApi, type InstitutionProfile } from "../api/institutions";
 import { farmerApi, type FarmerCreditScore, type FarmerLoan } from "../api/farmer";
 import { useToast } from "../context/ToastContext";
 
@@ -12,6 +13,7 @@ export const LoansPage = () => {
   const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
   const [loans, setLoans] = useState<FarmerLoan[]>([]);
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
+  const [selectedInstitution, setSelectedInstitution] = useState<InstitutionProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ requestedAmount: "", purpose: "SEEDS", purposeDescription: "", institutionId: "" });
@@ -24,10 +26,17 @@ export const LoansPage = () => {
           farmerApi.getLoans(),
           farmerApi.getLatestCreditScore().catch(() => null),
         ]);
+        const activeInstitutions = await institutionApi.getActiveInstitutions().catch(() => [] as InstitutionProfile[]);
+        const loadedInstitutions = activeInstitutions.length > 0
+          ? activeInstitutions
+          : await institutionApi.getAllInstitutions().catch(() => [] as InstitutionProfile[]);
+        const defaultInstitution = loadedInstitutions[0] || null;
 
         setApplications(loadedApplications);
         setLoans(loadedLoans);
         setCreditScore(latestScore);
+        setSelectedInstitution(defaultInstitution);
+        setForm((prev) => ({ ...prev, institutionId: defaultInstitution?.id || prev.institutionId }));
       } catch {
         showToast("Unable to load loan data", "error");
       } finally {
@@ -44,13 +53,18 @@ export const LoansPage = () => {
       return;
     }
 
+    if (!form.institutionId && !selectedInstitution) {
+      showToast("No finance institution is available for this loan application", "error");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await farmerApi.createLoanApplication({
         requestedAmount: Number(form.requestedAmount),
         purpose: form.purpose,
         purposeDescription: form.purposeDescription || undefined,
-        institutionId: form.institutionId || undefined,
+        institutionId: form.institutionId || selectedInstitution?.id,
       });
 
       const nextApplications = await getLoanApplications();
@@ -125,10 +139,13 @@ export const LoansPage = () => {
                 <textarea value={form.purposeDescription} onChange={(e) => setForm((prev) => ({ ...prev, purposeDescription: e.target.value }))} className="mt-2 min-h-28 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Add context for your loan request..." />
               </label>
 
-              <label className="block">
-                <span className="text-sm font-medium text-stone-700">Optional Institution ID</span>
-                <input value={form.institutionId} onChange={(e) => setForm((prev) => ({ ...prev, institutionId: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Optional backend institution reference" />
-              </label>
+              <div className="md:col-span-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <div className="text-sm font-medium text-emerald-800">Finance institution</div>
+                <div className="mt-1 text-sm text-emerald-900">
+                  {selectedInstitution ? `${selectedInstitution.name} (${selectedInstitution.type})` : "No finance institution available"}
+                </div>
+                <p className="mt-2 text-xs text-emerald-800">Your application will be linked here automatically.</p>
+              </div>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button onClick={() => navigate("/recommendations")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Save Draft</button>

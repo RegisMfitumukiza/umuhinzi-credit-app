@@ -49,11 +49,11 @@ export const getInstitutions = asyncHandler(async (req: Request, res: Response) 
 
   const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
 
-  // INSTITUTION role sees only their own
-  const institutionUserId =
-    req.user.role === Role.INSTITUTION ? req.user.id : undefined;
+  // INSTITUTION sees only their own. FARMER sees active institutions for loan selection.
+  const institutionUserId = req.user.role === Role.INSTITUTION ? req.user.id : undefined;
+  const status = req.user.role === Role.FARMER ? "ACTIVE" : undefined;
 
-  const result = await getAllInstitutionsService({ skip, limit, institutionUserId });
+  const result = await getAllInstitutionsService({ skip, limit, institutionUserId, status });
 
   res.status(200).json({
     success: true,

@@ -100,7 +100,19 @@ const getStats = (apps: LoanApplicationUi[]) => {
   ];
 };
 
-export const CooperativeApplicationsPage = ({ showActions = false }: { showActions?: boolean }) => {
+type CooperativeApplicationsPageProps = {
+  showActions?: boolean;
+  title?: string;
+  subtitle?: string;
+  emptyStateMessage?: string;
+};
+
+export const CooperativeApplicationsPage = ({
+  showActions = false,
+  title = "Loan Applications",
+  subtitle = "Manage and review agricultural loan requests from cooperatives across Rwanda.",
+  emptyStateMessage = "No applications submitted yet.",
+}: CooperativeApplicationsPageProps) => {
   const [appsState, setAppsState] = useState<LoanApplicationUi[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
@@ -142,8 +154,8 @@ export const CooperativeApplicationsPage = ({ showActions = false }: { showActio
       <div className="mx-auto max-w-[1400px]">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-stone-900">Loan Applications</h1>
-            <p className="mt-1 text-sm text-stone-500">Manage and review agricultural loan requests from cooperatives across Rwanda.</p>
+            <h1 className="text-3xl font-semibold text-stone-900">{title}</h1>
+            <p className="mt-1 text-sm text-stone-500">{subtitle}</p>
           </div>
 
           <div className="flex gap-3">
@@ -254,6 +266,8 @@ export const CooperativeApplicationsPage = ({ showActions = false }: { showActio
               </tbody>
             </table>
           </div>
+
+          {appsState.length === 0 && <div className="mt-4 text-sm text-stone-500">{emptyStateMessage}</div>}
 
           <div className="mt-4 flex flex-col gap-3 border-t border-stone-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-sm text-stone-500">Showing 1-5 of {appsState.length} applications</p>

@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { applications } from "./CooperativeApplicationsPage";
 import { getUsers, type AdminUser } from "../api/users";
+import { institutionApi, type InstitutionProfile, type InstitutionStatus } from "../api/institutions";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export const AdminDashboardPage = () => {
   const [adminName, setAdminName] = useState("Admin");
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
+  const [savingInstitutionId, setSavingInstitutionId] = useState<string | null>(null);
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -15,8 +19,12 @@ export const AdminDashboardPage = () => {
 
     void (async () => {
       try {
-        const list = await getUsers();
-        setUsers(list);
+        const [userList, institutionList] = await Promise.all([
+          getUsers(),
+          institutionApi.getAllInstitutions(),
+        ]);
+        setUsers(userList);
+        setInstitutions(institutionList);
       } catch {
         showToast("Unable to fetch user stats", "error");
       }
@@ -31,7 +39,25 @@ export const AdminDashboardPage = () => {
     return map;
   }, [users]);
 
+  const pendingInstitutions = useMemo(
+    () => institutions.filter((institution) => (institution.status || "PENDING") === "PENDING"),
+    [institutions]
+  );
+
   const totalLoans = applications.reduce((sum, a) => sum + Number(a.amount.replace(/,/g, "")), 0);
+
+  const handleInstitutionStatus = async (id: string, status: InstitutionStatus) => {
+    setSavingInstitutionId(id);
+    try {
+      const updated = await institutionApi.updateInstitutionStatus(id, status);
+      setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      showToast(`Institution ${status.toLowerCase()} successfully`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to update institution", "error");
+    } finally {
+      setSavingInstitutionId(null);
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -87,6 +113,51 @@ export const AdminDashboardPage = () => {
               <div className="text-sm text-stone-500">Total Loan Volume (from sample apps)</div>
               <div className="mt-2 text-2xl font-semibold text-stone-900">RWF {totalLoans.toLocaleString()}</div>
             </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm text-stone-500">Institution Approvals</div>
+                  <div className="mt-1 text-2xl font-semibold text-stone-900">{pendingInstitutions.length}</div>
+                </div>
+                <Link to="/admin/institutions" className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700">View all</Link>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {pendingInstitutions.slice(0, 3).map((institution) => (
+                  <div key={institution.id} className="rounded-2xl border border-stone-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-stone-900">{institution.name}</div>
+                        <div className="text-xs text-stone-500">{institution.type} • {institution.email || institution.phone || "No contact"}</div>
+                        <div className="mt-1 text-xs text-stone-400">Status: {institution.status || "PENDING"}</div>
+                      </div>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => void handleInstitutionStatus(institution.id, "ACTIVE")}
+                        disabled={savingInstitutionId === institution.id}
+                        className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-70"
+                      >
+                        {savingInstitutionId === institution.id ? "Saving..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => void handleInstitutionStatus(institution.id, "DEACTIVATED")}
+                        disabled={savingInstitutionId === institution.id}
+                        className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-70"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {pendingInstitutions.length === 0 && <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No institution profiles waiting for approval.</div>}
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
               <div className="text-sm text-stone-500">Recent Activity</div>
               <div className="mt-3 space-y-2 text-sm text-stone-600">

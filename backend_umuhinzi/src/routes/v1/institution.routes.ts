@@ -108,7 +108,7 @@ institutionRouter.post(
 institutionRouter.get(
   "/",
   authenticate,
-  requireAdminOrInstitution,
+  authorizeRoles("FARMER", "ADMIN", "INSTITUTION"),
   getInstitutions
 );
 
