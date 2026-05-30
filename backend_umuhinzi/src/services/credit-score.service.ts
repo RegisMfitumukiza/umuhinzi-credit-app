@@ -3,7 +3,7 @@ import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
 import { notifyCreditScoreUpdated } from "../utils/notification.helper.js";
 
-import type { Prisma, CreditScoreFactorType, RiskLevel } from "../generated/prisma/client.js";
+import type { Prisma, CreditScoreFactorType, RiskLevel, CredibilityStatus } from "../generated/prisma/client.js";
 
 type RequestContext = {
   actorId?: string;
@@ -93,6 +93,13 @@ const FACTOR_WEIGHTS: Record<CreditScoreFactorType, number> = {
   LIVESTOCK_VALUE: 0.05,
   COOPERATIVE_MEMBERSHIP: 0.05,
   DATA_COMPLETENESS: 0.05,
+};
+
+const CREDIBILITY_MULTIPLIERS: Record<CredibilityStatus, number> = {
+  TRUSTED: 1.0,
+  HIGH: 0.95,
+  MEDIUM: 0.85,
+  LOW: 0.7,
 };
 
 function scoreYieldConsistency(
@@ -398,6 +405,7 @@ export const generateCreditScoreService = async (
         gender: true,
         farmingExperienceYears: true,
         primaryCrop: true,
+        credibilityStatus: true,
       },
     }),
     prisma.farm.findMany({
@@ -449,19 +457,25 @@ export const generateCreditScoreService = async (
     DATA_COMPLETENESS: scoreDataCompleteness(farmer, farms.length, cropsCount),
   };
 
-  const totalScore = Math.round(
+  const rawScore = Math.round(
     Object.entries(factorResults).reduce((sum, [factorType, result]) => {
       const weight = FACTOR_WEIGHTS[factorType as CreditScoreFactorType];
       return sum + result.score * weight;
     }, 0)
   );
 
+  const credibilityMultiplier = CREDIBILITY_MULTIPLIERS[farmer.credibilityStatus];
+  const totalScore = Math.min(100, Math.round(rawScore * credibilityMultiplier));
+
   const riskLevel = getRiskLevel(totalScore);
   const reason = buildRiskReason(factorResults);
   const recommendedAction = buildRecommendedAction(riskLevel);
 
   // Build individual factor breakdown for summary
-  const summary = `Score: ${totalScore}/100. Risk: ${riskLevel}. ${reason}`;
+  const credibilityNote = credibilityMultiplier < 1.0
+    ? ` Credibility penalty applied (${farmer.credibilityStatus}: ×${credibilityMultiplier}).`
+    : "";
+  const summary = `Score: ${totalScore}/100. Risk: ${riskLevel}. ${reason}${credibilityNote}`;
 
   // Persist credit score with all factors in a single transaction
   const creditScore = await prisma.$transaction(async (tx) => {

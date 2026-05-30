@@ -9,13 +9,11 @@ if (!connectionString) {
   throw new Error("DIRECT_URL missing. Please set it in .env");
 }
 
+const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+
 const pool = new Pool({
   connectionString,
-
-  ssl: { 
-    rejectUnauthorized: false 
-  },
-
+  ssl: isLocal ? false : { rejectUnauthorized: false },
   max: Number(process.env.DB_POOL_MAX) || 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,

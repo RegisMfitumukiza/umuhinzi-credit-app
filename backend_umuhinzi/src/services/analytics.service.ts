@@ -57,6 +57,7 @@ export const getPlatformAnalyticsService = async () => {
         createdAt: true,
         farmer: {
           select: {
+            id: true,
             user: { select: { fullName: true } },
           },
         },
