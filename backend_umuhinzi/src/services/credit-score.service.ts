@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
 import { notifyCreditScoreUpdated } from "../utils/notification.helper.js";
+import { generateAutoRecommendations } from "../utils/auto-recommendation.helper.js";
 
 import type { Prisma, CreditScoreFactorType, RiskLevel, CredibilityStatus } from "../generated/prisma/client.js";
 
@@ -542,6 +543,15 @@ export const generateCreditScoreService = async (
   if (farmerUser?.userId) {
     await notifyCreditScoreUpdated(farmerUser.userId, totalScore, riskLevel);
   }
+
+  await generateAutoRecommendations(farmerId, totalScore, riskLevel, {
+    yieldConsistencyScore: factorResults.YIELD_CONSISTENCY.score,
+    farmingHistoryScore: factorResults.FARMING_HISTORY.score,
+    incomeStabilityScore: factorResults.INCOME_STABILITY.score,
+    repaymentBehaviorScore: factorResults.REPAYMENT_BEHAVIOR.score,
+    productivityScore: factorResults.PRODUCTIVITY.score,
+    dataCompletenessScore: factorResults.DATA_COMPLETENESS.score,
+  });
 
   return creditScore;
 };
