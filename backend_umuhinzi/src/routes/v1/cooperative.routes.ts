@@ -5,6 +5,7 @@ import {
   getCooperatives,
   getCooperativeById,
   getCooperativeAnalytics,
+  getCooperativeMemberProductivity,
   updateCooperative,
   deleteCooperative,
   updateCooperativeStatus,
@@ -142,6 +143,37 @@ cooperativeRouter.get(
   authenticate,
   authorizeRoles("ADMIN", "COOPERATIVE_MANAGER", "GOVERNMENT_PARTNER"),
   getCooperativeAnalytics
+);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/{id}/productivity:
+ *   get:
+ *     summary: Cooperative member productivity
+ *     description: Aggregated farms, crops, yields, input costs, and per-season productivity across all active members. ADMIN and GOVERNMENT_PARTNER see any; COOPERATIVE_MANAGER sees own only.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Cooperative member productivity fetched successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
+cooperativeRouter.get(
+  "/:id/productivity",
+  authenticate,
+  authorizeRoles("ADMIN", "COOPERATIVE_MANAGER", "GOVERNMENT_PARTNER"),
+  getCooperativeMemberProductivity
 );
 
 /**

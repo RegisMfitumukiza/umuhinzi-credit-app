@@ -9,6 +9,7 @@ import {
   getAllCooperativesService,
   getCooperativeByIdService,
   getCooperativeAnalyticsService,
+  getCooperativeMemberProductivityService,
   updateCooperativeService,
   deleteCooperativeService,
   addCooperativeMemberService,
@@ -82,6 +83,22 @@ export const getCooperativeAnalytics = asyncHandler(async (req: Request, res: Re
   res.status(200).json({
     success: true,
     message: "Cooperative analytics fetched successfully",
+    data,
+  });
+});
+
+export const getCooperativeMemberProductivity = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getCooperativeMemberProductivityService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Cooperative member productivity fetched successfully",
     data,
   });
 });

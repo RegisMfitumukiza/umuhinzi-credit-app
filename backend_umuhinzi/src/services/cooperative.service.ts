@@ -472,6 +472,84 @@ export const getCooperativeAnalyticsService = async (
 };
 
 /* ─────────────────────────────────────────
+   COOPERATIVE MEMBER PRODUCTIVITY
+───────────────────────────────────────── */
+
+export const getCooperativeMemberProductivityService = async (
+  cooperativeId: string,
+  userId: string,
+  userRole: string
+) => {
+  if (userRole === "COOPERATIVE_MANAGER") {
+    const manager = await resolveCooperativeManagerId(userId);
+    if (manager.cooperativeId !== cooperativeId) {
+      throw new APIError("Not authorized to access this cooperative's productivity.", 403);
+    }
+  }
+
+  const cooperative = await prisma.cooperative.findUnique({
+    where: { id: cooperativeId },
+    select: { id: true, name: true, status: true },
+  });
+  if (!cooperative) throw new APIError("Cooperative not found.", 404);
+
+  const activeFarmerIds = await prisma.cooperativeMember
+    .findMany({ where: { cooperativeId, status: "ACTIVE" }, select: { farmerId: true } })
+    .then((ms) => ms.map((m) => m.farmerId));
+
+  const [totalFarms, totalCrops, cropsByType, yieldAgg, inputCostAgg, productivityRecords] =
+    await Promise.all([
+      prisma.farm.count({ where: { farmerId: { in: activeFarmerIds } } }),
+      prisma.crop.count({ where: { farm: { farmerId: { in: activeFarmerIds } } } }),
+      prisma.crop.groupBy({
+        by: ["cropType"],
+        where: { farm: { farmerId: { in: activeFarmerIds } } },
+        _count: { id: true },
+      }),
+      prisma.yieldRecord.aggregate({
+        where: { crop: { farm: { farmerId: { in: activeFarmerIds } } } },
+        _sum: { actualYield: true },
+        _avg: { actualYield: true },
+        _max: { actualYield: true },
+      }),
+      prisma.inputCost.aggregate({
+        where: { crop: { farm: { farmerId: { in: activeFarmerIds } } } },
+        _sum: { totalCost: true },
+      }),
+      prisma.productivityRecord.findMany({
+        where: { farmerId: { in: activeFarmerIds } },
+        orderBy: [{ season: { year: "desc" } }, { season: { name: "asc" } }],
+        select: {
+          id: true,
+          farmerId: true,
+          totalExpectedYield: true,
+          totalActualYield: true,
+          unit: true,
+          productivityRate: true,
+          season: { select: { id: true, name: true, year: true } },
+        },
+      }),
+    ]);
+
+  return {
+    cooperative,
+    activeMemberCount: activeFarmerIds.length,
+    farms: { total: totalFarms },
+    crops: {
+      total: totalCrops,
+      byCropType: Object.fromEntries(cropsByType.map((r) => [r.cropType, r._count.id])),
+    },
+    yields: {
+      totalYield: Math.round((yieldAgg._sum.actualYield ?? 0) * 100) / 100,
+      averageYield: Math.round((yieldAgg._avg.actualYield ?? 0) * 100) / 100,
+      maxYield: Math.round((yieldAgg._max.actualYield ?? 0) * 100) / 100,
+    },
+    inputCosts: { total: inputCostAgg._sum.totalCost ?? 0 },
+    productivityBySeason: productivityRecords,
+  };
+};
+
+/* ─────────────────────────────────────────
    UPDATE COOPERATIVE STATUS (ADMIN)
 ───────────────────────────────────────── */
 
