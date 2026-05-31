@@ -12,6 +12,7 @@ import {
   getAllLoanApplicationsService,
   getLoanApplicationByIdService,
   deleteLoanApplicationService,
+  getLoanEligibilityService,
 } from "../services/loan-application.service.js";
 
 import {
@@ -141,6 +142,20 @@ export const getLoanApplicationById = asyncHandler(
       success: true,
       message: "Loan application fetched successfully",
       data: application,
+    });
+  }
+);
+
+export const getLoanEligibility = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const eligibility = await getLoanEligibilityService(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Loan eligibility check completed",
+      data: eligibility,
     });
   }
 );

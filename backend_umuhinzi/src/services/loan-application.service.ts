@@ -306,6 +306,65 @@ export const updateLoanApplicationStatusService = async (
 };
 
 /* ─────────────────────────────────────────
+   LOAN ELIGIBILITY PRE-CHECK (FARMER)
+───────────────────────────────────────── */
+
+export const getLoanEligibilityService = async (userId: string) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+
+  const [latestScore, activeLoans, pendingApplications] = await Promise.all([
+    prisma.creditScore.findFirst({
+      where: { farmerId },
+      orderBy: { createdAt: "desc" },
+      select: { score: true, riskLevel: true, createdAt: true },
+    }),
+    prisma.loan.count({
+      where: { farmerId, status: "ACTIVE" },
+    }),
+    prisma.loanApplication.count({
+      where: { farmerId, status: { in: ["PENDING", "UNDER_REVIEW"] } },
+    }),
+  ]);
+
+  if (!latestScore) {
+    return {
+      eligible: false,
+      score: null,
+      riskLevel: null,
+      reason: "No credit score found. Generate your credit score before applying.",
+      activeLoans: 0,
+      pendingApplications,
+    };
+  }
+
+  if (activeLoans > 0) {
+    return {
+      eligible: false,
+      score: latestScore.score,
+      riskLevel: latestScore.riskLevel,
+      reason: "You already have an active loan. Complete or settle it before applying for a new one.",
+      activeLoans,
+      pendingApplications,
+    };
+  }
+
+  const isEligible = latestScore.score >= 50;
+  const reason = isEligible
+    ? "Your credit profile meets the minimum requirements for a loan application."
+    : `Your credit score of ${latestScore.score}/100 (${latestScore.riskLevel} risk) is below the minimum threshold of 50. Improve your score before applying.`;
+
+  return {
+    eligible: isEligible,
+    score: latestScore.score,
+    riskLevel: latestScore.riskLevel,
+    scoreDate: latestScore.createdAt,
+    reason,
+    activeLoans,
+    pendingApplications,
+  };
+};
+
+/* ─────────────────────────────────────────
    GET MY LOAN APPLICATIONS (FARMER)
 ───────────────────────────────────────── */
 

@@ -6,6 +6,7 @@ import {
   getLoanApplications,
   getLoanApplicationById,
   deleteLoanApplication,
+  getLoanEligibility,
   getLoans,
   getLoanById,
   disburseLoan,
@@ -126,6 +127,28 @@ loanApplicationRouter.get(
   authenticate,
   authorizeRoles("FARMER", "ADMIN", "INSTITUTION"),
   getLoanApplications
+);
+
+/**
+ * @swagger
+ * /api/v1/loan-applications/eligibility:
+ *   get:
+ *     summary: Check loan eligibility
+ *     description: Returns whether the authenticated farmer is currently eligible to apply for a loan, based on their credit score, risk level, and active loan status.
+ *     tags: [Loan Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Eligibility check result
+ *       404:
+ *         description: Farmer profile not found
+ */
+loanApplicationRouter.get(
+  "/eligibility",
+  authenticate,
+  requireFarmer,
+  getLoanEligibility
 );
 
 /**
