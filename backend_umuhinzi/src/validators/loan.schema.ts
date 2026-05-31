@@ -29,6 +29,7 @@ export const paymentMethodSchema = z.enum([
 export const createLoanApplicationSchema = z.object({
   body: z.object({
     institutionId: uuidSchema("Invalid institution ID").optional(),
+    cooperativeId: uuidSchema("Invalid cooperative ID").optional(),
     creditScoreId: uuidSchema("Invalid credit score ID").optional(),
     requestedAmount: z.number().positive("Requested amount must be greater than 0"),
     purpose: loanPurposeSchema,

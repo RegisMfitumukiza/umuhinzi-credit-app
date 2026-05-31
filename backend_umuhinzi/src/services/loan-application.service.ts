@@ -27,6 +27,7 @@ const loanApplicationSelect = {
   id: true,
   farmerId: true,
   institutionId: true,
+  cooperativeId: true,
   creditScoreId: true,
   requestedAmount: true,
   recommendedAmount: true,
@@ -41,6 +42,7 @@ const loanApplicationSelect = {
   loan: { select: { id: true, status: true, disbursedAt: true } },
   creditScore: { select: { id: true, score: true, riskLevel: true } },
   institution: { select: { id: true, name: true, type: true } },
+  cooperative: { select: { id: true, name: true } },
 } satisfies Prisma.LoanApplicationSelect;
 
 const loanApplicationWithFarmerSelect = {
@@ -109,6 +111,24 @@ export const createLoanApplicationService = async (
     }
   }
 
+  if (input.cooperativeId) {
+    const cooperative = await prisma.cooperative.findUnique({
+      where: { id: input.cooperativeId },
+      select: { id: true, status: true },
+    });
+    if (!cooperative) throw new APIError("Cooperative not found", 404);
+    if (cooperative.status !== "ACTIVE") {
+      throw new APIError("Cooperative is not currently active", 400);
+    }
+    const membership = await prisma.cooperativeMember.findFirst({
+      where: { cooperativeId: input.cooperativeId, farmerId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!membership) {
+      throw new APIError("Farmer is not an active member of this cooperative", 403);
+    }
+  }
+
   if (input.creditScoreId) {
     const creditScore = await prisma.creditScore.findUnique({
       where: { id: input.creditScoreId },
@@ -124,6 +144,7 @@ export const createLoanApplicationService = async (
     data: {
       farmerId,
       institutionId: input.institutionId,
+      cooperativeId: input.cooperativeId,
       creditScoreId: input.creditScoreId,
       requestedAmount: input.requestedAmount,
       purpose: input.purpose,
@@ -166,6 +187,7 @@ export const updateLoanApplicationStatusService = async (
       id: true,
       farmerId: true,
       institutionId: true,
+      cooperativeId: true,
       status: true,
       requestedAmount: true,
     },
@@ -235,6 +257,7 @@ export const updateLoanApplicationStatusService = async (
           loanApplicationId: applicationId,
           farmerId: existing.farmerId,
           institutionId: existing.institutionId,
+          cooperativeId: existing.cooperativeId,
           principalAmount: approvedAmount,
           interestRate,
           totalPayable,

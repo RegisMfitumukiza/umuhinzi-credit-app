@@ -17,6 +17,8 @@ model Cooperative {
   managers           CooperativeManager[]
   members            CooperativeMember[]
   farmers            Farmer[]
+  loanApplications   LoanApplication[]
+  loans              Loan[]
 
   @@index([status])
   @@index([district])

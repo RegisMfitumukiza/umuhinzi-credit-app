@@ -265,6 +265,8 @@ export type CooperativeWhereInput = {
   managers?: Prisma.CooperativeManagerListRelationFilter
   members?: Prisma.CooperativeMemberListRelationFilter
   farmers?: Prisma.FarmerListRelationFilter
+  loanApplications?: Prisma.LoanApplicationListRelationFilter
+  loans?: Prisma.LoanListRelationFilter
 }
 
 export type CooperativeOrderByWithRelationInput = {
@@ -286,6 +288,8 @@ export type CooperativeOrderByWithRelationInput = {
   managers?: Prisma.CooperativeManagerOrderByRelationAggregateInput
   members?: Prisma.CooperativeMemberOrderByRelationAggregateInput
   farmers?: Prisma.FarmerOrderByRelationAggregateInput
+  loanApplications?: Prisma.LoanApplicationOrderByRelationAggregateInput
+  loans?: Prisma.LoanOrderByRelationAggregateInput
 }
 
 export type CooperativeWhereUniqueInput = Prisma.AtLeast<{
@@ -310,6 +314,8 @@ export type CooperativeWhereUniqueInput = Prisma.AtLeast<{
   managers?: Prisma.CooperativeManagerListRelationFilter
   members?: Prisma.CooperativeMemberListRelationFilter
   farmers?: Prisma.FarmerListRelationFilter
+  loanApplications?: Prisma.LoanApplicationListRelationFilter
+  loans?: Prisma.LoanListRelationFilter
 }, "id" | "registrationNumber">
 
 export type CooperativeOrderByWithAggregationInput = {
@@ -373,6 +379,8 @@ export type CooperativeCreateInput = {
   managers?: Prisma.CooperativeManagerCreateNestedManyWithoutCooperativeInput
   members?: Prisma.CooperativeMemberCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeUncheckedCreateInput = {
@@ -394,6 +402,8 @@ export type CooperativeUncheckedCreateInput = {
   managers?: Prisma.CooperativeManagerUncheckedCreateNestedManyWithoutCooperativeInput
   members?: Prisma.CooperativeMemberUncheckedCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerUncheckedCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationUncheckedCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanUncheckedCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeUpdateInput = {
@@ -415,6 +425,8 @@ export type CooperativeUpdateInput = {
   managers?: Prisma.CooperativeManagerUpdateManyWithoutCooperativeNestedInput
   members?: Prisma.CooperativeMemberUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeUncheckedUpdateInput = {
@@ -436,6 +448,8 @@ export type CooperativeUncheckedUpdateInput = {
   managers?: Prisma.CooperativeManagerUncheckedUpdateManyWithoutCooperativeNestedInput
   members?: Prisma.CooperativeMemberUncheckedUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUncheckedUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUncheckedUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUncheckedUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeCreateManyInput = {
@@ -604,6 +618,38 @@ export type CooperativeUpdateOneWithoutFarmersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CooperativeUpdateToOneWithWhereWithoutFarmersInput, Prisma.CooperativeUpdateWithoutFarmersInput>, Prisma.CooperativeUncheckedUpdateWithoutFarmersInput>
 }
 
+export type CooperativeCreateNestedOneWithoutLoanApplicationsInput = {
+  create?: Prisma.XOR<Prisma.CooperativeCreateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedCreateWithoutLoanApplicationsInput>
+  connectOrCreate?: Prisma.CooperativeCreateOrConnectWithoutLoanApplicationsInput
+  connect?: Prisma.CooperativeWhereUniqueInput
+}
+
+export type CooperativeUpdateOneWithoutLoanApplicationsNestedInput = {
+  create?: Prisma.XOR<Prisma.CooperativeCreateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedCreateWithoutLoanApplicationsInput>
+  connectOrCreate?: Prisma.CooperativeCreateOrConnectWithoutLoanApplicationsInput
+  upsert?: Prisma.CooperativeUpsertWithoutLoanApplicationsInput
+  disconnect?: Prisma.CooperativeWhereInput | boolean
+  delete?: Prisma.CooperativeWhereInput | boolean
+  connect?: Prisma.CooperativeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CooperativeUpdateToOneWithWhereWithoutLoanApplicationsInput, Prisma.CooperativeUpdateWithoutLoanApplicationsInput>, Prisma.CooperativeUncheckedUpdateWithoutLoanApplicationsInput>
+}
+
+export type CooperativeCreateNestedOneWithoutLoansInput = {
+  create?: Prisma.XOR<Prisma.CooperativeCreateWithoutLoansInput, Prisma.CooperativeUncheckedCreateWithoutLoansInput>
+  connectOrCreate?: Prisma.CooperativeCreateOrConnectWithoutLoansInput
+  connect?: Prisma.CooperativeWhereUniqueInput
+}
+
+export type CooperativeUpdateOneWithoutLoansNestedInput = {
+  create?: Prisma.XOR<Prisma.CooperativeCreateWithoutLoansInput, Prisma.CooperativeUncheckedCreateWithoutLoansInput>
+  connectOrCreate?: Prisma.CooperativeCreateOrConnectWithoutLoansInput
+  upsert?: Prisma.CooperativeUpsertWithoutLoansInput
+  disconnect?: Prisma.CooperativeWhereInput | boolean
+  delete?: Prisma.CooperativeWhereInput | boolean
+  connect?: Prisma.CooperativeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CooperativeUpdateToOneWithWhereWithoutLoansInput, Prisma.CooperativeUpdateWithoutLoansInput>, Prisma.CooperativeUncheckedUpdateWithoutLoansInput>
+}
+
 export type CooperativeCreateWithoutManagersInput = {
   id?: string
   name: string
@@ -622,6 +668,8 @@ export type CooperativeCreateWithoutManagersInput = {
   updatedAt?: Date | string
   members?: Prisma.CooperativeMemberCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeUncheckedCreateWithoutManagersInput = {
@@ -642,6 +690,8 @@ export type CooperativeUncheckedCreateWithoutManagersInput = {
   updatedAt?: Date | string
   members?: Prisma.CooperativeMemberUncheckedCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerUncheckedCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationUncheckedCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanUncheckedCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeCreateOrConnectWithoutManagersInput = {
@@ -678,6 +728,8 @@ export type CooperativeUpdateWithoutManagersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   members?: Prisma.CooperativeMemberUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeUncheckedUpdateWithoutManagersInput = {
@@ -698,6 +750,8 @@ export type CooperativeUncheckedUpdateWithoutManagersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   members?: Prisma.CooperativeMemberUncheckedUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUncheckedUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUncheckedUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUncheckedUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeCreateWithoutMembersInput = {
@@ -718,6 +772,8 @@ export type CooperativeCreateWithoutMembersInput = {
   updatedAt?: Date | string
   managers?: Prisma.CooperativeManagerCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeUncheckedCreateWithoutMembersInput = {
@@ -738,6 +794,8 @@ export type CooperativeUncheckedCreateWithoutMembersInput = {
   updatedAt?: Date | string
   managers?: Prisma.CooperativeManagerUncheckedCreateNestedManyWithoutCooperativeInput
   farmers?: Prisma.FarmerUncheckedCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationUncheckedCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanUncheckedCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeCreateOrConnectWithoutMembersInput = {
@@ -774,6 +832,8 @@ export type CooperativeUpdateWithoutMembersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   managers?: Prisma.CooperativeManagerUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeUncheckedUpdateWithoutMembersInput = {
@@ -794,6 +854,8 @@ export type CooperativeUncheckedUpdateWithoutMembersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   managers?: Prisma.CooperativeManagerUncheckedUpdateManyWithoutCooperativeNestedInput
   farmers?: Prisma.FarmerUncheckedUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUncheckedUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUncheckedUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeCreateWithoutFarmersInput = {
@@ -814,6 +876,8 @@ export type CooperativeCreateWithoutFarmersInput = {
   updatedAt?: Date | string
   managers?: Prisma.CooperativeManagerCreateNestedManyWithoutCooperativeInput
   members?: Prisma.CooperativeMemberCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeUncheckedCreateWithoutFarmersInput = {
@@ -834,6 +898,8 @@ export type CooperativeUncheckedCreateWithoutFarmersInput = {
   updatedAt?: Date | string
   managers?: Prisma.CooperativeManagerUncheckedCreateNestedManyWithoutCooperativeInput
   members?: Prisma.CooperativeMemberUncheckedCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationUncheckedCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanUncheckedCreateNestedManyWithoutCooperativeInput
 }
 
 export type CooperativeCreateOrConnectWithoutFarmersInput = {
@@ -870,6 +936,8 @@ export type CooperativeUpdateWithoutFarmersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   managers?: Prisma.CooperativeManagerUpdateManyWithoutCooperativeNestedInput
   members?: Prisma.CooperativeMemberUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUpdateManyWithoutCooperativeNestedInput
 }
 
 export type CooperativeUncheckedUpdateWithoutFarmersInput = {
@@ -890,6 +958,216 @@ export type CooperativeUncheckedUpdateWithoutFarmersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   managers?: Prisma.CooperativeManagerUncheckedUpdateManyWithoutCooperativeNestedInput
   members?: Prisma.CooperativeMemberUncheckedUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUncheckedUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUncheckedUpdateManyWithoutCooperativeNestedInput
+}
+
+export type CooperativeCreateWithoutLoanApplicationsInput = {
+  id?: string
+  name: string
+  registrationNumber?: string | null
+  description?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+  province?: string | null
+  district?: string | null
+  sector?: string | null
+  cell?: string | null
+  village?: string | null
+  status?: $Enums.CooperativeStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  managers?: Prisma.CooperativeManagerCreateNestedManyWithoutCooperativeInput
+  members?: Prisma.CooperativeMemberCreateNestedManyWithoutCooperativeInput
+  farmers?: Prisma.FarmerCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanCreateNestedManyWithoutCooperativeInput
+}
+
+export type CooperativeUncheckedCreateWithoutLoanApplicationsInput = {
+  id?: string
+  name: string
+  registrationNumber?: string | null
+  description?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+  province?: string | null
+  district?: string | null
+  sector?: string | null
+  cell?: string | null
+  village?: string | null
+  status?: $Enums.CooperativeStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  managers?: Prisma.CooperativeManagerUncheckedCreateNestedManyWithoutCooperativeInput
+  members?: Prisma.CooperativeMemberUncheckedCreateNestedManyWithoutCooperativeInput
+  farmers?: Prisma.FarmerUncheckedCreateNestedManyWithoutCooperativeInput
+  loans?: Prisma.LoanUncheckedCreateNestedManyWithoutCooperativeInput
+}
+
+export type CooperativeCreateOrConnectWithoutLoanApplicationsInput = {
+  where: Prisma.CooperativeWhereUniqueInput
+  create: Prisma.XOR<Prisma.CooperativeCreateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedCreateWithoutLoanApplicationsInput>
+}
+
+export type CooperativeUpsertWithoutLoanApplicationsInput = {
+  update: Prisma.XOR<Prisma.CooperativeUpdateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedUpdateWithoutLoanApplicationsInput>
+  create: Prisma.XOR<Prisma.CooperativeCreateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedCreateWithoutLoanApplicationsInput>
+  where?: Prisma.CooperativeWhereInput
+}
+
+export type CooperativeUpdateToOneWithWhereWithoutLoanApplicationsInput = {
+  where?: Prisma.CooperativeWhereInput
+  data: Prisma.XOR<Prisma.CooperativeUpdateWithoutLoanApplicationsInput, Prisma.CooperativeUncheckedUpdateWithoutLoanApplicationsInput>
+}
+
+export type CooperativeUpdateWithoutLoanApplicationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  registrationNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  province?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  district?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sector?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cell?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  village?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCooperativeStatusFieldUpdateOperationsInput | $Enums.CooperativeStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  managers?: Prisma.CooperativeManagerUpdateManyWithoutCooperativeNestedInput
+  members?: Prisma.CooperativeMemberUpdateManyWithoutCooperativeNestedInput
+  farmers?: Prisma.FarmerUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUpdateManyWithoutCooperativeNestedInput
+}
+
+export type CooperativeUncheckedUpdateWithoutLoanApplicationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  registrationNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  province?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  district?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sector?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cell?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  village?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCooperativeStatusFieldUpdateOperationsInput | $Enums.CooperativeStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  managers?: Prisma.CooperativeManagerUncheckedUpdateManyWithoutCooperativeNestedInput
+  members?: Prisma.CooperativeMemberUncheckedUpdateManyWithoutCooperativeNestedInput
+  farmers?: Prisma.FarmerUncheckedUpdateManyWithoutCooperativeNestedInput
+  loans?: Prisma.LoanUncheckedUpdateManyWithoutCooperativeNestedInput
+}
+
+export type CooperativeCreateWithoutLoansInput = {
+  id?: string
+  name: string
+  registrationNumber?: string | null
+  description?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+  province?: string | null
+  district?: string | null
+  sector?: string | null
+  cell?: string | null
+  village?: string | null
+  status?: $Enums.CooperativeStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  managers?: Prisma.CooperativeManagerCreateNestedManyWithoutCooperativeInput
+  members?: Prisma.CooperativeMemberCreateNestedManyWithoutCooperativeInput
+  farmers?: Prisma.FarmerCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationCreateNestedManyWithoutCooperativeInput
+}
+
+export type CooperativeUncheckedCreateWithoutLoansInput = {
+  id?: string
+  name: string
+  registrationNumber?: string | null
+  description?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+  province?: string | null
+  district?: string | null
+  sector?: string | null
+  cell?: string | null
+  village?: string | null
+  status?: $Enums.CooperativeStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  managers?: Prisma.CooperativeManagerUncheckedCreateNestedManyWithoutCooperativeInput
+  members?: Prisma.CooperativeMemberUncheckedCreateNestedManyWithoutCooperativeInput
+  farmers?: Prisma.FarmerUncheckedCreateNestedManyWithoutCooperativeInput
+  loanApplications?: Prisma.LoanApplicationUncheckedCreateNestedManyWithoutCooperativeInput
+}
+
+export type CooperativeCreateOrConnectWithoutLoansInput = {
+  where: Prisma.CooperativeWhereUniqueInput
+  create: Prisma.XOR<Prisma.CooperativeCreateWithoutLoansInput, Prisma.CooperativeUncheckedCreateWithoutLoansInput>
+}
+
+export type CooperativeUpsertWithoutLoansInput = {
+  update: Prisma.XOR<Prisma.CooperativeUpdateWithoutLoansInput, Prisma.CooperativeUncheckedUpdateWithoutLoansInput>
+  create: Prisma.XOR<Prisma.CooperativeCreateWithoutLoansInput, Prisma.CooperativeUncheckedCreateWithoutLoansInput>
+  where?: Prisma.CooperativeWhereInput
+}
+
+export type CooperativeUpdateToOneWithWhereWithoutLoansInput = {
+  where?: Prisma.CooperativeWhereInput
+  data: Prisma.XOR<Prisma.CooperativeUpdateWithoutLoansInput, Prisma.CooperativeUncheckedUpdateWithoutLoansInput>
+}
+
+export type CooperativeUpdateWithoutLoansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  registrationNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  province?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  district?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sector?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cell?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  village?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCooperativeStatusFieldUpdateOperationsInput | $Enums.CooperativeStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  managers?: Prisma.CooperativeManagerUpdateManyWithoutCooperativeNestedInput
+  members?: Prisma.CooperativeMemberUpdateManyWithoutCooperativeNestedInput
+  farmers?: Prisma.FarmerUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUpdateManyWithoutCooperativeNestedInput
+}
+
+export type CooperativeUncheckedUpdateWithoutLoansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  registrationNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  province?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  district?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sector?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cell?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  village?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCooperativeStatusFieldUpdateOperationsInput | $Enums.CooperativeStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  managers?: Prisma.CooperativeManagerUncheckedUpdateManyWithoutCooperativeNestedInput
+  members?: Prisma.CooperativeMemberUncheckedUpdateManyWithoutCooperativeNestedInput
+  farmers?: Prisma.FarmerUncheckedUpdateManyWithoutCooperativeNestedInput
+  loanApplications?: Prisma.LoanApplicationUncheckedUpdateManyWithoutCooperativeNestedInput
 }
 
 
@@ -901,12 +1179,16 @@ export type CooperativeCountOutputType = {
   managers: number
   members: number
   farmers: number
+  loanApplications: number
+  loans: number
 }
 
 export type CooperativeCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   managers?: boolean | CooperativeCountOutputTypeCountManagersArgs
   members?: boolean | CooperativeCountOutputTypeCountMembersArgs
   farmers?: boolean | CooperativeCountOutputTypeCountFarmersArgs
+  loanApplications?: boolean | CooperativeCountOutputTypeCountLoanApplicationsArgs
+  loans?: boolean | CooperativeCountOutputTypeCountLoansArgs
 }
 
 /**
@@ -940,6 +1222,20 @@ export type CooperativeCountOutputTypeCountFarmersArgs<ExtArgs extends runtime.T
   where?: Prisma.FarmerWhereInput
 }
 
+/**
+ * CooperativeCountOutputType without action
+ */
+export type CooperativeCountOutputTypeCountLoanApplicationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LoanApplicationWhereInput
+}
+
+/**
+ * CooperativeCountOutputType without action
+ */
+export type CooperativeCountOutputTypeCountLoansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LoanWhereInput
+}
+
 
 export type CooperativeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -960,6 +1256,8 @@ export type CooperativeSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   managers?: boolean | Prisma.Cooperative$managersArgs<ExtArgs>
   members?: boolean | Prisma.Cooperative$membersArgs<ExtArgs>
   farmers?: boolean | Prisma.Cooperative$farmersArgs<ExtArgs>
+  loanApplications?: boolean | Prisma.Cooperative$loanApplicationsArgs<ExtArgs>
+  loans?: boolean | Prisma.Cooperative$loansArgs<ExtArgs>
   _count?: boolean | Prisma.CooperativeCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["cooperative"]>
 
@@ -1022,6 +1320,8 @@ export type CooperativeInclude<ExtArgs extends runtime.Types.Extensions.Internal
   managers?: boolean | Prisma.Cooperative$managersArgs<ExtArgs>
   members?: boolean | Prisma.Cooperative$membersArgs<ExtArgs>
   farmers?: boolean | Prisma.Cooperative$farmersArgs<ExtArgs>
+  loanApplications?: boolean | Prisma.Cooperative$loanApplicationsArgs<ExtArgs>
+  loans?: boolean | Prisma.Cooperative$loansArgs<ExtArgs>
   _count?: boolean | Prisma.CooperativeCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type CooperativeIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1033,6 +1333,8 @@ export type $CooperativePayload<ExtArgs extends runtime.Types.Extensions.Interna
     managers: Prisma.$CooperativeManagerPayload<ExtArgs>[]
     members: Prisma.$CooperativeMemberPayload<ExtArgs>[]
     farmers: Prisma.$FarmerPayload<ExtArgs>[]
+    loanApplications: Prisma.$LoanApplicationPayload<ExtArgs>[]
+    loans: Prisma.$LoanPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1447,6 +1749,8 @@ export interface Prisma__CooperativeClient<T, Null = never, ExtArgs extends runt
   managers<T extends Prisma.Cooperative$managersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Cooperative$managersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CooperativeManagerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   members<T extends Prisma.Cooperative$membersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Cooperative$membersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CooperativeMemberPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   farmers<T extends Prisma.Cooperative$farmersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Cooperative$farmersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FarmerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  loanApplications<T extends Prisma.Cooperative$loanApplicationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Cooperative$loanApplicationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LoanApplicationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  loans<T extends Prisma.Cooperative$loansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Cooperative$loansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LoanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1953,6 +2257,54 @@ export type Cooperative$farmersArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.FarmerScalarFieldEnum | Prisma.FarmerScalarFieldEnum[]
+}
+
+/**
+ * Cooperative.loanApplications
+ */
+export type Cooperative$loanApplicationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LoanApplication
+   */
+  select?: Prisma.LoanApplicationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LoanApplication
+   */
+  omit?: Prisma.LoanApplicationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LoanApplicationInclude<ExtArgs> | null
+  where?: Prisma.LoanApplicationWhereInput
+  orderBy?: Prisma.LoanApplicationOrderByWithRelationInput | Prisma.LoanApplicationOrderByWithRelationInput[]
+  cursor?: Prisma.LoanApplicationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LoanApplicationScalarFieldEnum | Prisma.LoanApplicationScalarFieldEnum[]
+}
+
+/**
+ * Cooperative.loans
+ */
+export type Cooperative$loansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Loan
+   */
+  select?: Prisma.LoanSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Loan
+   */
+  omit?: Prisma.LoanOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LoanInclude<ExtArgs> | null
+  where?: Prisma.LoanWhereInput
+  orderBy?: Prisma.LoanOrderByWithRelationInput | Prisma.LoanOrderByWithRelationInput[]
+  cursor?: Prisma.LoanWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LoanScalarFieldEnum | Prisma.LoanScalarFieldEnum[]
 }
 
 /**

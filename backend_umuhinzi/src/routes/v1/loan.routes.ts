@@ -66,6 +66,10 @@ export const loanApplicationRouter = Router();
  *               institutionId:
  *                 type: string
  *                 format: uuid
+ *               cooperativeId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional cooperative ID for group loan applications. Farmer must be an active member.
  *               creditScoreId:
  *                 type: string
  *                 format: uuid

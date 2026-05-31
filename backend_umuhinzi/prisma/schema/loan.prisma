@@ -2,6 +2,7 @@ model LoanApplication {
   id                 String                @id @default(uuid())
   farmerId           String
   institutionId      String?
+  cooperativeId      String?
   creditScoreId      String?
   requestedAmount    Float
   recommendedAmount  Float?
@@ -18,10 +19,12 @@ model LoanApplication {
   creditScore        CreditScore?          @relation(fields: [creditScoreId], references: [id])
   farmer             Farmer                @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   institution        Institution?          @relation(fields: [institutionId], references: [id])
+  cooperative        Cooperative?          @relation(fields: [cooperativeId], references: [id])
   reviewedBy         User?                 @relation(fields: [reviewedById], references: [id])
 
   @@index([farmerId])
   @@index([institutionId])
+  @@index([cooperativeId])
   @@index([creditScoreId])
   @@index([reviewedById])
   @@index([status])
@@ -34,6 +37,7 @@ model Loan {
   loanApplicationId  String              @unique
   farmerId           String
   institutionId      String?
+  cooperativeId      String?
   principalAmount    Float
   interestRate       Float               @default(0)
   totalPayable       Float
@@ -46,6 +50,7 @@ model Loan {
   updatedAt          DateTime            @updatedAt
   farmer             Farmer              @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   institution        Institution?        @relation(fields: [institutionId], references: [id])
+  cooperative        Cooperative?        @relation(fields: [cooperativeId], references: [id])
   loanApplication    LoanApplication     @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
   statusHistory      LoanStatusHistory[]
   repayments         Repayment[]
@@ -53,6 +58,7 @@ model Loan {
 
   @@index([farmerId])
   @@index([institutionId])
+  @@index([cooperativeId])
   @@index([status])
   @@index([disbursedAt])
   @@index([createdAt])

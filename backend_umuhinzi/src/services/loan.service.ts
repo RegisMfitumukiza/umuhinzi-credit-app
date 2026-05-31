@@ -34,6 +34,7 @@ const safeLoanSelect = {
   loanApplicationId: true,
   farmerId: true,
   institutionId: true,
+  cooperativeId: true,
   principalAmount: true,
   interestRate: true,
   totalPayable: true,
@@ -45,6 +46,7 @@ const safeLoanSelect = {
   createdAt: true,
   updatedAt: true,
   institution: { select: { id: true, name: true, type: true } },
+  cooperative: { select: { id: true, name: true } },
   repaymentSchedules: {
     select: repaymentScheduleSelect,
     orderBy: { dueDate: "asc" as const },
