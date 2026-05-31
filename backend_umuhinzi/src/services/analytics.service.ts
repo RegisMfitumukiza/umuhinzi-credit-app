@@ -358,15 +358,67 @@ export const generateAnalyticsReportService = async (
     }
 
     case "PRODUCTIVITY": {
-      const [totalYields, avgYield, totalInputCosts] = await Promise.all([
+      const [totalYields, avgYield, totalInputCosts, byProvince, bySeason, byCropType] = await Promise.all([
         prisma.yieldRecord.count(),
         prisma.yieldRecord.aggregate({ _avg: { actualYield: true } }),
         prisma.inputCost.aggregate({ _sum: { totalCost: true } }),
+        prisma.$queryRaw<Array<{ province: string; count: bigint; avg_yield: number; total_yield: number }>>`
+          SELECT f.province,
+                 COUNT(yr.id) AS count,
+                 AVG(yr."actualYield") AS avg_yield,
+                 SUM(yr."actualYield") AS total_yield
+          FROM "YieldRecord" yr
+          JOIN "Crop" c ON yr."cropId" = c.id
+          JOIN "Farm" f ON c."farmId" = f.id
+          WHERE f.province IS NOT NULL
+          GROUP BY f.province
+          ORDER BY avg_yield DESC
+        `,
+        prisma.$queryRaw<Array<{ name: string; year: number; yield_count: bigint; avg_yield: number; total_yield: number }>>`
+          SELECT fs.name, fs.year,
+                 COUNT(yr.id) AS yield_count,
+                 AVG(yr."actualYield") AS avg_yield,
+                 SUM(yr."actualYield") AS total_yield
+          FROM "YieldRecord" yr
+          JOIN "Crop" c ON yr."cropId" = c.id
+          JOIN "FarmingSeason" fs ON c."seasonId" = fs.id
+          GROUP BY fs.id, fs.name, fs.year
+          ORDER BY fs.year DESC, fs.name ASC
+        `,
+        prisma.$queryRaw<Array<{ cropType: string; yield_count: bigint; avg_yield: number; total_yield: number }>>`
+          SELECT c."cropType",
+                 COUNT(yr.id) AS yield_count,
+                 AVG(yr."actualYield") AS avg_yield,
+                 SUM(yr."actualYield") AS total_yield
+          FROM "YieldRecord" yr
+          JOIN "Crop" c ON yr."cropId" = c.id
+          GROUP BY c."cropType"
+          ORDER BY total_yield DESC
+        `,
       ]);
       data = {
         totalYieldRecords: totalYields,
         averageActualYield: Math.round((avgYield._avg.actualYield ?? 0) * 100) / 100,
         totalInputCosts: totalInputCosts._sum.totalCost ?? 0,
+        byProvince: byProvince.map((r) => ({
+          province: r.province,
+          yieldCount: Number(r.count),
+          averageYield: Math.round(Number(r.avg_yield) * 100) / 100,
+          totalYield: Math.round(Number(r.total_yield) * 100) / 100,
+        })),
+        bySeason: bySeason.map((r) => ({
+          season: r.name,
+          year: r.year,
+          yieldCount: Number(r.yield_count),
+          averageYield: Math.round(Number(r.avg_yield) * 100) / 100,
+          totalYield: Math.round(Number(r.total_yield) * 100) / 100,
+        })),
+        byCropType: byCropType.map((r) => ({
+          cropType: r.cropType,
+          yieldCount: Number(r.yield_count),
+          averageYield: Math.round(Number(r.avg_yield) * 100) / 100,
+          totalYield: Math.round(Number(r.total_yield) * 100) / 100,
+        })),
       };
       break;
     }
