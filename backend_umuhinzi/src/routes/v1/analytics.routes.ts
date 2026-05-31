@@ -10,7 +10,6 @@ import {
 
 import {
   authenticate,
-  requireAdmin,
   requireAdminOrGovernmentPartner,
   authorizeRoles,
 } from "../../middlewares/auth.middleware.js";
@@ -61,7 +60,7 @@ analyticsRouter.get(
  * @swagger
  * /api/v1/analytics/reports:
  *   post:
- *     summary: Generate and store an analytics report (ADMIN only)
+ *     summary: Generate and store an analytics report (ADMIN and GOVERNMENT_PARTNER)
  *     tags: [Analytics]
  *     security:
  *       - bearerAuth: []
@@ -90,7 +89,7 @@ analyticsRouter.get(
 analyticsRouter.post(
   "/reports",
   authenticate,
-  requireAdmin,
+  authorizeRoles("ADMIN", "GOVERNMENT_PARTNER"),
   generateAnalyticsReport
 );
 
