@@ -28,6 +28,7 @@ const safeYieldRecordSelect = {
   unit: true,
   harvestDate: true,
   qualityGrade: true,
+  estimatedIncome: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
@@ -124,6 +125,20 @@ const resolveFarmerIdFromUser = async (userId: string) => {
   return farmer.id;
 };
 
+const lookupEstimatedIncome = async (
+  cropName: string,
+  actualYield: number,
+  unit: string
+): Promise<number | null> => {
+  const price = await prisma.marketPrice.findFirst({
+    where: { cropName: { contains: cropName, mode: "insensitive" }, unit },
+    orderBy: { recordedAt: "desc" },
+    select: { pricePerUnit: true },
+  });
+  if (!price) return null;
+  return Math.round(actualYield * price.pricePerUnit * 100) / 100;
+};
+
 const assertCropOwnership = async (cropId: string, farmerId: string) => {
   const crop = await prisma.crop.findUnique({
     where: { id: cropId },
@@ -149,14 +164,24 @@ export const createYieldRecordService = async (
   const farmerId = await resolveFarmerIdFromUser(userId);
   await assertCropOwnership(input.cropId, farmerId);
 
+  const crop = await prisma.crop.findUnique({
+    where: { id: input.cropId },
+    select: { cropName: true },
+  });
+  const unit = input.unit ?? "kg";
+  const estimatedIncome = crop
+    ? await lookupEstimatedIncome(crop.cropName, input.actualYield, unit)
+    : null;
+
   const record = await prisma.yieldRecord.create({
     data: {
       cropId: input.cropId,
       expectedYield: input.expectedYield,
       actualYield: input.actualYield,
-      unit: input.unit ?? "kg",
+      unit,
       harvestDate: input.harvestDate,
       qualityGrade: input.qualityGrade ?? "AVERAGE",
+      estimatedIncome,
       notes: input.notes,
     },
     select: safeYieldRecordSelect,
@@ -276,7 +301,17 @@ export const updateYieldRecordService = async (
 
   const existing = await prisma.yieldRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, crop: { select: { farm: { select: { farmerId: true } } } } },
+    select: {
+      id: true,
+      actualYield: true,
+      unit: true,
+      crop: {
+        select: {
+          cropName: true,
+          farm: { select: { farmerId: true } },
+        },
+      },
+    },
   });
 
   if (!existing) throw new APIError("Yield record not found", 404);
@@ -284,6 +319,14 @@ export const updateYieldRecordService = async (
   if (existing.crop.farm.farmerId !== farmerId) {
     throw new APIError("You are not authorized to update this yield record", 403);
   }
+
+  const newActualYield = input.actualYield ?? existing.actualYield;
+  const newUnit = input.unit ?? existing.unit;
+  const estimatedIncome = await lookupEstimatedIncome(
+    existing.crop.cropName,
+    newActualYield,
+    newUnit
+  );
 
   const updated = await prisma.yieldRecord.update({
     where: { id: recordId },
@@ -293,6 +336,7 @@ export const updateYieldRecordService = async (
       unit: input.unit,
       harvestDate: input.harvestDate,
       qualityGrade: input.qualityGrade,
+      estimatedIncome,
       notes: input.notes,
     },
     select: safeYieldRecordSelect,
