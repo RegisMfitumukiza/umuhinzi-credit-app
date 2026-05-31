@@ -4,6 +4,7 @@ import {
   createCooperative,
   getCooperatives,
   getCooperativeById,
+  getCooperativeAnalytics,
   updateCooperative,
   deleteCooperative,
   updateCooperativeStatus,
@@ -111,6 +112,37 @@ cooperativeRouter.post(
  *         description: Cooperatives fetched successfully
  */
 cooperativeRouter.get("/", authenticate, getCooperatives);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/{id}/analytics:
+ *   get:
+ *     summary: Cooperative analytics dashboard
+ *     description: Members, loans, credit scores, and yield aggregates for a cooperative. ADMIN and GOVERNMENT_PARTNER see any; COOPERATIVE_MANAGER sees own only.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Cooperative analytics fetched successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
+cooperativeRouter.get(
+  "/:id/analytics",
+  authenticate,
+  authorizeRoles("ADMIN", "COOPERATIVE_MANAGER", "GOVERNMENT_PARTNER"),
+  getCooperativeAnalytics
+);
 
 /**
  * @swagger

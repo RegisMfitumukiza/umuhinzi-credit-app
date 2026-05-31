@@ -8,6 +8,7 @@ import {
   createCooperativeService,
   getAllCooperativesService,
   getCooperativeByIdService,
+  getCooperativeAnalyticsService,
   updateCooperativeService,
   deleteCooperativeService,
   addCooperativeMemberService,
@@ -66,6 +67,22 @@ export const getCooperativeById = asyncHandler(async (req: Request, res: Respons
     success: true,
     message: "Cooperative fetched successfully",
     data: cooperative,
+  });
+});
+
+export const getCooperativeAnalytics = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getCooperativeAnalyticsService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Cooperative analytics fetched successfully",
+    data,
   });
 });
 

@@ -405,6 +405,73 @@ export const removeCooperativeMemberService = async (
 };
 
 /* ─────────────────────────────────────────
+   COOPERATIVE ANALYTICS DASHBOARD
+───────────────────────────────────────── */
+
+export const getCooperativeAnalyticsService = async (
+  cooperativeId: string,
+  userId: string,
+  userRole: string
+) => {
+  if (userRole === "COOPERATIVE_MANAGER") {
+    const manager = await resolveCooperativeManagerId(userId);
+    if (manager.cooperativeId !== cooperativeId) {
+      throw new APIError("Not authorized to access this cooperative's analytics.", 403);
+    }
+  }
+
+  const cooperative = await prisma.cooperative.findUnique({
+    where: { id: cooperativeId },
+    select: { id: true, name: true, status: true, province: true, district: true },
+  });
+  if (!cooperative) throw new APIError("Cooperative not found.", 404);
+
+  const [totalMembers, activeMembers] = await Promise.all([
+    prisma.cooperativeMember.count({ where: { cooperativeId } }),
+    prisma.cooperativeMember.count({ where: { cooperativeId, status: "ACTIVE" } }),
+  ]);
+
+  const activeFarmerIds = await prisma.cooperativeMember
+    .findMany({ where: { cooperativeId, status: "ACTIVE" }, select: { farmerId: true } })
+    .then((ms) => ms.map((m) => m.farmerId));
+
+  const [loanCount, loanDisbursed, avgCreditScore, yieldAgg] = await Promise.all([
+    prisma.loan.count({ where: { farmerId: { in: activeFarmerIds } } }),
+    prisma.loan.aggregate({
+      where: { farmerId: { in: activeFarmerIds }, disbursedAmount: { not: null } },
+      _sum: { disbursedAmount: true },
+    }),
+    prisma.creditScore.aggregate({
+      where: { farmerId: { in: activeFarmerIds } },
+      _avg: { score: true },
+    }),
+    prisma.yieldRecord.aggregate({
+      where: { crop: { farm: { farmerId: { in: activeFarmerIds } } } },
+      _sum: { actualYield: true },
+      _avg: { actualYield: true },
+    }),
+  ]);
+
+  return {
+    cooperative,
+    members: { total: totalMembers, active: activeMembers },
+    loans: {
+      total: loanCount,
+      totalDisbursedAmount: loanDisbursed._sum.disbursedAmount ?? 0,
+    },
+    creditScores: {
+      averageScore: avgCreditScore._avg.score
+        ? Math.round(avgCreditScore._avg.score * 100) / 100
+        : null,
+    },
+    yields: {
+      totalYield: Math.round((yieldAgg._sum.actualYield ?? 0) * 100) / 100,
+      averageYield: Math.round((yieldAgg._avg.actualYield ?? 0) * 100) / 100,
+    },
+  };
+};
+
+/* ─────────────────────────────────────────
    UPDATE COOPERATIVE STATUS (ADMIN)
 ───────────────────────────────────────── */
 
