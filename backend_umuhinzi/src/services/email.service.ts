@@ -14,36 +14,26 @@ export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
     return null;
   }
 
-  // In development, redirect ALL emails to DEV_EMAIL_REDIRECT.
-  // This is needed because onboarding@resend.dev only delivers to
-  // the email address you used to sign up at resend.com.
-  const isDev = process.env.NODE_ENV !== "production";
-  const devRedirect = process.env.DEV_EMAIL_REDIRECT;
-
-  const recipient = isDev && devRedirect ? devRedirect : to;
-
-  const finalSubject =
-    isDev && devRedirect && devRedirect !== to
-      ? `[DEV → ${to}] ${subject}`
-      : subject;
-
   try {
     const result = await resend.emails.send({
       from: EMAIL_FROM,
-      to: recipient,
-      subject: finalSubject,
+      to,
+      subject,
       html,
     });
 
     logger.info("Email sent", {
-      originalTo: to,
-      deliveredTo: recipient,
-      subject: finalSubject,
+      to,
+      subject,
     });
 
     return result;
   } catch (error) {
-    logger.error("Failed to send email", { to: recipient, subject: finalSubject, error });
-    throw new APIError("Failed to send email", 500);
+    logger.error("Failed to send email", {
+      to,
+      subject,
+      error
+    });
+    throw error;
   }
 };
