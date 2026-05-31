@@ -126,19 +126,25 @@ export const disburseLoanService = async (
     }
   }
 
-  const { disbursedAmount, startDate, durationMonths } = input;
-  const endDate = addMonths(startDate, durationMonths);
-  const monthlyPayment =
-    Math.round((loan.totalPayable / durationMonths) * 100) / 100;
+  const { disbursedAmount, startDate, durationMonths, customDueDates } = input;
 
-  const scheduleData: Prisma.RepaymentScheduleCreateManyInput[] = Array.from(
-    { length: durationMonths },
-    (_, i) => ({
+  let endDate: Date;
+  let scheduleData: Prisma.RepaymentScheduleCreateManyInput[];
+
+  if (customDueDates && customDueDates.length > 0) {
+    const sorted = [...customDueDates].sort((a, b) => a.getTime() - b.getTime());
+    endDate = sorted[sorted.length - 1];
+    const perInstallment = Math.round((loan.totalPayable / sorted.length) * 100) / 100;
+    scheduleData = sorted.map((dueDate) => ({ loanId, dueDate, expectedAmount: perInstallment }));
+  } else {
+    endDate = addMonths(startDate, durationMonths);
+    const monthlyPayment = Math.round((loan.totalPayable / durationMonths) * 100) / 100;
+    scheduleData = Array.from({ length: durationMonths }, (_, i) => ({
       loanId,
       dueDate: addMonths(startDate, i + 1),
       expectedAmount: monthlyPayment,
-    })
-  );
+    }));
+  }
 
   const updatedLoan = await prisma.$transaction(async (tx) => {
     await tx.loan.update({

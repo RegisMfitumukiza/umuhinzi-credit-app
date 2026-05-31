@@ -64,6 +64,10 @@ export const disburseLoanSchema = z.object({
       .int()
       .min(1, "Duration must be at least 1 month")
       .max(120, "Duration cannot exceed 120 months"),
+    customDueDates: z
+      .array(z.coerce.date())
+      .min(1, "customDueDates must contain at least one date")
+      .optional(),
   }),
 });
 
