@@ -95,7 +95,7 @@ recommendationRouter.post(
 recommendationRouter.get(
   "/",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN"),
+  authorizeRoles("FARMER", "ADMIN", "INSTITUTION"),
   getRecommendations
 );
 
@@ -126,7 +126,7 @@ recommendationRouter.get(
 recommendationRouter.get(
   "/:id",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN"),
+  authorizeRoles("FARMER", "ADMIN", "INSTITUTION"),
   validate(recommendationIdParamSchema),
   getRecommendationById
 );

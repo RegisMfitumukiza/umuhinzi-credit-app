@@ -50,6 +50,15 @@ const resolveFarmerIdFromUser = async (userId: string) => {
   return farmer.id;
 };
 
+const resolveInstitutionIdFromUser = async (userId: string) => {
+  const institution = await prisma.institution.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!institution) throw new APIError("Institution profile not found.", 404);
+  return institution.id;
+};
+
 /* ─────────────────────────────────────────
    CREATE RECOMMENDATION (ADMIN)
 ───────────────────────────────────────── */
@@ -108,6 +117,13 @@ export const getRecommendationsService = async (
   if (userRole === "FARMER") {
     const farmerId = await resolveFarmerIdFromUser(userId);
     where = { farmerId };
+  } else if (userRole === "INSTITUTION") {
+    const institutionId = await resolveInstitutionIdFromUser(userId);
+    where = {
+      farmer: {
+        loanApplications: { some: { institutionId } },
+      },
+    };
   }
 
   const [recommendations, total] = await Promise.all([
@@ -154,6 +170,14 @@ export const getRecommendationByIdService = async (
   if (userRole === "FARMER") {
     const farmerId = await resolveFarmerIdFromUser(userId);
     if (recommendation.farmerId !== farmerId) {
+      throw new APIError("Not authorized to access this recommendation.", 403);
+    }
+  } else if (userRole === "INSTITUTION") {
+    const institutionId = await resolveInstitutionIdFromUser(userId);
+    const hasRelation = await prisma.loanApplication.count({
+      where: { farmerId: recommendation.farmerId, institutionId },
+    });
+    if (!hasRelation) {
       throw new APIError("Not authorized to access this recommendation.", 403);
     }
   }
