@@ -7,6 +7,7 @@ import { getPagination } from "../utils/pagination.js";
 import {
   getPlatformAnalyticsService,
   getFarmerAnalyticsService,
+  getFarmerProductivityService,
   getRegionalAnalyticsService,
   generateAnalyticsReportService,
   getAnalyticsReportsService,
@@ -36,6 +37,22 @@ export const getFarmerAnalytics = asyncHandler(async (req: Request, res: Respons
   res.status(200).json({
     success: true,
     message: "Farmer analytics fetched successfully",
+    data,
+  });
+});
+
+export const getFarmerProductivity = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getFarmerProductivityService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Farmer productivity dashboard fetched successfully",
     data,
   });
 });

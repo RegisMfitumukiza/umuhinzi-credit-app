@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   getPlatformAnalytics,
   getFarmerAnalytics,
+  getFarmerProductivity,
   getRegionalAnalytics,
   generateAnalyticsReport,
   getAnalyticsReports,
@@ -123,6 +124,33 @@ analyticsRouter.get(
   authenticate,
   requireAdminOrGovernmentPartner,
   getAnalyticsReports
+);
+
+/**
+ * @swagger
+ * /api/v1/analytics/farmer/{id}/productivity:
+ *   get:
+ *     summary: Farmer productivity dashboard
+ *     description: Farms, crops, yield records, input costs, and per-season productivity for a farmer. ADMIN/GOVERNMENT_PARTNER see any; FARMER sees own only.
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Farmer productivity dashboard fetched successfully
+ */
+analyticsRouter.get(
+  "/farmer/:id/productivity",
+  authenticate,
+  authorizeRoles("ADMIN", "FARMER", "GOVERNMENT_PARTNER"),
+  getFarmerProductivity
 );
 
 /**

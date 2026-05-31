@@ -262,6 +262,99 @@ export const getRegionalAnalyticsService = async () => {
 };
 
 /* ─────────────────────────────────────────
+   FARMER PRODUCTIVITY DASHBOARD
+───────────────────────────────────────── */
+
+export const getFarmerProductivityService = async (
+  farmerId: string,
+  requestingUserId: string,
+  userRole: string
+) => {
+  if (userRole === "FARMER") {
+    const own = await prisma.farmer.findUnique({
+      where: { userId: requestingUserId },
+      select: { id: true },
+    });
+    if (!own || own.id !== farmerId) {
+      throw new APIError("Not authorized to access this farmer's productivity.", 403);
+    }
+  }
+
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: farmerId },
+    select: { id: true, user: { select: { fullName: true, email: true } } },
+  });
+  if (!farmer) throw new APIError("Farmer not found.", 404);
+
+  const [
+    totalFarms,
+    totalCrops,
+    cropsByType,
+    totalYieldRecords,
+    yieldAgg,
+    totalInputCosts,
+    productivityBySeason,
+  ] = await Promise.all([
+    prisma.farm.count({ where: { farmerId } }),
+
+    prisma.crop.count({ where: { farm: { farmerId } } }),
+
+    prisma.crop.groupBy({
+      by: ["cropType"],
+      where: { farm: { farmerId } },
+      _count: { id: true },
+    }),
+
+    prisma.yieldRecord.count({ where: { crop: { farm: { farmerId } } } }),
+
+    prisma.yieldRecord.aggregate({
+      where: { crop: { farm: { farmerId } } },
+      _avg: { actualYield: true },
+      _sum: { actualYield: true },
+      _max: { actualYield: true },
+      _min: { actualYield: true },
+    }),
+
+    prisma.inputCost.aggregate({
+      where: { crop: { farm: { farmerId } } },
+      _sum: { totalCost: true },
+    }),
+
+    prisma.productivityRecord.findMany({
+      where: { farmerId },
+      orderBy: [{ season: { year: "desc" } }, { season: { name: "asc" } }],
+      select: {
+        id: true,
+        totalExpectedYield: true,
+        totalActualYield: true,
+        unit: true,
+        productivityRate: true,
+        createdAt: true,
+        season: { select: { id: true, name: true, year: true } },
+      },
+    }),
+  ]);
+
+  return {
+    farmer: { id: farmer.id, ...farmer.user },
+    farms: { total: totalFarms },
+    crops: {
+      total: totalCrops,
+      byCropType: Object.fromEntries(cropsByType.map((r) => [r.cropType, r._count.id])),
+    },
+    yields: {
+      total: totalYieldRecords,
+      averageYield: Math.round((yieldAgg._avg.actualYield ?? 0) * 100) / 100,
+      totalYield: Math.round((yieldAgg._sum.actualYield ?? 0) * 100) / 100,
+      maxYield: Math.round((yieldAgg._max.actualYield ?? 0) * 100) / 100,
+      minYield: Math.round((yieldAgg._min.actualYield ?? 0) * 100) / 100,
+    },
+    inputCosts: { total: totalInputCosts._sum.totalCost ?? 0 },
+    productivityBySeason,
+  };
+};
+
+/* ─────────────────────────────────────────
    ANALYTICS REPORT GENERATION
 ───────────────────────────────────────── */
 
