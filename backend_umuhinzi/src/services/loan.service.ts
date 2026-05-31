@@ -63,6 +63,17 @@ const loanWithFarmerSelect = {
 
 /* ─── Helpers ─── */
 
+const computeOutstandingBalance = (
+  schedules: Array<{ expectedAmount: number; paidAmount: number; status: string }>
+): number =>
+  schedules
+    .filter((s) => s.status !== "PAID" && s.status !== "CANCELLED")
+    .reduce((sum, s) => sum + Math.max(0, s.expectedAmount - s.paidAmount), 0);
+
+const withBalance = <T extends { repaymentSchedules: Array<{ expectedAmount: number; paidAmount: number; status: string }> }>(
+  loan: T
+) => ({ ...loan, outstandingBalance: computeOutstandingBalance(loan.repaymentSchedules) });
+
 const resolveFarmerIdFromUser = async (userId: string) => {
   const farmer = await prisma.farmer.findUnique({
     where: { userId },
@@ -153,10 +164,11 @@ export const disburseLoanService = async (
     await tx.repaymentSchedule.createMany({ data: scheduleData });
 
     // Re-fetch after schedules are created so they appear in the response
-    return tx.loan.findUnique({
+    const fetched = await tx.loan.findUnique({
       where: { id: loanId },
       select: loanWithFarmerSelect,
     });
+    return fetched ? withBalance(fetched) : null;
   });
 
   await writeAuditLog({
@@ -230,7 +242,7 @@ export const updateLoanStatusService = async (
       },
     });
 
-    return result;
+    return withBalance(result);
   });
 
   await writeAuditLog({
@@ -282,7 +294,7 @@ export const getMyLoansService = async (
   ]);
 
   return {
-    loans,
+    loans: loans.map(withBalance),
     pagination: {
       total,
       limit,
@@ -332,7 +344,7 @@ export const getAllLoansService = async (
   ]);
 
   return {
-    loans,
+    loans: loans.map(withBalance),
     pagination: {
       total,
       limit,
@@ -375,5 +387,5 @@ export const getLoanByIdService = async (
     }
   }
 
-  return loan;
+  return withBalance(loan);
 };
