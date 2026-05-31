@@ -7,6 +7,7 @@ import type {
   CreateInstitutionInput,
   UpdateInstitutionInput,
   UpdateInstitutionStatusInput,
+  AddInstitutionStaffInput,
 } from "../validators/institution.schema.js";
 
 type RequestContext = {
@@ -296,4 +297,185 @@ export const deleteInstitutionService = async (
   });
 
   return { message: "Institution deactivated successfully." };
+};
+
+/* ─── Staff select ─── */
+
+const safeStaffSelect = {
+  id: true,
+  institutionId: true,
+  userId: true,
+  role: true,
+  status: true,
+  addedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  user: { select: { id: true, fullName: true, email: true, role: true } },
+} satisfies Prisma.InstitutionStaffSelect;
+
+/* ─────────────────────────────────────────
+   ADD INSTITUTION STAFF
+───────────────────────────────────────── */
+
+export const addInstitutionStaffService = async (
+  institutionId: string,
+  requestUserId: string,
+  userRole: string,
+  input: AddInstitutionStaffInput,
+  context: RequestContext = {}
+) => {
+  const institution = await prisma.institution.findUnique({
+    where: { id: institutionId },
+    select: { id: true, userId: true },
+  });
+  if (!institution) throw new APIError("Institution not found.", 404);
+
+  if (userRole === "INSTITUTION" && institution.userId !== requestUserId) {
+    throw new APIError("Not authorized to manage staff for this institution.", 403);
+  }
+
+  const userExists = await prisma.user.findUnique({
+    where: { id: input.userId },
+    select: { id: true },
+  });
+  if (!userExists) throw new APIError("User not found.", 404);
+
+  const existing = await prisma.institutionStaff.findUnique({
+    where: { institutionId_userId: { institutionId, userId: input.userId } },
+    select: { id: true, status: true },
+  });
+
+  if (existing) {
+    if (existing.status === "ACTIVE") {
+      throw new APIError("User is already an active staff member of this institution.", 409);
+    }
+    const reactivated = await prisma.institutionStaff.update({
+      where: { id: existing.id },
+      data: { status: "ACTIVE", role: input.role ?? "LOAN_OFFICER", addedAt: new Date() },
+      select: safeStaffSelect,
+    });
+    return reactivated;
+  }
+
+  const staff = await prisma.institutionStaff.create({
+    data: {
+      institutionId,
+      userId: input.userId,
+      role: input.role ?? "LOAN_OFFICER",
+    },
+    select: safeStaffSelect,
+  });
+
+  await writeAuditLog({
+    actorId: context.actorId ?? requestUserId,
+    action: "CREATE",
+    resource: "INSTITUTION",
+    resourceId: institutionId,
+    description: "Institution staff member added",
+    metadata: { userId: input.userId, role: input.role ?? "LOAN_OFFICER" },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return staff;
+};
+
+/* ─────────────────────────────────────────
+   GET INSTITUTION STAFF
+───────────────────────────────────────── */
+
+export const getInstitutionStaffService = async (
+  institutionId: string,
+  requestUserId: string,
+  userRole: string,
+  options: { skip?: number; limit?: number } = {}
+) => {
+  const institution = await prisma.institution.findUnique({
+    where: { id: institutionId },
+    select: { id: true, userId: true },
+  });
+  if (!institution) throw new APIError("Institution not found.", 404);
+
+  if (userRole === "INSTITUTION" && institution.userId !== requestUserId) {
+    throw new APIError("Not authorized to view staff for this institution.", 403);
+  }
+
+  const { skip = 0, limit = 10 } = options;
+  const where: Prisma.InstitutionStaffWhereInput = { institutionId, status: "ACTIVE" };
+
+  const [staff, total] = await Promise.all([
+    prisma.institutionStaff.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { addedAt: "desc" },
+      select: safeStaffSelect,
+    }),
+    prisma.institutionStaff.count({ where }),
+  ]);
+
+  return {
+    staff,
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
+};
+
+/* ─────────────────────────────────────────
+   REMOVE INSTITUTION STAFF
+───────────────────────────────────────── */
+
+export const removeInstitutionStaffService = async (
+  institutionId: string,
+  staffId: string,
+  requestUserId: string,
+  userRole: string,
+  context: RequestContext = {}
+) => {
+  const institution = await prisma.institution.findUnique({
+    where: { id: institutionId },
+    select: { id: true, userId: true },
+  });
+  if (!institution) throw new APIError("Institution not found.", 404);
+
+  if (userRole === "INSTITUTION" && institution.userId !== requestUserId) {
+    throw new APIError("Not authorized to manage staff for this institution.", 403);
+  }
+
+  const staff = await prisma.institutionStaff.findUnique({
+    where: { id: staffId },
+    select: { id: true, institutionId: true, status: true },
+  });
+  if (!staff) throw new APIError("Staff member not found.", 404);
+  if (staff.institutionId !== institutionId) {
+    throw new APIError("Staff member does not belong to this institution.", 400);
+  }
+  if (staff.status === "REMOVED") {
+    throw new APIError("Staff member has already been removed.", 400);
+  }
+
+  await prisma.institutionStaff.update({
+    where: { id: staffId },
+    data: { status: "REMOVED" },
+  });
+
+  await writeAuditLog({
+    actorId: context.actorId ?? requestUserId,
+    action: "DELETE",
+    resource: "INSTITUTION",
+    resourceId: institutionId,
+    description: "Institution staff member removed",
+    metadata: { staffId },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return { message: "Staff member removed successfully." };
 };

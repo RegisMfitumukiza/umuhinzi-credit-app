@@ -7,6 +7,9 @@ import {
   updateInstitution,
   updateInstitutionStatus,
   deleteInstitution,
+  addInstitutionStaff,
+  getInstitutionStaff,
+  removeInstitutionStaff,
 } from "../../controllers/institution.controller.js";
 
 import {
@@ -23,6 +26,8 @@ import {
   updateInstitutionSchema,
   updateInstitutionStatusSchema,
   institutionIdParamSchema,
+  addInstitutionStaffSchema,
+  institutionStaffIdParamSchema,
 } from "../../validators/institution.schema.js";
 
 export const institutionRouter = Router();
@@ -245,4 +250,134 @@ institutionRouter.delete(
   requireAdmin,
   validate(institutionIdParamSchema),
   deleteInstitution
+);
+
+/* ─────────────────────────────────────────
+   INSTITUTION STAFF  /api/v1/institutions/:id/staff
+───────────────────────────────────────── */
+
+/**
+ * @swagger
+ * /api/v1/institutions/{id}/staff:
+ *   post:
+ *     summary: Add a staff member to an institution
+ *     description: ADMIN or the institution owner can add staff. Accepts any registered user by userId and assigns a role (ADMIN, LOAN_OFFICER, VIEWER).
+ *     tags: [Institutions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId]
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 format: uuid
+ *               role:
+ *                 type: string
+ *                 enum: [ADMIN, LOAN_OFFICER, VIEWER]
+ *     responses:
+ *       201:
+ *         description: Staff member added successfully
+ *       409:
+ *         description: User is already an active staff member
+ *       404:
+ *         description: Institution or user not found
+ */
+institutionRouter.post(
+  "/:id/staff",
+  authenticate,
+  requireAdminOrInstitution,
+  validate(addInstitutionStaffSchema),
+  addInstitutionStaff
+);
+
+/**
+ * @swagger
+ * /api/v1/institutions/{id}/staff:
+ *   get:
+ *     summary: List active staff members of an institution
+ *     description: ADMIN or the institution owner can list staff.
+ *     tags: [Institutions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Institution staff fetched successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Institution not found
+ */
+institutionRouter.get(
+  "/:id/staff",
+  authenticate,
+  requireAdminOrInstitution,
+  validate(institutionIdParamSchema),
+  getInstitutionStaff
+);
+
+/**
+ * @swagger
+ * /api/v1/institutions/{id}/staff/{staffId}:
+ *   delete:
+ *     summary: Remove a staff member from an institution
+ *     description: ADMIN or the institution owner can remove staff. Sets status to REMOVED (soft delete).
+ *     tags: [Institutions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: staffId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Staff member removed successfully
+ *       400:
+ *         description: Staff member already removed or belongs to different institution
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
+institutionRouter.delete(
+  "/:id/staff/:staffId",
+  authenticate,
+  requireAdminOrInstitution,
+  validate(institutionStaffIdParamSchema),
+  removeInstitutionStaff
 );

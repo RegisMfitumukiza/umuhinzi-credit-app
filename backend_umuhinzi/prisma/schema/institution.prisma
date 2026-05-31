@@ -19,12 +19,31 @@ model Institution {
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   loans              Loan[]
   loanApplications   LoanApplication[]
+  staff              InstitutionStaff[]
 
   @@index([type])
   @@index([status])
   @@index([district])
   @@index([sector])
   @@index([createdAt])
+}
+
+model InstitutionStaff {
+  id            String                 @id @default(uuid())
+  institutionId String
+  userId        String
+  role          InstitutionStaffRole   @default(LOAN_OFFICER)
+  status        InstitutionStaffStatus @default(ACTIVE)
+  addedAt       DateTime               @default(now())
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  institution   Institution            @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([institutionId, userId])
+  @@index([institutionId])
+  @@index([userId])
+  @@index([status])
 }
 
 enum InstitutionType {
@@ -41,4 +60,15 @@ enum InstitutionStatus {
   ACTIVE
   SUSPENDED
   DEACTIVATED
+}
+
+enum InstitutionStaffRole {
+  ADMIN
+  LOAN_OFFICER
+  VIEWER
+}
+
+enum InstitutionStaffStatus {
+  ACTIVE
+  REMOVED
 }

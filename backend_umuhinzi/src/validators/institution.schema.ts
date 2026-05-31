@@ -114,6 +114,28 @@ export const updateInstitutionStatusSchema = z.object({
   }),
 });
 
+/* ================= INSTITUTION STAFF ================= */
+
+export const institutionStaffRoleSchema = z.enum(["ADMIN", "LOAN_OFFICER", "VIEWER"]);
+
+export const addInstitutionStaffSchema = z.object({
+  params: z.object({
+    id: z.uuid({ message: "Invalid institution ID" }),
+  }),
+
+  body: z.object({
+    userId: z.uuid({ message: "Invalid user ID" }),
+    role: institutionStaffRoleSchema.optional(),
+  }),
+});
+
+export const institutionStaffIdParamSchema = z.object({
+  params: z.object({
+    id: z.uuid({ message: "Invalid institution ID" }),
+    staffId: z.uuid({ message: "Invalid staff ID" }),
+  }),
+});
+
 /* ================= PARAMS ================= */
 
 export const institutionIdParamSchema = z.object({
@@ -135,3 +157,5 @@ export type CreateInstitutionInput = z.infer<typeof createInstitutionSchema>["bo
 export type UpdateInstitutionInput = z.infer<typeof updateInstitutionSchema>["body"];
 
 export type UpdateInstitutionStatusInput = z.infer<typeof updateInstitutionStatusSchema>["body"];
+
+export type AddInstitutionStaffInput = z.infer<typeof addInstitutionStaffSchema>["body"];

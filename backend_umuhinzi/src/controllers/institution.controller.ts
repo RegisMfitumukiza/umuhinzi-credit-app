@@ -12,6 +12,9 @@ import {
   updateInstitutionService,
   updateInstitutionStatusService,
   deleteInstitutionService,
+  addInstitutionStaffService,
+  getInstitutionStaffService,
+  removeInstitutionStaffService,
 } from "../services/institution.service.js";
 
 const getContext = (req: Request) => ({
@@ -136,6 +139,62 @@ export const deleteInstitution = asyncHandler(async (req: Request, res: Response
   const result = await deleteInstitutionService(
     String(req.params.id),
     req.user.id,
+    getContext(req)
+  );
+
+  res.status(200).json({ success: true, ...result });
+});
+
+/* ─────────────────────────────────────────
+   INSTITUTION STAFF
+───────────────────────────────────────── */
+
+export const addInstitutionStaff = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const staff = await addInstitutionStaffService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role,
+    req.body,
+    getContext(req)
+  );
+
+  res.status(201).json({
+    success: true,
+    message: "Staff member added successfully",
+    data: staff,
+  });
+});
+
+export const getInstitutionStaff = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
+
+  const result = await getInstitutionStaffService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role,
+    { skip, limit }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Institution staff fetched successfully",
+    data: result.staff,
+    pagination: { page, ...result.pagination },
+  });
+});
+
+export const removeInstitutionStaff = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const result = await removeInstitutionStaffService(
+    String(req.params.id),
+    String(req.params.staffId),
+    req.user.id,
+    req.user.role,
     getContext(req)
   );
 
