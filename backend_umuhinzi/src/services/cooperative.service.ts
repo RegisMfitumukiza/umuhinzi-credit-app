@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import { notifyCooperativeAnnouncement } from "../utils/notification.helper.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -8,6 +9,7 @@ import type {
   UpdateCooperativeInput,
   AddCooperativeMemberInput,
   UpdateCooperativeMemberInput,
+  SendCooperativeAnnouncementInput,
 } from "../validators/cooperative.schema.js";
 
 type RequestContext = {
@@ -583,4 +585,57 @@ export const updateCooperativeStatusService = async (
   });
 
   return updated;
+};
+
+/* ─────────────────────────────────────────
+   SEND COOPERATIVE ANNOUNCEMENT
+───────────────────────────────────────── */
+
+export const sendCooperativeAnnouncementService = async (
+  cooperativeId: string,
+  userId: string,
+  userRole: string,
+  input: SendCooperativeAnnouncementInput,
+  context: RequestContext = {}
+) => {
+  const cooperative = await prisma.cooperative.findUnique({
+    where: { id: cooperativeId },
+    select: { id: true, name: true, status: true },
+  });
+  if (!cooperative) throw new APIError("Cooperative not found.", 404);
+
+  if (userRole === "COOPERATIVE_MANAGER") {
+    const manager = await resolveCooperativeManagerId(userId);
+    if (manager.cooperativeId !== cooperativeId) {
+      throw new APIError("Not authorized to send announcements for this cooperative.", 403);
+    }
+  }
+
+  const activeMembers = await prisma.cooperativeMember.findMany({
+    where: { cooperativeId, status: "ACTIVE" },
+    select: { farmer: { select: { userId: true } } },
+  });
+
+  const userIds = activeMembers
+    .map((m) => m.farmer?.userId)
+    .filter((id): id is string => Boolean(id));
+
+  await Promise.all(
+    userIds.map((memberId) =>
+      notifyCooperativeAnnouncement(memberId, cooperativeId, input.title, input.message)
+    )
+  );
+
+  await writeAuditLog({
+    actorId: context.actorId ?? userId,
+    action: "CREATE",
+    resource: "COOPERATIVE",
+    resourceId: cooperativeId,
+    description: `Announcement sent to ${userIds.length} member(s): "${input.title}"`,
+    metadata: { title: input.title, notifiedCount: userIds.length },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return { message: "Announcement sent successfully.", notifiedCount: userIds.length };
 };

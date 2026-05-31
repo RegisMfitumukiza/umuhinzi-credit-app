@@ -12,6 +12,7 @@ import {
   addCooperativeMember,
   getCooperativeMembers,
   removeCooperativeMember,
+  sendCooperativeAnnouncement,
 } from "../../controllers/cooperative.controller.js";
 
 import {
@@ -29,6 +30,7 @@ import {
   cooperativeIdParamSchema,
   addCooperativeMemberSchema,
   cooperativeMemberIdParamSchema,
+  sendCooperativeAnnouncementSchema,
 } from "../../validators/cooperative.schema.js";
 
 /* ─────────────────────────────────────────
@@ -305,6 +307,54 @@ cooperativeRouter.patch(
   requireAdmin,
   validate(cooperativeIdParamSchema),
   updateCooperativeStatus
+);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/{id}/announcements:
+ *   post:
+ *     summary: Send an announcement to all active cooperative members
+ *     description: COOPERATIVE_MANAGER sends an announcement to all active members of their cooperative. ADMIN can send to any cooperative.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 150
+ *               message:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 1000
+ *     responses:
+ *       200:
+ *         description: Announcement sent successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Cooperative not found
+ */
+cooperativeRouter.post(
+  "/:id/announcements",
+  authenticate,
+  authorizeRoles("ADMIN", "COOPERATIVE_MANAGER"),
+  validate(sendCooperativeAnnouncementSchema),
+  sendCooperativeAnnouncement
 );
 
 /* ─────────────────────────────────────────

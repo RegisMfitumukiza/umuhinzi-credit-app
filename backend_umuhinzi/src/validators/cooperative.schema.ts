@@ -154,6 +154,28 @@ export const removeCooperativeMemberSchema = z.object({
     }),
 });
 
+/* ================= COOPERATIVE ANNOUNCEMENT ================= */
+
+export const sendCooperativeAnnouncementSchema = z.object({
+  params: z.object({
+    id: uuidSchema("Invalid cooperative ID"),
+  }),
+
+  body: z.object({
+    title: z
+      .string()
+      .trim()
+      .min(3, "Title must be at least 3 characters")
+      .max(150, "Title must not exceed 150 characters"),
+
+    message: z
+      .string()
+      .trim()
+      .min(5, "Message must be at least 5 characters")
+      .max(1000, "Message must not exceed 1000 characters"),
+  }),
+});
+
 /* ================= PARAMS ================= */
 
 export const cooperativeIdParamSchema = z.object({
@@ -199,6 +221,8 @@ export type UpdateCooperativeManagerInput = z.infer<typeof updateCooperativeMana
 export type AddCooperativeMemberInput = z.infer<typeof addCooperativeMemberSchema>["body"];
 
 export type UpdateCooperativeMemberInput = z.infer<typeof updateCooperativeMemberSchema>["body"];
+
+export type SendCooperativeAnnouncementInput = z.infer<typeof sendCooperativeAnnouncementSchema>["body"];
 
 /*for now let us stop here, i will tell you when to continue. 
 so i have services and controller i want to start implementing the codes. 

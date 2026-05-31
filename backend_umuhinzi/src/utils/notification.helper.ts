@@ -186,3 +186,18 @@ export const notifyMissingData = (userId: string, missingFields: string[]) =>
     message: `Your profile is missing important data: ${missingFields.join(", ")}. Complete it to improve your credit score.`,
     actionUrl: `/profile`,
   });
+
+export const notifyCooperativeAnnouncement = (
+  userId: string,
+  cooperativeId: string,
+  title: string,
+  message: string
+) =>
+  createNotification({
+    userId,
+    type: "COOPERATIVE_ANNOUNCEMENT",
+    priority: "HIGH",
+    title,
+    message,
+    actionUrl: `/cooperatives/${cooperativeId}`,
+  });

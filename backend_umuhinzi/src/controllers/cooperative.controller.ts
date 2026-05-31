@@ -16,6 +16,7 @@ import {
   getCooperativeMembersService,
   removeCooperativeMemberService,
   updateCooperativeStatusService,
+  sendCooperativeAnnouncementService,
 } from "../services/cooperative.service.js";
 
 const getContext = (req: Request) => ({
@@ -201,6 +202,20 @@ export const removeCooperativeMember = asyncHandler(async (req: Request, res: Re
     String(req.params.id),
     req.user.id,
     req.user.role,
+    getContext(req)
+  );
+
+  res.status(200).json({ success: true, ...result });
+});
+
+export const sendCooperativeAnnouncement = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const result = await sendCooperativeAnnouncementService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role,
+    req.body,
     getContext(req)
   );
 
