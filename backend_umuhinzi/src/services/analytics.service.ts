@@ -18,6 +18,7 @@ export const getPlatformAnalyticsService = async () => {
     totalInstitutions,
     totalCooperatives,
     recentLoans,
+    monthlyGrowthRaw,
   ] = await Promise.all([
     prisma.farmer.count(),
 
@@ -63,6 +64,14 @@ export const getPlatformAnalyticsService = async () => {
         },
       },
     }),
+
+    prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
+      SELECT DATE_TRUNC('month', "createdAt") AS month, COUNT(id) AS count
+      FROM "Farmer"
+      WHERE "createdAt" >= NOW() - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', "createdAt")
+      ORDER BY month ASC
+    `,
   ]);
 
   const loanStatusMap = Object.fromEntries(
@@ -70,7 +79,13 @@ export const getPlatformAnalyticsService = async () => {
   );
 
   return {
-    farmers: { total: totalFarmers },
+    farmers: {
+      total: totalFarmers,
+      monthlyGrowth: monthlyGrowthRaw.map((r) => ({
+        month: r.month,
+        count: Number(r.count),
+      })),
+    },
     loans: {
       total: totalLoans,
       totalDisbursedAmount: totalDisbursed._sum.disbursedAmount ?? 0,
