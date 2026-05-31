@@ -26,6 +26,9 @@ export const ProfilePage = () => {
   const [isCreatingInstitution, setIsCreatingInstitution] = useState(false);
   const isCooperativeManagerUser = user?.role === "COOPERATIVE_MANAGER";
   const isInstitutionUser = user?.role === "INSTITUTION";
+  const selectableCooperatives = cooperatives.filter(
+    (item) => item.status === "ACTIVE" && (item._count?.managers ?? 0) > 0
+  );
   const [form, setForm] = useState<FarmerProfilePayload>({
     nationalId: "",
     dateOfBirth: "",
@@ -159,6 +162,14 @@ export const ProfilePage = () => {
       }
     })();
   }, [isCooperativeManagerUser, isInstitutionUser, user?.id]);
+
+  useEffect(() => {
+    if (isCooperativeManagerUser) return;
+
+    if (form.cooperativeId && !selectableCooperatives.some((item) => item.id === form.cooperativeId)) {
+      setForm((prev) => ({ ...prev, cooperativeId: null }));
+    }
+  }, [form.cooperativeId, isCooperativeManagerUser, selectableCooperatives]);
 
   const isPending = profile?.status === "PENDING";
   const approvedInFrontend = isFarmerFrontendApproved(user?.id);
@@ -492,13 +503,13 @@ export const ProfilePage = () => {
                 className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-stone-100"
               >
                 <option value="">Select an approved cooperative</option>
-                {cooperatives.filter((item) => item.status === "ACTIVE").map((cooperative) => (
+                {selectableCooperatives.map((cooperative) => (
                   <option key={cooperative.id} value={cooperative.id}>
                     {cooperative.name} {cooperative.district ? `• ${cooperative.district}` : ""}
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-stone-500">Only approved cooperatives are available here.</p>
+              <p className="mt-2 text-xs text-stone-500">Only approved cooperatives with an active manager are available here.</p>
             </label>
           </div>
 

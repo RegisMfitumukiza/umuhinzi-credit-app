@@ -24,6 +24,10 @@ export type CooperativeProfile = {
   status?: CooperativeStatus;
   createdAt?: string;
   updatedAt?: string;
+  _count?: {
+    managers?: number;
+    members?: number;
+  };
 };
 
 export type CreateCooperativePayload = {
