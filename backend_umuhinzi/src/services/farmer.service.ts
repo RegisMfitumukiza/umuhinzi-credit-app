@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
-import { safeFarmerSelect, farmerWithUserSelect } from "../utils/selects/farmer.select.js";
+import { safeFarmerSelect, farmerWithUserSelect, farmerAdminListSelect } from "../utils/selects/farmer.select.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -135,7 +135,7 @@ export const getAllFarmersService = async ({
       skip,
       take: limit,
       orderBy: { [sortBy]: sortOrder },
-      select: farmerWithUserSelect,
+      select: farmerAdminListSelect,
     }),
     prisma.farmer.count({ where }),
   ]);

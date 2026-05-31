@@ -111,8 +111,12 @@ export const getLoanApplicationById = async (id: string): Promise<LoanApplicatio
 
 export const updateLoanApplicationStatus = async (
   id: string,
-  status: "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED"
+  status: "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED",
+  rejectionReason?: string
 ): Promise<LoanApplicationUi> => {
-  const response = await api.patch<ApiResponse<LoanApplicationRaw>>(`/loan-applications/${id}/status`, { status });
+  const response = await api.patch<ApiResponse<LoanApplicationRaw>>(`/loan-applications/${id}/status`, {
+    status,
+    ...(rejectionReason ? { rejectionReason } : {}),
+  });
   return toUiModel(response.data.data);
 };

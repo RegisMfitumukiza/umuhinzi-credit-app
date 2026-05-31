@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export const CooperativesPage = () => {
   const trendPoints = "40,215 110,235 180,110 250,198 320,162 390,172 460,154 530,176 600,168";
   const donutSegments = [
@@ -16,8 +18,25 @@ export const CooperativesPage = () => {
           </div>
 
           <div className="flex gap-3">
+            <Link to="/cooperatives/profile" className="rounded-full border border-emerald-200 bg-white px-5 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50">
+              Create / Update Profile
+            </Link>
             <button className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Reports</button>
             <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">Manage Loans</button>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-emerald-900">Cooperative profile and approval</div>
+              <p className="mt-1 text-sm text-emerald-900/75">
+                Use the profile button to submit or update your cooperative details. Once an admin approves it, farmers can select it from their profile page.
+              </p>
+            </div>
+            <Link to="/cooperatives/profile" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">
+              Go to Profile
+            </Link>
           </div>
         </div>
 

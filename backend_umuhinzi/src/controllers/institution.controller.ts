@@ -64,6 +64,24 @@ export const getInstitutions = asyncHandler(async (req: Request, res: Response) 
 });
 
 /* ─────────────────────────────────────────
+   GET AVAILABLE INSTITUTIONS (PUBLIC)
+───────────────────────────────────────── */
+
+export const getAvailableInstitutions = asyncHandler(async (_req: Request, res: Response) => {
+  const { institutions } = await getAllInstitutionsService({
+    status: "ACTIVE",
+    limit: 100,
+    skip: 0,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Available institutions fetched successfully",
+    data: institutions,
+  });
+});
+
+/* ─────────────────────────────────────────
    GET INSTITUTION BY ID
 ───────────────────────────────────────── */
 

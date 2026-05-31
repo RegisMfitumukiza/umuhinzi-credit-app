@@ -50,3 +50,21 @@ export const farmerWithUserSelect = {
     },
   },
 } satisfies Prisma.FarmerSelect;
+
+export const farmerAdminListSelect = {
+  ...farmerWithUserSelect,
+  productivityRecords: {
+    take: 1,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      season: {
+        select: {
+          id: true,
+          name: true,
+          year: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.FarmerSelect;

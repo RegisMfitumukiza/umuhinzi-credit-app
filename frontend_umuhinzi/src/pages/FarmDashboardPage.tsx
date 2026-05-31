@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { farmerApi, type FarmerCreditScore, type FarmerCrop, type FarmerLoan, type FarmerNotification, type FarmerProductivityRecord, type FarmerRecommendation, type FarmerRepaymentSchedule } from "../api/farmer";
+import { getCurrentAuthUser } from "../api/auth";
+import { farmerApi, type FarmerCreditScore, type FarmerCrop, type FarmerLoan, type FarmerNotification, type FarmerProductivityRecord, type FarmerRecommendation, type FarmerRepaymentSchedule, type FarmerSeason } from "../api/farmer";
+import { institutionApi, type InstitutionProfile } from "../api/institutions";
 import type { Farm } from "../types/farm";
 
 const formatMoney = (value?: number | null) => `RWF ${Number(value || 0).toLocaleString()}`;
@@ -25,6 +27,7 @@ export const FarmDashboardPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const [authUser, setAuthUser] = useState(user);
   const [profile, setProfile] = useState<{ fullName?: string; province?: string | null; district?: string | null; sector?: string | null } | null>(null);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [crops, setCrops] = useState<FarmerCrop[]>([]);
@@ -34,6 +37,8 @@ export const FarmDashboardPage = () => {
   const [notifications, setNotifications] = useState<FarmerNotification[]>([]);
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
   const [productivity, setProductivity] = useState<FarmerProductivityRecord[]>([]);
+  const [seasons, setSeasons] = useState<FarmerSeason[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [generatingScore, setGeneratingScore] = useState(false);
 
@@ -42,7 +47,8 @@ export const FarmDashboardPage = () => {
 
     void (async () => {
       try {
-        const [profileData, farmResponse, cropsData, loansData, schedulesData, recommendationsData, notificationsData, creditScoreData, productivityData] = await Promise.all([
+        const currentUser = await getCurrentAuthUser().catch(() => null);
+        const [profileData, farmResponse, cropsData, loansData, schedulesData, recommendationsData, notificationsData, creditScoreData, productivityData, seasonData, activeInstitutionData] = await Promise.all([
           farmerApi.getProfile().catch(() => null),
           farmerApi.getFarms().catch(() => ({ farms: [] } as { farms: Farm[] })),
           farmerApi.getCrops().catch(() => [] as FarmerCrop[]),
@@ -52,10 +58,16 @@ export const FarmDashboardPage = () => {
           farmerApi.getNotifications(4).catch(() => [] as FarmerNotification[]),
           farmerApi.getLatestCreditScore().catch(() => null),
           farmerApi.getProductivityRecords().catch(() => [] as FarmerProductivityRecord[]),
+          farmerApi.getSeasons().catch(() => [] as FarmerSeason[]),
+          institutionApi.getActiveInstitutions().catch(() => [] as InstitutionProfile[]),
         ]);
+
+        const resolvedCreditScore =
+          creditScoreData ?? (await farmerApi.generateCreditScore().catch(() => null));
 
         if (!mounted) return;
 
+  setAuthUser(currentUser || user);
         setProfile(profileData);
         setFarms(farmResponse.farms || []);
         setCrops(cropsData);
@@ -63,8 +75,10 @@ export const FarmDashboardPage = () => {
         setSchedules(schedulesData);
         setRecommendations(recommendationsData);
         setNotifications(notificationsData);
-        setCreditScore(creditScoreData);
+        setCreditScore(resolvedCreditScore);
         setProductivity(productivityData);
+        setSeasons(seasonData);
+        setInstitutions(activeInstitutionData);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -85,8 +99,8 @@ export const FarmDashboardPage = () => {
     }
   };
 
-  const displayName = profile?.fullName || user?.fullName || "Farmer";
-  const location = [profile?.district || user?.district, profile?.province || user?.province].filter(Boolean).join(", ") || "Your registered location";
+  const displayName = profile?.fullName || authUser?.fullName || "Farmer";
+  const location = [profile?.district || authUser?.district, profile?.province || authUser?.province].filter(Boolean).join(", ") || "Your registered location";
   const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
   const pendingReminders = schedules.filter((schedule) => ["UPCOMING", "SCHEDULED", "DUE"].includes(String(schedule.status || "").toUpperCase()));
   const activeCropCount = crops.length;
@@ -94,10 +108,13 @@ export const FarmDashboardPage = () => {
   const scoreValue = creditScore?.score ?? 0;
   const scoreRisk = creditScore?.riskLevel || creditScore?.grade || "Pending";
   const hasCreditScore = creditScore !== null;
+  const scoreSummary = creditScore?.summary || "A credit score will be generated from your current farm records.";
 
   const topCrops = useMemo(() => crops.slice(0, 3), [crops]);
   const topRecommendations = useMemo(() => recommendations.slice(0, 3), [recommendations]);
   const topNotifications = useMemo(() => notifications.slice(0, 3), [notifications]);
+  const topSeasons = useMemo(() => seasons.slice(0, 3), [seasons]);
+  const topInstitutions = useMemo(() => institutions.slice(0, 3), [institutions]);
 
   if (isLoading) {
     return <div className="p-6 text-sm text-stone-500">Loading farmer dashboard...</div>;
@@ -123,9 +140,10 @@ export const FarmDashboardPage = () => {
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-stone-500">
                 <span>{location}</span>
-                <span>{profile?.sector || user?.sector || "Registered farmer"}</span>
-                <span className="font-medium text-brand-600">Credit Score: {hasCreditScore ? scoreValue : "No score yet"}</span>
+                <span>{profile?.sector || authUser?.sector || "Registered farmer"}</span>
+                <span className="font-medium text-brand-600">Credit Score: {hasCreditScore ? scoreValue : "Generating your score..."}</span>
               </div>
+              <p className="mt-2 max-w-2xl text-sm text-stone-500">{scoreSummary}</p>
             </div>
           </div>
 
@@ -162,7 +180,7 @@ export const FarmDashboardPage = () => {
       <section className="grid gap-4 md:grid-cols-4">
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Credit score</p>
-          <h3 className="mt-2 text-3xl font-semibold text-stone-900">{hasCreditScore ? scoreValue : "No score yet"}</h3>
+          <h3 className="mt-2 text-3xl font-semibold text-stone-900">{hasCreditScore ? scoreValue : "Generating..."}</h3>
           <p className="mt-1 text-sm text-stone-500">{scoreRisk}</p>
           <button
             type="button"
@@ -171,6 +189,13 @@ export const FarmDashboardPage = () => {
             className="mt-4 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-70"
           >
             {generatingScore ? "Generating..." : creditScore ? "Refresh score" : "Generate score"}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/analytics")}
+            className="mt-3 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700"
+          >
+            View score details
           </button>
         </article>
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
@@ -187,6 +212,56 @@ export const FarmDashboardPage = () => {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Estimated income</p>
           <h3 className="mt-2 text-3xl font-semibold text-stone-900">{formatMoney(estimatedIncome)}</h3>
           <p className="mt-1 text-sm text-stone-500">From productivity records</p>
+        </article>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Available seasons</p>
+              <h3 className="mt-2 text-xl font-semibold text-stone-900">Season updates from admin</h3>
+            </div>
+            <button onClick={() => navigate("/crops")} className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700">Add crop</button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {topSeasons.map((season) => (
+              <div key={season.id} className="rounded-2xl border border-stone-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-stone-900">{season.name || "Season"} {season.year || ""}</p>
+                    <p className="text-sm text-stone-500">Use this season for crop and harvest tracking.</p>
+                  </div>
+                  <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">Live</span>
+                </div>
+              </div>
+            ))}
+            {topSeasons.length === 0 && <p className="text-sm text-stone-500">No seasons available yet. Ask admin to create one.</p>}
+          </div>
+        </article>
+
+        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Loan institutions</p>
+              <h3 className="mt-2 text-xl font-semibold text-stone-900">Where you can apply</h3>
+            </div>
+            <button onClick={() => navigate("/loans")} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white">Apply</button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {topInstitutions.map((institution) => (
+              <div key={institution.id} className="rounded-2xl border border-stone-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-stone-900">{institution.name}</p>
+                    <p className="text-sm text-stone-500">{institution.type}{institution.district ? ` • ${institution.district}` : ""}</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">ACTIVE</span>
+                </div>
+              </div>
+            ))}
+            {topInstitutions.length === 0 && <p className="text-sm text-stone-500">No active institutions available right now.</p>}
+          </div>
         </article>
       </section>
 

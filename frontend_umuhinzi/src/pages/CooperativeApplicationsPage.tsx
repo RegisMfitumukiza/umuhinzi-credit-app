@@ -135,9 +135,19 @@ export const CooperativeApplicationsPage = ({
   async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
     try {
       const needsReviewStep = currentStatus === "Pending" || currentStatus === "PENDING";
+      let rejectionReason: string | undefined;
+
+      if (status === "REJECTED") {
+        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
+        if (!rejectionReason) {
+          showToast("Rejection reason is required", "error");
+          return;
+        }
+      }
+
       const updated = needsReviewStep
-        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status))
-        : await updateLoanApplicationStatus(id, status);
+        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status, rejectionReason))
+        : await updateLoanApplicationStatus(id, status, rejectionReason);
       setAppsState((p) => p.map((x) => (x.id === id ? updated : x)));
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch {

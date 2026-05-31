@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { getCurrentAuthUser } from "../api/auth";
+import { cooperativeApi, type CooperativeProfile } from "../api/cooperatives";
+import { cooperativeMembersApi, type CooperativeMemberApi } from "../api/cooperativeMembers";
 import { useToast } from "../context/ToastContext";
 import {
   getPendingFarmerRequests,
@@ -22,27 +25,64 @@ type CooperativeMember = {
   role: string;
 };
 
-const initialMembers: CooperativeMember[] = [
-  { id: "MEM-101", name: "Alice Mutoni", phone: "+250788777888", village: "Kimironko", role: "Treasurer" },
-  { id: "MEM-102", name: "Jean Gakweya", phone: "+250788999000", village: "Nyamirambo", role: "Member" },
-];
-
 export const CooperativeMemberManagementPage = () => {
   const { showToast } = useToast();
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
-  const [members, setMembers] = useState<CooperativeMember[]>(initialMembers);
-    useEffect(() => {
-      const requests = getPendingFarmerRequests();
-      setPendingMembers(
-        requests.map((request) => ({
-          id: request.userId,
-          name: request.fullName,
-          phone: request.phone || "-",
-          village: request.village || "-",
-          status: "Pending",
-        }))
-      );
-    }, []);
+  const [members, setMembers] = useState<CooperativeMember[]>([]);
+  const [cooperative, setCooperative] = useState<CooperativeProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void (async () => {
+      try {
+        const currentUser = await getCurrentAuthUser();
+        const cooperativeId = (currentUser as { cooperativeManagerProfile?: { cooperativeId?: string | null } | null }).cooperativeManagerProfile?.cooperativeId;
+
+        const [allCooperatives, memberRows] = await Promise.all([
+          cooperativeId ? cooperativeApi.getAllCooperatives().catch(() => [] as CooperativeProfile[]) : Promise.resolve([] as CooperativeProfile[]),
+          cooperativeId ? cooperativeMembersApi.getMyCooperativeMembers().catch(() => [] as CooperativeMemberApi[]) : Promise.resolve([] as CooperativeMemberApi[]),
+        ]);
+
+        const currentCooperative = allCooperatives.find((item) => item.id === cooperativeId) || null;
+
+        if (!mounted) return;
+
+        setCooperative(currentCooperative);
+        setMembers(
+          memberRows.map((member) => ({
+            id: member.id,
+            name: member.farmer?.user?.fullName || "Farmer",
+            phone: member.farmer?.user?.email || "-",
+            village: "-",
+            role: member.status || "Member",
+          }))
+        );
+
+        const requests = getPendingFarmerRequests();
+        setPendingMembers(
+          requests.map((request) => ({
+            id: request.userId,
+            name: request.fullName,
+            phone: request.phone || "-",
+            village: request.village || "-",
+            status: "Pending",
+          }))
+        );
+      } catch {
+        if (!mounted) return;
+        setMembers([]);
+        setPendingMembers([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newMember, setNewMember] = useState({
@@ -126,6 +166,12 @@ export const CooperativeMemberManagementPage = () => {
           <StatCard label="Pending Requests" value={summary.pending} />
         </div>
 
+        {cooperative === null && !loading && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+            This cooperative manager does not have a cooperative profile linked yet. Create the cooperative first, then members will appear here.
+          </section>
+        )}
+
         {showAddForm && (
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
@@ -179,7 +225,8 @@ export const CooperativeMemberManagementPage = () => {
             </div>
 
             <div className="space-y-3">
-              {pendingMembers.length === 0 && (
+              {loading && <p className="text-sm text-stone-500">Loading pending requests...</p>}
+              {!loading && pendingMembers.length === 0 && (
                 <p className="text-sm text-stone-500">No pending farmer requests yet.</p>
               )}
               {pendingMembers.map((member) => (
@@ -221,6 +268,10 @@ export const CooperativeMemberManagementPage = () => {
             </div>
 
             <div className="space-y-3">
+              {loading && <p className="text-sm text-stone-500">Loading members...</p>}
+              {!loading && members.length === 0 && (
+                <p className="text-sm text-stone-500">No approved members yet for this cooperative.</p>
+              )}
               {members.map((member) => (
                 <div key={member.id} className="rounded-2xl border border-stone-100 p-4">
                   <div className="flex items-center justify-between gap-4">

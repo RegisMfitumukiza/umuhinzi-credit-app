@@ -121,6 +121,7 @@ export const App = () => {
       <Route element={<RequireAuth roles={["COOPERATIVE_MANAGER"]} />}>
         <Route element={<CooperativeLayout />}>
           <Route path="/cooperatives" element={<CooperativesPage />} />
+          <Route path="/cooperatives/profile" element={<ProfilePage />} />
           <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
           <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
           <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />

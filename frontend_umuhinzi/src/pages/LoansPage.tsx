@@ -13,7 +13,7 @@ export const LoansPage = () => {
   const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
   const [loans, setLoans] = useState<FarmerLoan[]>([]);
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
-  const [selectedInstitution, setSelectedInstitution] = useState<InstitutionProfile | null>(null);
+  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ requestedAmount: "", purpose: "SEEDS", purposeDescription: "", institutionId: "" });
@@ -21,22 +21,28 @@ export const LoansPage = () => {
   useEffect(() => {
     void (async () => {
       try {
-        const [loadedApplications, loadedLoans, latestScore] = await Promise.all([
-          getLoanApplications(),
-          farmerApi.getLoans(),
-          farmerApi.getLatestCreditScore().catch(() => null),
+        const allInstitutionsPromise = institutionApi.getAvailableInstitutions().catch(async () => {
+          return institutionApi.getActiveInstitutions().catch(() => [] as InstitutionProfile[]);
+        });
+        const loadedApplicationsPromise = getLoanApplications().catch(() => [] as LoanApplicationUi[]);
+        const loadedLoansPromise = farmerApi.getLoans().catch(() => [] as FarmerLoan[]);
+        const latestScorePromise = farmerApi.getLatestCreditScore().catch(() => null);
+
+        const [allInstitutions, loadedApplications, loadedLoans, latestScore] = await Promise.all([
+          allInstitutionsPromise,
+          loadedApplicationsPromise,
+          loadedLoansPromise,
+          latestScorePromise,
         ]);
-        const activeInstitutions = await institutionApi.getActiveInstitutions().catch(() => [] as InstitutionProfile[]);
-        const loadedInstitutions = activeInstitutions.length > 0
-          ? activeInstitutions
-          : await institutionApi.getAllInstitutions().catch(() => [] as InstitutionProfile[]);
-        const defaultInstitution = loadedInstitutions[0] || null;
 
         setApplications(loadedApplications);
         setLoans(loadedLoans);
         setCreditScore(latestScore);
-        setSelectedInstitution(defaultInstitution);
-        setForm((prev) => ({ ...prev, institutionId: defaultInstitution?.id || prev.institutionId }));
+        setInstitutions(allInstitutions);
+        setForm((prev) => ({
+          ...prev,
+          institutionId: prev.institutionId || allInstitutions.find((institution) => institution.status === "ACTIVE")?.id || allInstitutions[0]?.id || "",
+        }));
       } catch {
         showToast("Unable to load loan data", "error");
       } finally {
@@ -53,8 +59,20 @@ export const LoansPage = () => {
       return;
     }
 
-    if (!form.institutionId && !selectedInstitution) {
-      showToast("No finance institution is available for this loan application", "error");
+    const selectedInstitution = institutions.find((institution) => institution.id === form.institutionId);
+
+    if (!form.institutionId) {
+      showToast("Please select a finance institution", "error");
+      return;
+    }
+
+    if (!selectedInstitution) {
+      showToast("Selected institution is not available", "error");
+      return;
+    }
+
+    if (selectedInstitution.status !== "ACTIVE") {
+      showToast("Please choose an active institution", "error");
       return;
     }
 
@@ -64,7 +82,7 @@ export const LoansPage = () => {
         requestedAmount: Number(form.requestedAmount),
         purpose: form.purpose,
         purposeDescription: form.purposeDescription || undefined,
-        institutionId: form.institutionId || selectedInstitution?.id,
+        institutionId: form.institutionId,
       });
 
       const nextApplications = await getLoanApplications();
@@ -109,6 +127,46 @@ export const LoansPage = () => {
         <StatCard label="Eligible amount" value={creditScore?.score ? Math.max(500000, creditScore.score * 1500) : 500000} helper="Estimate from credit score" currency />
       </section>
 
+      <section className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Available institutions</p>
+            <h3 className="mt-2 text-xl font-semibold text-stone-900">Choose where to apply your loan</h3>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            {institutions.length} total
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {institutions.map((institution) => (
+            <button
+              key={institution.id}
+              type="button"
+              onClick={() => institution.status === "ACTIVE" && setForm((prev) => ({ ...prev, institutionId: institution.id }))}
+              disabled={institution.status !== "ACTIVE"}
+              className={`rounded-2xl border p-4 text-left transition ${form.institutionId === institution.id ? "border-emerald-500 bg-emerald-50 shadow-sm" : institution.status === "ACTIVE" ? "border-stone-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40" : "cursor-not-allowed border-stone-200 bg-stone-50 opacity-70"}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-stone-900">{institution.name}</div>
+                  <div className="text-sm text-stone-500">{institution.type}{institution.district ? ` • ${institution.district}` : ""}</div>
+                </div>
+                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${institution.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : institution.status === "PENDING" ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-600"}`}>
+                  {institution.status || "PENDING"}
+                </span>
+              </div>
+              {institution.status !== "ACTIVE" && <p className="mt-3 text-xs text-stone-500">This institution is not active yet.</p>}
+            </button>
+          ))}
+          {institutions.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500 md:col-span-2 xl:col-span-3">
+              No institution is available right now.
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.7fr)]">
         <div className="space-y-5">
           <article className="rounded-[1.5rem] border border-stone-200 bg-white p-6 shadow-panel">
@@ -139,13 +197,22 @@ export const LoansPage = () => {
                 <textarea value={form.purposeDescription} onChange={(e) => setForm((prev) => ({ ...prev, purposeDescription: e.target.value }))} className="mt-2 min-h-28 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Add context for your loan request..." />
               </label>
 
-              <div className="md:col-span-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-                <div className="text-sm font-medium text-emerald-800">Finance institution</div>
-                <div className="mt-1 text-sm text-emerald-900">
-                  {selectedInstitution ? `${selectedInstitution.name} (${selectedInstitution.type})` : "No finance institution available"}
-                </div>
-                <p className="mt-2 text-xs text-emerald-800">Your application will be linked here automatically.</p>
-              </div>
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium text-stone-700">Select Finance Institution</span>
+                <select
+                  value={form.institutionId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, institutionId: e.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
+                >
+                  <option value="">Choose a finance institution</option>
+                  {institutions.map((institution) => (
+                    <option key={institution.id} value={institution.id} disabled={institution.status !== "ACTIVE"}>
+                      {institution.name} ({institution.type}) - {institution.status || "PENDING"}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-stone-500">Only active institutions can be selected for loan applications, but all institutions are shown here.</p>
+              </label>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button onClick={() => navigate("/recommendations")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Save Draft</button>

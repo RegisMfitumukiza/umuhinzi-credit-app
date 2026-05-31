@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   createInstitution,
   getInstitutions,
+  getAvailableInstitutions,
   getInstitutionById,
   updateInstitution,
   updateInstitutionStatus,
@@ -108,9 +109,21 @@ institutionRouter.post(
 institutionRouter.get(
   "/",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN", "INSTITUTION"),
   getInstitutions
 );
+
+/**
+ * @swagger
+ * /api/v1/institutions/available:
+ *   get:
+ *     summary: List active institutions for farmers
+ *     description: Returns active institutions that farmers can choose when applying for loans.
+ *     tags: [Institutions]
+ *     responses:
+ *       200:
+ *         description: Active institutions fetched successfully
+ */
+institutionRouter.get("/available", getAvailableInstitutions);
 
 /**
  * @swagger

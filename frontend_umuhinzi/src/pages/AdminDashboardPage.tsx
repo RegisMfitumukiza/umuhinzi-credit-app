@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { applications } from "./CooperativeApplicationsPage";
 import { getUsers, type AdminUser } from "../api/users";
 import { institutionApi, type InstitutionProfile, type InstitutionStatus } from "../api/institutions";
+import { cooperativeApi, type CooperativeProfile, type CooperativeStatus } from "../api/cooperatives";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -10,7 +11,9 @@ export const AdminDashboardPage = () => {
   const [adminName, setAdminName] = useState("Admin");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
+  const [cooperatives, setCooperatives] = useState<CooperativeProfile[]>([]);
   const [savingInstitutionId, setSavingInstitutionId] = useState<string | null>(null);
+  const [savingCooperativeId, setSavingCooperativeId] = useState<string | null>(null);
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -23,8 +26,10 @@ export const AdminDashboardPage = () => {
           getUsers(),
           institutionApi.getAllInstitutions(),
         ]);
+        const cooperativeList = await cooperativeApi.getAllCooperatives();
         setUsers(userList);
         setInstitutions(institutionList);
+        setCooperatives(cooperativeList);
       } catch {
         showToast("Unable to fetch user stats", "error");
       }
@@ -44,6 +49,11 @@ export const AdminDashboardPage = () => {
     [institutions]
   );
 
+  const pendingCooperatives = useMemo(
+    () => cooperatives.filter((cooperative) => (cooperative.status || "PENDING") === "PENDING"),
+    [cooperatives]
+  );
+
   const totalLoans = applications.reduce((sum, a) => sum + Number(a.amount.replace(/,/g, "")), 0);
 
   const handleInstitutionStatus = async (id: string, status: InstitutionStatus) => {
@@ -56,6 +66,19 @@ export const AdminDashboardPage = () => {
       showToast(error instanceof Error ? error.message : "Unable to update institution", "error");
     } finally {
       setSavingInstitutionId(null);
+    }
+  };
+
+  const handleCooperativeStatus = async (id: string, status: CooperativeStatus) => {
+    setSavingCooperativeId(id);
+    try {
+      const updated = await cooperativeApi.updateCooperativeStatus(id, status);
+      setCooperatives((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      showToast(`Cooperative ${status.toLowerCase()} successfully`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to update cooperative", "error");
+    } finally {
+      setSavingCooperativeId(null);
     }
   };
 
@@ -155,6 +178,50 @@ export const AdminDashboardPage = () => {
                 ))}
 
                 {pendingInstitutions.length === 0 && <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No institution profiles waiting for approval.</div>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm text-stone-500">Cooperative Approvals</div>
+                  <div className="mt-1 text-2xl font-semibold text-stone-900">{pendingCooperatives.length}</div>
+                </div>
+                <Link to="/cooperatives" className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700">View all</Link>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {pendingCooperatives.slice(0, 3).map((cooperative) => (
+                  <div key={cooperative.id} className="rounded-2xl border border-stone-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-stone-900">{cooperative.name}</div>
+                        <div className="text-xs text-stone-500">{cooperative.registrationNumber || "No registration number"} • {cooperative.email || cooperative.phone || "No contact"}</div>
+                        <div className="mt-1 text-xs text-stone-400">Status: {cooperative.status || "PENDING"}</div>
+                      </div>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => void handleCooperativeStatus(cooperative.id, "ACTIVE")}
+                        disabled={savingCooperativeId === cooperative.id}
+                        className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-70"
+                      >
+                        {savingCooperativeId === cooperative.id ? "Saving..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => void handleCooperativeStatus(cooperative.id, "DEACTIVATED")}
+                        disabled={savingCooperativeId === cooperative.id}
+                        className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-70"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {pendingCooperatives.length === 0 && <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No cooperative profiles waiting for approval.</div>}
               </div>
             </div>
 

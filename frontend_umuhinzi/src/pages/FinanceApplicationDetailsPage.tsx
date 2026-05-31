@@ -12,6 +12,7 @@ export const FinanceApplicationDetailsPage = () => {
   const [application, setApplication] = useState<LoanApplicationUi | null>(locationApplication);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -37,12 +38,20 @@ export const FinanceApplicationDetailsPage = () => {
   const handleDecision = async (status: "APPROVED" | "REJECTED") => {
     if (!id || !application) return;
 
+    if (status === "REJECTED" && !rejectionReason.trim()) {
+      showToast("Rejection reason is required", "error");
+      return;
+    }
+
     setSaving(true);
     try {
       const needsReviewStep = application.status === "Pending" || application.status === "PENDING";
       const updated = needsReviewStep
-        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status))
-        : await updateLoanApplicationStatus(id, status);
+        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() =>
+            updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined)
+          )
+        : await updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined);
+
       setApplication(updated);
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch (error) {
@@ -178,7 +187,12 @@ export const FinanceApplicationDetailsPage = () => {
 
               <div className="rounded-2xl border border-stone-100 p-4">
                 <div className="text-sm font-semibold text-stone-900">Approver Notes</div>
-                <textarea className="mt-3 min-h-24 w-full rounded-xl border border-stone-200 p-3 text-sm" placeholder="Provide justification for your decision..." />
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="mt-3 min-h-24 w-full rounded-xl border border-stone-200 p-3 text-sm"
+                  placeholder="Provide justification for your decision..."
+                />
                 <div className="mt-3 flex gap-3">
                   <button
                     type="button"

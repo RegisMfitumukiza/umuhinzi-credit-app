@@ -5,6 +5,7 @@ import {
   type LoanApplicationUi,
   updateLoanApplicationStatus,
 } from "../api/loanApplications";
+import { institutionApi, type InstitutionProfile } from "../api/institutions";
 import { farmerApi, type FarmerLoan } from "../api/farmer";
 import { useToast } from "../context/ToastContext";
 
@@ -48,6 +49,7 @@ const metricsFromData = (apps: LoanApplicationUi[], loans: FarmerLoan[]) => {
 export const FinanceDashboardPage = () => {
   const [apps, setApps] = useState<LoanApplicationUi[]>([]);
   const [loans, setLoans] = useState<FarmerLoan[]>([]);
+  const [institution, setInstitution] = useState<InstitutionProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
 
@@ -58,8 +60,10 @@ export const FinanceDashboardPage = () => {
           getLoanApplications(),
           farmerApi.getLoans().catch(() => [] as FarmerLoan[]),
         ]);
+        const currentInstitution = await institutionApi.getMyInstitution().catch(() => null);
         setApps(loadedApplications);
         setLoans(loadedLoans);
+        setInstitution(currentInstitution);
       } catch {
         showToast("Unable to load applications", "error");
       } finally {
@@ -70,9 +74,17 @@ export const FinanceDashboardPage = () => {
 
   const metrics = useMemo(() => metricsFromData(apps, loans), [apps, loans]);
 
+  const institutionApps = useMemo(() => {
+    if (!institution?.id) {
+      return apps;
+    }
+
+    return apps.filter((app) => !app.institutionId || app.institutionId === institution.id);
+  }, [apps, institution?.id]);
+
   const applicationBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
-    apps.forEach((app) => {
+    institutionApps.forEach((app) => {
       const key = app.purpose || app.crop || "Other";
       counts.set(key, (counts.get(key) || 0) + 1);
     });
@@ -80,13 +92,23 @@ export const FinanceDashboardPage = () => {
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 4);
-  }, [apps]);
+  }, [institutionApps]);
 
-  const recentActivity = useMemo(() => apps.slice(0, 4), [apps]);
+  const recentActivity = useMemo(() => institutionApps.slice(0, 4), [institutionApps]);
 
   async function handleUpdateStatus(id: string, status: "APPROVED" | "REJECTED") {
     try {
-      const updated = await updateLoanApplicationStatus(id, status);
+      let rejectionReason: string | undefined;
+
+      if (status === "REJECTED") {
+        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
+        if (!rejectionReason) {
+          showToast("Rejection reason is required", "error");
+          return;
+        }
+      }
+
+      const updated = await updateLoanApplicationStatus(id, status, rejectionReason);
       setApps((prev) => prev.map((p) => (p.id === id ? updated : p)));
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch {
@@ -225,7 +247,7 @@ export const FinanceDashboardPage = () => {
                   </div>
                 </div>
               ))}
-              {recentActivity.length === 0 && <div className="py-4 text-sm text-stone-500">No loan applications found in the database.</div>}
+              {recentActivity.length === 0 && <div className="py-4 text-sm text-stone-500">No loan applications found for this institution yet.</div>}
             </div>
           </div>
 
