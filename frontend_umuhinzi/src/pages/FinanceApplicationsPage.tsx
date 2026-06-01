@@ -39,6 +39,7 @@ export const FinanceApplicationsPage = () => {
 
       <CooperativeApplicationsPage
         showActions={true}
+        scope="institution"
         title="Institution Loan Applications"
         subtitle="These are the farmer applications linked to your approved finance institution."
         emptyStateMessage="No farmer applications have been linked to this institution yet."

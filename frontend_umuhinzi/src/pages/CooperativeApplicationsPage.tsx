@@ -49,6 +49,7 @@ type CooperativeApplicationsPageProps = {
   title?: string;
   subtitle?: string;
   emptyStateMessage?: string;
+  scope?: "cooperative" | "institution";
 };
 
 export const CooperativeApplicationsPage = ({
@@ -56,6 +57,7 @@ export const CooperativeApplicationsPage = ({
   title = "Loan Applications",
   subtitle = "Manage and review agricultural loan requests from cooperatives across Rwanda.",
   emptyStateMessage = "No applications submitted yet.",
+  scope = "cooperative",
 }: CooperativeApplicationsPageProps) => {
   const [appsState, setAppsState] = useState<LoanApplicationUi[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,8 +69,20 @@ export const CooperativeApplicationsPage = ({
     void (async () => {
       try {
         const currentUser = await getCurrentUserProfile().catch(() => null);
-        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
 
+        if (scope === "institution") {
+          const institutionId = currentUser?.institutionProfile?.id;
+          if (!institutionId) {
+            setAppsState([]);
+            return;
+          }
+
+          const data = await getLoanApplications().catch(() => [] as LoanApplicationUi[]);
+          setAppsState(data);
+          return;
+        }
+
+        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
         if (!cooperativeId) {
           setAppsState([]);
           return;
@@ -88,7 +102,7 @@ export const CooperativeApplicationsPage = ({
         setIsLoading(false);
       }
     })();
-  }, [showToast]);
+  }, [scope, showToast]);
 
   async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
     try {
