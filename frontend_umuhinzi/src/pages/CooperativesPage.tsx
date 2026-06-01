@@ -1,219 +1,142 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { cooperativeApi, type CooperativeProfile } from "../api/cooperatives";
-import { cooperativeMembersApi, type CooperativeMemberApi } from "../api/cooperativeMembers";
-import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
-import { getCurrentUserProfile } from "../api/users";
-
-const parseAmount = (value?: string) => {
-  if (!value) return 0;
-  return Number(value.replace(/,/g, "")) || 0;
-};
-
 export const CooperativesPage = () => {
-  const [loading, setLoading] = useState(true);
-  const [cooperative, setCooperative] = useState<CooperativeProfile | null>(null);
-  const [members, setMembers] = useState<CooperativeMemberApi[]>([]);
-  const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const currentUser = await getCurrentUserProfile().catch(() => null);
-        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
-
-        if (!cooperativeId) {
-          setCooperative(null);
-          setMembers([]);
-          setApplications([]);
-          return;
-        }
-
-        const [cooperatives, memberRows, loanRows] = await Promise.all([
-          cooperativeApi.getAllCooperatives().catch(() => [] as CooperativeProfile[]),
-          cooperativeMembersApi.getMyCooperativeMembers().catch(() => [] as CooperativeMemberApi[]),
-          getLoanApplications().catch(() => [] as LoanApplicationUi[]),
-        ]);
-
-        const currentCooperative = cooperatives.find((item) => item.id === cooperativeId) || null;
-        const memberFarmerIds = new Set(memberRows.map((member) => member.farmerId));
-        const filteredApplications = loanRows.filter((application) => application.farmerId ? memberFarmerIds.has(application.farmerId) : false);
-
-        setCooperative(currentCooperative);
-        setMembers(memberRows);
-        setApplications(filteredApplications);
-      } catch {
-        setCooperative(null);
-        setMembers([]);
-        setApplications([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const summary = useMemo(() => {
-    const activeMembers = members.filter((member) => (member.status || "PENDING").toUpperCase() === "ACTIVE").length;
-    const pendingMembers = members.filter((member) => (member.status || "PENDING").toUpperCase() === "PENDING").length;
-    const approvedApplications = applications.filter((application) => application.status === "Approved").length;
-    const totalLoanVolume = applications.reduce((sum, application) => sum + parseAmount(application.amount), 0);
-    const scoreValues = applications.map((application) => Number(application.scoreValue)).filter((value) => Number.isFinite(value) && value > 0);
-    const averageScore = scoreValues.length > 0 ? Math.round(scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length) : 0;
-
-    return {
-      totalMembers: members.length,
-      activeMembers,
-      pendingMembers,
-      applications: applications.length,
-      approvedApplications,
-      totalLoanVolume,
-      averageScore,
-    };
-  }, [applications, members]);
-
-  const monthlyTrend = useMemo(() => {
-    const monthBuckets = new Map<string, number>();
-
-    applications.forEach((application) => {
-      if (!application.createdAt) return;
-      const date = new Date(application.createdAt);
-      if (Number.isNaN(date.getTime())) return;
-      const key = date.toLocaleString("en-US", { month: "short", year: "2-digit" });
-      monthBuckets.set(key, (monthBuckets.get(key) || 0) + 1);
-    });
-
-    return Array.from(monthBuckets.entries()).slice(-6).map(([label, value]) => ({ label, value }));
-  }, [applications]);
-
-  const recentApplications = useMemo(
-    () => [...applications].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 5),
-    [applications]
-  );
-
-  const recentMembers = useMemo(
-    () => [...members].slice(0, 5),
-    [members]
-  );
-
-  const maxTrendValue = Math.max(...monthlyTrend.map((item) => item.value), 1);
-
-  if (loading) {
-    return <div className="p-6 text-sm text-stone-500">Loading cooperative data...</div>;
-  }
+  const trendPoints = "40,215 110,235 180,110 250,198 320,162 390,172 460,154 530,176 600,168";
+  const donutSegments = [
+    { dasharray: "214 214", offset: 0, color: "#22c55e" },
+    { dasharray: "88 214", offset: -214, color: "#86efac" },
+    { dasharray: "34 214", offset: -302, color: "#f59e0b" },
+  ];
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto max-w-[1400px]">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Cooperative Overview</h1>
-            <p className="mt-1 text-sm text-stone-500">Live database view for your cooperative members, applications, and loan activity.</p>
+            <p className="mt-1 text-sm text-stone-500">Monitor your group's productivity, financial health, and member performance.</p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link to="/cooperatives/profile" className="rounded-full border border-emerald-200 bg-white px-5 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50">
-              Create / Update Profile
-            </Link>
-            <Link to="/cooperatives/reports" className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">
-              Reports
-            </Link>
-            <Link to="/cooperatives/applications" className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">
-              Manage Loans
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-emerald-900">Cooperative profile and approval</div>
-              <p className="mt-1 text-sm text-emerald-900/75">
-                {cooperative
-                  ? `Your cooperative profile is ${cooperative.status || "PENDING"}. Farmers can only select it when the admin approves it.`
-                  : "Create or link your cooperative profile first so farmers can select it from their profile page."}
-              </p>
-            </div>
-            <Link to="/cooperatives/profile" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800">
-              Go to Profile
-            </Link>
+          <div className="flex gap-3">
+            <button className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Reports</button>
+            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">Manage Loans</button>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Total Members" value={summary.totalMembers} delta={summary.pendingMembers > 0 ? `${summary.pendingMembers} pending` : "All active"} accent="blue" />
-          <StatCard title="Loan Applications" value={summary.applications} delta={`${summary.approvedApplications} approved`} accent="green" />
-          <StatCard title="Total Loan Volume" value={`RWF ${summary.totalLoanVolume.toLocaleString()}`} delta="Live cooperative data" accent="orange" />
-          <StatCard title="Avg. Credit Score" value={summary.averageScore ? String(summary.averageScore) : "N/A"} delta="From member applications" accent="emerald" />
+          <StatCard title="Total Members" value="1,240" delta="12.5%" accent="blue" />
+          <StatCard title="Group Loan Volume" value="RWF 45.2M" delta="8.2%" accent="green" />
+          <StatCard title="Avg. Productivity" value="4.2 T/Ha" delta="15.1%" accent="orange" />
+          <StatCard title="Repayment Rate" value="98.4%" delta="2.4%" accent="emerald" />
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.5fr_0.9fr]">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.6fr_0.8fr]">
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-stone-900">Loan Application Trend</h2>
-                <p className="text-xs text-stone-500">Applications submitted by your cooperative members in the last months available in the database</p>
+                <h2 className="text-lg font-semibold text-stone-900">Seasonal Productivity Trends</h2>
+                <p className="text-xs text-stone-500">Historical yield data across primary crops (Tonnes/Hectare)</p>
               </div>
-              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600">Live</span>
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600">2023 Season</span>
             </div>
 
-            {monthlyTrend.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-200 p-6 text-sm text-stone-500">
-                No loan applications are linked to your cooperative members yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {monthlyTrend.map((item) => (
-                  <div key={item.label} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-stone-700">{item.label}</span>
-                      <span className="font-semibold text-stone-900">{item.value}</span>
-                    </div>
-                    <div className="h-3 rounded-full bg-stone-100">
-                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(item.value / maxTrendValue) * 100}%` }} />
-                    </div>
-                  </div>
+            <div className="relative h-[320px] rounded-xl bg-gradient-to-b from-white to-stone-50 p-4">
+              <div className="absolute left-4 top-4 text-xs text-stone-400">10,000</div>
+              <div className="absolute left-4 top-[25%] text-xs text-stone-400">7,500</div>
+              <div className="absolute left-4 top-[50%] text-xs text-stone-400">5,000</div>
+              <div className="absolute left-4 top-[75%] text-xs text-stone-400">2,500</div>
+              <div className="absolute bottom-4 left-16 right-6 h-px border-t border-dashed border-stone-200" />
+
+              <svg viewBox="0 0 640 240" className="h-full w-full" role="img" aria-label="Seasonal productivity trend chart">
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity="0.18" />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+
+                {[40, 95, 150, 205].map((y) => (
+                  <line key={y} x1="36" y1={y} x2="610" y2={y} stroke="#ececec" strokeDasharray="4 6" />
                 ))}
+
+                <polyline
+                  points={`${trendPoints} 600,235 40,235`}
+                  fill="url(#trendFill)"
+                  stroke="none"
+                />
+                <polyline
+                  points={trendPoints}
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                <polyline
+                  points="40,190 110,210 180,58 250,148 320,121 390,150 460,136 530,142 600,128"
+                  fill="none"
+                  stroke="#fb923c"
+                  strokeWidth="3"
+                  strokeDasharray="6 6"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+
+                {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"].map((label, index) => (
+                  <text key={label} x={40 + index * 95} y="220" textAnchor="middle" className="fill-stone-400 text-[11px]">
+                    {label}
+                  </text>
+                ))}
+              </svg>
+
+              <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-6 text-xs text-stone-500">
+                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Maize</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-orange-400" />Coffee</span>
               </div>
-            )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Member Status</h2>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-600">Database</span>
+              <h2 className="text-lg font-semibold text-stone-900">Harvest & Financials</h2>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-600">Live</span>
             </div>
 
             <div className="space-y-3">
-              <StatusLine label="Active Members" value={summary.activeMembers} />
-              <StatusLine label="Pending Members" value={summary.pendingMembers} />
-              <StatusLine label="Total Cooperative Records" value={summary.totalMembers} />
+              <TimelineItem month="OCT" day="15" title="Coffee Harvest Start" status="Completed" />
+              <TimelineItem month="NOV" day="02" title="First Quarter Repayment" status="In Progress" />
+              <TimelineItem month="DEC" day="10" title="Input Distribution (Seed)" status="Upcoming" />
+              <TimelineItem month="JAN" day="05" title="Annual Group Meeting" status="Upcoming" />
             </div>
+
+            <div className="mt-4 text-center text-sm text-stone-500">View Full Calendar</div>
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Recent Applications</h2>
-              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Live</span>
+              <h2 className="text-lg font-semibold text-stone-900">Member Performance</h2>
+              <button className="rounded-full border border-stone-200 px-4 py-2 text-sm text-stone-600">View All</button>
             </div>
 
             <div className="space-y-3">
-              {recentApplications.length === 0 && <p className="text-sm text-stone-500">No live applications are available for this cooperative yet.</p>}
-              {recentApplications.map((application) => (
-                <div key={application.id} className="rounded-xl border border-stone-100 px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
+              {[
+                ["#1", "Alice Mutoni", "Repayment: 100%", "5.2 T/Ha", "Top Performer"],
+                ["#2", "Jean Gakweya", "Repayment: 98%", "4.9 T/Ha", ""],
+                ["#3", "Safi Uwineza", "Repayment: 100%", "4.8 T/Ha", ""],
+                ["#4", "Emile Karemera", "Repayment: 95%", "4.5 T/Ha", ""],
+                ["#5", "Grace Uwera", "Repayment: 99%", "4.4 T/Ha", ""],
+              ].map(([rank, name, meta, value, tag]) => (
+                <div key={rank} className="flex items-center justify-between rounded-xl border border-stone-100 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 text-sm font-semibold text-stone-400">{rank}</span>
                     <div>
-                      <div className="text-sm font-semibold text-stone-900">{application.farmer}</div>
-                      <div className="text-xs text-stone-500">{application.crop} • {application.institution || "No institution"}</div>
-                      <div className="mt-1 text-xs text-stone-400">Submitted: {application.date}</div>
+                      <div className="text-sm font-semibold text-stone-900">{name}</div>
+                      <div className="text-xs text-stone-500">{meta}</div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-stone-900">RWF {application.amount}</div>
-                      <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${application.status === "Approved" ? "bg-emerald-100 text-emerald-700" : application.status === "Rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                        {application.status}
-                      </span>
-                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-stone-900">{value}</div>
+                    {tag ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">{tag}</span> : null}
                   </div>
                 </div>
               ))}
@@ -222,53 +145,59 @@ export const CooperativesPage = () => {
 
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Members from Database</h2>
-              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Latest</span>
+              <h2 className="text-lg font-semibold text-stone-900">Group Loan Status</h2>
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Real-time</span>
             </div>
 
-            <div className="space-y-3">
-              {recentMembers.length === 0 && <p className="text-sm text-stone-500">No members found for your cooperative.</p>}
-              {recentMembers.map((member) => (
-                <div key={member.id} className="rounded-xl border border-stone-100 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-stone-900">{member.farmer?.user?.fullName || "Farmer"}</div>
-                      <div className="text-xs text-stone-500">{member.farmer?.user?.email || "-"}</div>
-                    </div>
-                    <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${member.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : member.status === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"}`}>
-                      {member.status || "PENDING"}
-                    </span>
-                  </div>
+            <div className="flex h-[280px] items-center justify-center rounded-xl bg-stone-50">
+              <div className="relative h-52 w-52">
+                <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-label="Group loan status donut chart" role="img">
+                  <circle cx="60" cy="60" r="34" fill="none" stroke="#e5e7eb" strokeWidth="12" />
+                  {donutSegments.map((segment) => (
+                    <circle
+                      key={`${segment.color}-${segment.offset}`}
+                      cx="60"
+                      cy="60"
+                      r="34"
+                      fill="none"
+                      stroke={segment.color}
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                      strokeDasharray={segment.dasharray}
+                      strokeDashoffset={segment.offset}
+                    />
+                  ))}
+                </svg>
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <div className="text-3xl font-semibold text-stone-900">1,240</div>
+                  <div className="text-[11px] font-medium tracking-[0.25em] text-stone-400">TOTAL LOANS</div>
                 </div>
-              ))}
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-3 text-center text-sm">
+              <div>
+                <div className="text-emerald-500">Fully Repaid</div>
+                <div className="mt-1 font-semibold text-stone-900">540</div>
+              </div>
+              <div>
+                <div className="text-emerald-500">Active</div>
+                <div className="mt-1 font-semibold text-stone-900">620</div>
+              </div>
+              <div>
+                <div className="text-amber-500">Pending</div>
+                <div className="mt-1 font-semibold text-stone-900">80</div>
+              </div>
             </div>
           </div>
         </div>
-
-        <section className="rounded-[1.75rem] border border-emerald-500 bg-emerald-500 p-6 text-white shadow-panel">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="text-2xl font-semibold">Next Actions From Live Data</h3>
-              <p className="mt-2 max-w-2xl text-sm text-emerald-50">
-                Keep members active, review their loan applications from the database, and maintain your cooperative approval so farmers can keep selecting it.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link to="/cooperatives/members" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-emerald-700">View Members</Link>
-                <Link to="/cooperatives/applications" className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white">Review Applications</Link>
-              </div>
-            </div>
-            <div className="rounded-[1.5rem] border border-white/20 bg-white/10 px-6 py-4 text-center">
-              <div className="text-4xl font-semibold">{summary.activeMembers}</div>
-              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-emerald-50">Active Members</p>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
 };
 
-const StatCard = ({ title, value, delta, accent }: { title: string; value: string | number; delta: string; accent: "blue" | "green" | "orange" | "emerald" }) => {
+const StatCard = ({ title, value, delta, accent }: { title: string; value: string; delta: string; accent: "blue" | "green" | "orange" | "emerald" }) => {
   const accentClasses = {
     blue: "from-blue-50 to-white text-blue-600",
     green: "from-emerald-50 to-white text-emerald-600",
@@ -288,11 +217,20 @@ const StatCard = ({ title, value, delta, accent }: { title: string; value: strin
   );
 };
 
-const StatusLine = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex items-center justify-between rounded-xl border border-stone-100 px-4 py-3">
-    <div className="text-sm text-stone-600">{label}</div>
-    <div className="text-lg font-semibold text-stone-900">{value}</div>
-  </div>
-);
+const TimelineItem = ({ month, day, title, status }: { month: string; day: string; title: string; status: string }) => {
+  const statusClass = status === "Completed" ? "bg-emerald-100 text-emerald-700" : status === "In Progress" ? "bg-stone-100 text-stone-700" : "bg-amber-100 text-amber-700";
 
-export default CooperativesPage;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-stone-100 p-3">
+      <div className="w-12 rounded-xl border border-stone-200 bg-stone-50 py-2 text-center">
+        <div className="text-[10px] font-semibold text-stone-500">{month}</div>
+        <div className="text-lg font-semibold text-stone-900">{day}</div>
+      </div>
+      <div className="flex-1">
+        <div className="text-sm font-semibold text-stone-900">{title}</div>
+        <div className="text-xs text-stone-500">• Financial</div>
+      </div>
+      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass}`}>{status}</span>
+    </div>
+  );
+};

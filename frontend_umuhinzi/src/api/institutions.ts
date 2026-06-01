@@ -47,24 +47,14 @@ export type CreateInstitutionPayload = {
 
 export type UpdateInstitutionPayload = Partial<CreateInstitutionPayload>;
 
-const institutionsCacheBust = () => `?_ts=${Date.now()}`;
-
 export const institutionApi = {
   getMyInstitution: async (): Promise<InstitutionProfile | null> => {
-    const response = await api.get<ApiResponse<InstitutionProfile[]>>(`/institutions${institutionsCacheBust()}`);
+    const response = await api.get<ApiResponse<InstitutionProfile[]>>("/institutions");
     return response.data.data?.[0] || null;
   },
-  getAvailableInstitutions: async (): Promise<InstitutionProfile[]> => {
-    const response = await api.get<ApiResponse<InstitutionProfile[]>>(`/institutions/available${institutionsCacheBust()}`);
-    return response.data.data || [];
-  },
   getAllInstitutions: async (): Promise<InstitutionProfile[]> => {
-    const response = await api.get<ApiResponse<InstitutionProfile[]>>(`/institutions${institutionsCacheBust()}`);
+    const response = await api.get<ApiResponse<InstitutionProfile[]>>("/institutions");
     return response.data.data || [];
-  },
-  getActiveInstitutions: async (): Promise<InstitutionProfile[]> => {
-    const response = await api.get<ApiResponse<InstitutionProfile[]>>(`/institutions${institutionsCacheBust()}`);
-    return (response.data.data || []).filter((institution) => institution.status === "ACTIVE");
   },
   createInstitution: async (payload: CreateInstitutionPayload): Promise<InstitutionProfile> => {
     const response = await api.post<ApiResponse<InstitutionProfile>>("/institutions", payload);

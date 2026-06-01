@@ -1,69 +1,42 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   getLoanApplications,
   type LoanApplicationUi,
   updateLoanApplicationStatus,
 } from "../api/loanApplications";
-import { institutionApi, type InstitutionProfile } from "../api/institutions";
-import { farmerApi, type FarmerLoan } from "../api/farmer";
 import { useToast } from "../context/ToastContext";
 
 const exportApplicationsCSV = (apps: LoanApplicationUi[]) => {
-  const header = ["id", "farmer", "institution", "purpose", "amount", "score", "date", "status"];
-  const rows = apps.map((a) => [a.id, a.farmer, a.institution || "", a.purpose || a.crop, a.amount, a.scoreValue, a.date, a.status]);
+  const header = ["id", "farmer", "location", "crop", "amount", "score", "date", "status"];
+  const rows = apps.map((a) => [a.id, a.farmer, a.location, a.crop, a.amount, a.scoreValue, a.date, a.status]);
   return [header, ...rows]
     .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
     .join("\n");
 };
 
-const parseMoney = (value?: string | number | null) => {
-  if (typeof value === "number") return value;
-  if (!value) return 0;
-  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
-};
-
-const metricsFromData = (apps: LoanApplicationUi[], loans: FarmerLoan[]) => {
-  const totalApplications = apps.length;
-  const pendingApplications = apps.filter((a) => a.status === "Pending" || a.status === "Under Review").length;
-  const approvedApplications = apps.filter((a) => a.status === "Approved").length;
-  const uniqueFarmers = new Set(apps.map((a) => a.farmerId || a.farmer)).size;
-  const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
-  const defaultedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "DEFAULTED").length;
-  const completedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "COMPLETED").length;
-  const portfolioValue = activeLoans.reduce((sum, loan) => sum + parseMoney(loan.approvedAmount ?? loan.requestedAmount ?? 0), 0);
-  const totalLoans = loans.length || 1;
+const metricsFromApps = (apps: LoanApplicationUi[]) => {
+  const total = apps.length;
+  const approved = apps.filter((a) => a.status === "Approved").length;
+  const disbursed = 0;
+  const value = apps.reduce((s, a) => s + Number(a.amount.replace(/,/g, "")), 0);
   return {
-    totalApplications,
-    pendingApplications,
-    approvedApplications,
-    uniqueFarmers,
-    activeLoans: activeLoans.length,
-    completedLoans,
-    nplRatio: `${((defaultedLoans / totalLoans) * 100).toFixed(1)}%`,
-    recoveryRate: `${((completedLoans / totalLoans) * 100).toFixed(1)}%`,
-    portfolioValue: `RWF ${portfolioValue.toLocaleString()}`,
+    total,
+    approved,
+    disbursed,
+    value: `RWF ${Number(value).toLocaleString()}`,
   };
 };
 
 export const FinanceDashboardPage = () => {
   const [apps, setApps] = useState<LoanApplicationUi[]>([]);
-  const [loans, setLoans] = useState<FarmerLoan[]>([]);
-  const [institution, setInstitution] = useState<InstitutionProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
 
   useEffect(() => {
     void (async () => {
       try {
-        const [loadedApplications, loadedLoans] = await Promise.all([
-          getLoanApplications(),
-          farmerApi.getLoans().catch(() => [] as FarmerLoan[]),
-        ]);
-        const currentInstitution = await institutionApi.getMyInstitution().catch(() => null);
-        setApps(loadedApplications);
-        setLoans(loadedLoans);
-        setInstitution(currentInstitution);
+        const loaded = await getLoanApplications();
+        setApps(loaded);
       } catch {
         showToast("Unable to load applications", "error");
       } finally {
@@ -72,43 +45,11 @@ export const FinanceDashboardPage = () => {
     })();
   }, []);
 
-  const metrics = useMemo(() => metricsFromData(apps, loans), [apps, loans]);
-
-  const institutionApps = useMemo(() => {
-    if (!institution?.id) {
-      return apps;
-    }
-
-    return apps.filter((app) => !app.institutionId || app.institutionId === institution.id);
-  }, [apps, institution?.id]);
-
-  const applicationBreakdown = useMemo(() => {
-    const counts = new Map<string, number>();
-    institutionApps.forEach((app) => {
-      const key = app.purpose || app.crop || "Other";
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-    return Array.from(counts.entries())
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
-  }, [institutionApps]);
-
-  const recentActivity = useMemo(() => institutionApps.slice(0, 4), [institutionApps]);
+  const metrics = useMemo(() => metricsFromApps(apps), [apps]);
 
   async function handleUpdateStatus(id: string, status: "APPROVED" | "REJECTED") {
     try {
-      let rejectionReason: string | undefined;
-
-      if (status === "REJECTED") {
-        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
-        if (!rejectionReason) {
-          showToast("Rejection reason is required", "error");
-          return;
-        }
-      }
-
-      const updated = await updateLoanApplicationStatus(id, status, rejectionReason);
+      const updated = await updateLoanApplicationStatus(id, status);
       setApps((prev) => prev.map((p) => (p.id === id ? updated : p)));
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch {
@@ -148,23 +89,23 @@ export const FinanceDashboardPage = () => {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="text-sm text-stone-500">Active Portfolio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.portfolioValue}</div>
-            <div className="mt-1 text-xs text-stone-400">From active loans</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.value}</div>
+            <div className="mt-1 text-xs text-stone-400">Portfolio value</div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Farmers in Pipeline</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.uniqueFarmers}</div>
-            <div className="mt-1 text-xs text-stone-400">Unique farmers with applications</div>
+            <div className="text-sm text-stone-500">Active Farmers</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.total}</div>
+            <div className="mt-1 text-xs text-stone-400">Active applications</div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="text-sm text-stone-500">NPL Ratio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.nplRatio}</div>
-            <div className="mt-1 text-xs text-stone-400">Based on loan status</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">3.1%</div>
+            <div className="mt-1 text-xs text-stone-400">Non-performing loans</div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="text-sm text-stone-500">Loan Recovery</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.recoveryRate}</div>
-            <div className="mt-1 text-xs text-stone-400">Completed loans / all loans</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">96.4%</div>
+            <div className="mt-1 text-xs text-stone-400">Recovery rate</div>
           </div>
         </div>
 
@@ -172,48 +113,30 @@ export const FinanceDashboardPage = () => {
           <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-stone-900">Financial Performance</h2>
-              <div className="text-sm text-stone-500">Live</div>
+              <div className="text-sm text-stone-500">Monthly</div>
             </div>
-            <div className="space-y-3 rounded-lg border border-stone-100 bg-stone-50 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Pending review</span>
-                <span className="font-semibold text-stone-900">{metrics.pendingApplications}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Approved applications</span>
-                <span className="font-semibold text-stone-900">{metrics.approvedApplications}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Active loans</span>
-                <span className="font-semibold text-stone-900">{metrics.activeLoans}</span>
-              </div>
-              <div className="h-3 overflow-hidden rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${Math.min(100, (metrics.approvedApplications / Math.max(metrics.totalApplications, 1)) * 100)}%` }}
-                />
-              </div>
-            </div>
+            <div className="h-60 w-full bg-gradient-to-b from-emerald-50 to-white rounded-lg" />
           </div>
 
           <aside className="space-y-4">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Portfolio by Purpose</div>
-              <div className="mt-3 space-y-3 text-sm">
-                {applicationBreakdown.length > 0 ? applicationBreakdown.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between gap-3">
-                    <span className="text-stone-700">{item.label}</span>
-                    <span className="font-semibold text-stone-900">{item.count}</span>
-                  </div>
-                )) : <div className="text-stone-500">No applications yet.</div>}
+              <div className="text-sm text-stone-500">Portfolio by Sector</div>
+              <div className="mt-3 flex items-center gap-4">
+                <div className="h-28 w-28 rounded-full bg-emerald-50" />
+                <div className="flex-1">
+                  <div className="text-sm">Coffee</div>
+                  <div className="text-sm">Maize</div>
+                  <div className="text-sm">Tea</div>
+                  <div className="text-sm">Livestock</div>
+                </div>
               </div>
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Application Status Mix</div>
+              <div className="text-sm text-stone-500">Regional Risk Index</div>
               <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <div className="flex items-center justify-between"><span>Awaiting review</span><span>{metrics.pendingApplications}</span></div>
-                <div className="flex items-center justify-between"><span>Approved</span><span>{metrics.approvedApplications}</span></div>
-                <div className="flex items-center justify-between"><span>Rejected</span><span>{apps.filter((a) => a.status === "Rejected").length}</span></div>
+                <div className="flex items-center justify-between"><span>Northern Province</span><span>LOW</span></div>
+                <div className="flex items-center justify-between"><span>Southern Province</span><span>MEDIUM</span></div>
+                <div className="flex items-center justify-between"><span>Western Province</span><span>HIGH</span></div>
               </div>
             </div>
           </aside>
@@ -223,18 +146,15 @@ export const FinanceDashboardPage = () => {
           <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-stone-900">Recent Applications</h3>
-              <Link className="text-sm text-emerald-600" to="/finance/applications">View All</Link>
+              <a className="text-sm text-emerald-600">View All</a>
             </div>
 
             <div className="space-y-3">
-              {recentActivity.map((a) => (
+              {apps.slice(0, 5).map((a) => (
                 <div key={a.id} className="flex items-center justify-between gap-4 border-b border-stone-100 py-3">
                   <div>
                     <div className="font-semibold text-stone-900">{a.farmer}</div>
-                    <div className="text-xs text-stone-500">
-                      {a.amount} • {a.purpose || a.crop} • {a.institution || "Assigned institution"}
-                    </div>
-                    {a.purposeDescription && <div className="mt-1 text-xs text-stone-400">{a.purposeDescription}</div>}
+                    <div className="text-xs text-stone-500">{a.amount} • {a.crop} • {a.location}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-stone-500">{a.status}</div>
@@ -247,16 +167,15 @@ export const FinanceDashboardPage = () => {
                   </div>
                 </div>
               ))}
-              {recentActivity.length === 0 && <div className="py-4 text-sm text-stone-500">No loan applications found for this institution yet.</div>}
             </div>
           </div>
 
           <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
             <div className="text-sm text-stone-500">Notifications</div>
             <div className="mt-3 space-y-2 text-sm text-stone-600">
-              <div>{metrics.pendingApplications} applications awaiting review</div>
-              <div>{metrics.approvedApplications} applications approved from farmer submissions</div>
-              <div>{metrics.completedLoans} completed loans in the active portfolio</div>
+              <div>5 high-priority requests awaiting your review</div>
+              <div>2 loans ready for disbursement</div>
+              <div>3 institutions requested updated reports</div>
             </div>
           </div>
         </div>

@@ -30,38 +30,6 @@ export type FarmerDashboardProfile = {
   village?: string | null;
 };
 
-export type AdminFarmerSeason = {
-  id: string;
-  name?: string;
-  year?: number;
-};
-
-export type AdminFarmer = {
-  id: string;
-  userId: string;
-  nationalId: string;
-  status?: string;
-  primaryCrop?: string | null;
-  cooperativeId?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  user?: {
-    id?: string;
-    fullName?: string;
-    email?: string;
-    phone?: string | null;
-    province?: string | null;
-    district?: string | null;
-    sector?: string | null;
-    cell?: string | null;
-    village?: string | null;
-  };
-  productivityRecords?: Array<{
-    id: string;
-    season?: AdminFarmerSeason | null;
-  }>;
-};
-
 export type FarmerProfilePayload = {
   nationalId: string;
   dateOfBirth?: string;
@@ -203,10 +171,6 @@ export const farmerApi = {
   getProfile: async () => {
     const response = await api.get<ApiResponse<FarmerDashboardProfile>>("/farmers/me");
     return response.data.data;
-  },
-  getAllFarmers: async () => {
-    const response = await api.get<ApiResponse<AdminFarmer[]>>("/farmers");
-    return response.data.data || [];
   },
   createProfile: async (payload: FarmerProfilePayload) => {
     const response = await api.post<ApiResponse<FarmerDashboardProfile>>("/farmers", payload);

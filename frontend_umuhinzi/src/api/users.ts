@@ -38,10 +38,6 @@ export const updateUserStatus = async (
   return toAdminUser(response.data.data);
 };
 
-export const deleteUser = async (id: string): Promise<void> => {
-  await api.delete(`/users/${id}`);
-};
-
 export type UpdateMyProfilePayload = {
   fullName?: string;
   phone?: string;
@@ -54,22 +50,5 @@ export type UpdateMyProfilePayload = {
 
 export const updateMyProfile = async (payload: UpdateMyProfilePayload): Promise<AuthUser> => {
   const response = await api.patch<ApiResponse<AuthUser>>("/users/me", payload);
-  return response.data.data;
-};
-
-export type CurrentUserProfile = AuthUser & {
-  cooperativeManagerProfile?: {
-    cooperativeId?: string | null;
-  } | null;
-  institutionProfile?: {
-    id?: string;
-  } | null;
-  farmerProfile?: {
-    id?: string;
-  } | null;
-};
-
-export const getCurrentUserProfile = async (): Promise<CurrentUserProfile> => {
-  const response = await api.get<ApiResponse<CurrentUserProfile>>("/users/me");
   return response.data.data;
 };

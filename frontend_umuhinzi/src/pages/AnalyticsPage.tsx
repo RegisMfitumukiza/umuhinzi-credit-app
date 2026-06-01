@@ -6,25 +6,21 @@ const factorCards = [
     title: "Repayment Reliability",
     description: "Consistency of on-time loan repayments over time.",
     impact: "High",
-    level: "Core",
   },
   {
     title: "Agricultural Productivity",
     description: "Yield performance relative to your farm records.",
     impact: "High",
-    level: "Core",
   },
   {
     title: "Tenure & Stability",
     description: "Duration of farming activities on registered land parcels.",
     impact: "Medium",
-    level: "Supporting",
   },
   {
     title: "Market Engagement",
     description: "Active participation in cooperatives and markets.",
     impact: "Medium",
-    level: "Supporting",
   },
 ];
 

@@ -17,19 +17,13 @@ type FarmerLike = {
 type LoanApplicationRaw = {
   id: string;
   farmerId?: string;
-  institutionId?: string;
   requestedAmount?: number;
   approvedAmount?: number;
   recommendedAmount?: number;
   status?: string;
   purpose?: string;
-  purposeDescription?: string;
   createdAt?: string;
-  rejectionReason?: string;
   farmer?: FarmerLike;
-  institution?: { name?: string; type?: string };
-  reviewedBy?: { fullName?: string; email?: string };
-  reviewedAt?: string;
   creditScore?: {
     score?: number;
     riskLevel?: string;
@@ -39,25 +33,15 @@ type LoanApplicationRaw = {
 export type LoanApplicationUi = {
   id: string;
   farmerId?: string;
-  institutionId?: string;
   farmer: string;
-  institution?: string;
   location: string;
   crop: string;
-  purpose?: string;
-  purposeDescription?: string;
   amount: string;
-  requestedAmount?: number;
-  approvedAmount?: number;
   scoreLabel: string;
   scoreValue: string;
   riskLevel?: string;
   date: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
   status: string;
-  createdAt?: string;
-  rejectionReason?: string;
 };
 
 const formatCurrencyAmount = (value?: number): string => {
@@ -82,25 +66,15 @@ const toUiModel = (row: LoanApplicationRaw): LoanApplicationUi => {
   return {
     id: row.id,
     farmerId: row.farmerId,
-    institutionId: row.institutionId,
     farmer: row.farmer?.user?.fullName || "Farmer",
-    institution: row.institution?.name,
     location: "Rwanda",
     crop: row.purpose || "General",
-    purpose: row.purpose,
-    purposeDescription: row.purposeDescription,
     amount: formatCurrencyAmount(amount),
-    requestedAmount: row.requestedAmount,
-    approvedAmount: row.approvedAmount,
     scoreLabel,
     scoreValue,
     riskLevel: row.creditScore?.riskLevel,
     date,
-    reviewedBy: row.reviewedBy?.fullName || row.reviewedBy?.email,
-    reviewedAt: row.reviewedAt ? new Date(row.reviewedAt).toLocaleString() : undefined,
     status: toUiStatus(row.status),
-    createdAt: row.createdAt,
-    rejectionReason: row.rejectionReason,
   };
 };
 
@@ -116,12 +90,8 @@ export const getLoanApplicationById = async (id: string): Promise<LoanApplicatio
 
 export const updateLoanApplicationStatus = async (
   id: string,
-  status: "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED",
-  rejectionReason?: string
+  status: "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED"
 ): Promise<LoanApplicationUi> => {
-  const response = await api.patch<ApiResponse<LoanApplicationRaw>>(`/loan-applications/${id}/status`, {
-    status,
-    ...(rejectionReason ? { rejectionReason } : {}),
-  });
+  const response = await api.patch<ApiResponse<LoanApplicationRaw>>(`/loan-applications/${id}/status`, { status });
   return toUiModel(response.data.data);
 };

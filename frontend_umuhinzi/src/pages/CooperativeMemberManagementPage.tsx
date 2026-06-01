@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCurrentUserProfile } from "../api/users";
-import { cooperativeApi, type CooperativeProfile } from "../api/cooperatives";
-import { cooperativeMembersApi, type CooperativeMemberApi } from "../api/cooperativeMembers";
 import { useToast } from "../context/ToastContext";
+import {
+  getPendingFarmerRequests,
+  markFarmerApproved,
+  markFarmerDeclined,
+} from "../utils/farmerApprovalQueue";
+
+type PendingMember = {
+  id: string;
+  name: string;
+  phone: string;
+  village: string;
+  status: "Pending";
+};
 
 type CooperativeMember = {
   id: string;
@@ -10,93 +20,87 @@ type CooperativeMember = {
   phone: string;
   village: string;
   role: string;
-  status: string;
 };
+
+const initialMembers: CooperativeMember[] = [
+  { id: "MEM-101", name: "Alice Mutoni", phone: "+250788777888", village: "Kimironko", role: "Treasurer" },
+  { id: "MEM-102", name: "Jean Gakweya", phone: "+250788999000", village: "Nyamirambo", role: "Member" },
+];
 
 export const CooperativeMemberManagementPage = () => {
   const { showToast } = useToast();
-  const [members, setMembers] = useState<CooperativeMember[]>([]);
-  const [cooperative, setCooperative] = useState<CooperativeProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+  const [members, setMembers] = useState<CooperativeMember[]>(initialMembers);
+    useEffect(() => {
+      const requests = getPendingFarmerRequests();
+      setPendingMembers(
+        requests.map((request) => ({
+          id: request.userId,
+          name: request.fullName,
+          phone: request.phone || "-",
+          village: request.village || "-",
+          status: "Pending",
+        }))
+      );
+    }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    void (async () => {
-      try {
-        const currentUser = await getCurrentUserProfile();
-        const cooperativeId = currentUser.cooperativeManagerProfile?.cooperativeId;
-
-        const [allCooperatives, memberRows] = await Promise.all([
-          cooperativeId ? cooperativeApi.getAllCooperatives().catch(() => [] as CooperativeProfile[]) : Promise.resolve([] as CooperativeProfile[]),
-          cooperativeId ? cooperativeMembersApi.getMyCooperativeMembers().catch(() => [] as CooperativeMemberApi[]) : Promise.resolve([] as CooperativeMemberApi[]),
-        ]);
-
-        const currentCooperative = allCooperatives.find((item) => item.id === cooperativeId) || null;
-
-        if (!mounted) return;
-
-        setCooperative(currentCooperative);
-        setMembers(
-          memberRows.map((member) => ({
-            id: member.id,
-            name: member.farmer?.user?.fullName || "Farmer",
-            phone: member.farmer?.user?.email || "-",
-            village: "-",
-            role: member.status || "Member",
-            status: member.status || "PENDING",
-          }))
-        );
-      } catch {
-        if (!mounted) return;
-        setMembers([]);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newMember, setNewMember] = useState({
+    name: "",
+    phone: "",
+    village: "",
+    role: "Member",
+  });
 
   const summary = useMemo(
     () => ({
-      total: members.length,
-      active: members.filter((member) => member.status === "ACTIVE").length,
-      pending: members.filter((member) => member.status === "PENDING").length,
+      total: members.length + pendingMembers.length,
+      active: members.length,
+      pending: pendingMembers.length,
     }),
-    [members]
+    [members.length, pendingMembers.length]
   );
 
-  const handleRemoveMember = async (memberId: string) => {
-    try {
-      await cooperativeMembersApi.removeCooperativeMember(memberId);
-      setMembers((prev) => prev.filter((member) => member.id !== memberId));
-      showToast("Member removed successfully", "success");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to remove member", "error");
-    }
+  const acceptMember = (member: PendingMember) => {
+    markFarmerApproved(member.id);
+    setPendingMembers((prev) => prev.filter((item) => item.id !== member.id));
+    setMembers((prev) => [
+      {
+        id: `MEM-${Date.now()}`,
+        name: member.name,
+        phone: member.phone,
+        village: member.village,
+        role: "Member",
+      },
+      ...prev,
+    ]);
+    showToast("Farmer approved. Pending restrictions removed.", "success");
+  };
+  const declineMember = (memberId: string) => {
+    markFarmerDeclined(memberId);
+    setPendingMembers((prev) => prev.filter((item) => item.id !== memberId));
+    showToast("Farmer request declined.", "success");
   };
 
-  const handleApproveMember = async (memberId: string) => {
-    try {
-      const updated = await cooperativeMembersApi.updateCooperativeMember(memberId, { status: "ACTIVE" });
-      setMembers((prev) =>
-        prev.map((member) =>
-          member.id === memberId
-            ? {
-                ...member,
-                status: updated.status || "ACTIVE",
-                role: "Member",
-              }
-            : member
-        )
-      );
-      showToast("Member approved successfully", "success");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to approve member", "error");
+
+  const handleAddMember = () => {
+    if (!newMember.name.trim() || !newMember.phone.trim() || !newMember.village.trim()) {
+      return;
     }
+
+    setMembers((prev) => [
+      {
+        id: `MEM-${Date.now()}`,
+        name: newMember.name.trim(),
+        phone: newMember.phone.trim(),
+        village: newMember.village.trim(),
+        role: newMember.role.trim() || "Member",
+      },
+      ...prev,
+    ]);
+
+    setNewMember({ name: "", phone: "", village: "", role: "Member" });
+    setShowAddForm(false);
   };
 
   return (
@@ -108,9 +112,12 @@ export const CooperativeMemberManagementPage = () => {
             <p className="mt-1 text-sm text-stone-500">Accept new members and add approved members to the cooperative list.</p>
           </div>
 
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-            Live database members only
-          </span>
+          <button
+            onClick={() => setShowAddForm((prev) => !prev)}
+            className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-sm"
+          >
+            {showAddForm ? "Close Form" : "Add New Member"}
+          </button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -119,28 +126,63 @@ export const CooperativeMemberManagementPage = () => {
           <StatCard label="Pending Requests" value={summary.pending} />
         </div>
 
-        {cooperative === null && !loading && (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
-            This cooperative manager does not have a cooperative profile linked yet. Create the cooperative first, then members will appear here.
+        {showAddForm && (
+          <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-stone-900">Add New Member</h2>
+              <span className="text-xs text-stone-500">Manual registration</span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <input
+                value={newMember.name}
+                onChange={(e) => setNewMember((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Full name"
+                className="rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+              <input
+                value={newMember.phone}
+                onChange={(e) => setNewMember((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="Phone"
+                className="rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+              <input
+                value={newMember.village}
+                onChange={(e) => setNewMember((prev) => ({ ...prev, village: e.target.value }))}
+                placeholder="Village"
+                className="rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+              <input
+                value={newMember.role}
+                onChange={(e) => setNewMember((prev) => ({ ...prev, role: e.target.value }))}
+                placeholder="Role"
+                className="rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleAddMember}
+                className="rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold text-white"
+              >
+                Save Member
+              </button>
+            </div>
           </section>
         )}
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-stone-900">Pending Members</h2>
-                <p className="text-xs text-stone-500">For {cooperative?.name || "your cooperative"}</p>
-              </div>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">From database</span>
+              <h2 className="text-lg font-semibold text-stone-900">Pending New Members</h2>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Awaiting approval</span>
             </div>
 
             <div className="space-y-3">
-              {loading && <p className="text-sm text-stone-500">Loading pending requests...</p>}
-              {!loading && members.filter((member) => member.status === "PENDING").length === 0 && (
-                <p className="text-sm text-stone-500">No pending member records yet.</p>
+              {pendingMembers.length === 0 && (
+                <p className="text-sm text-stone-500">No pending farmer requests yet.</p>
               )}
-              {members.filter((member) => member.status === "PENDING").map((member) => (
+              {pendingMembers.map((member) => (
                 <div key={member.id} className="rounded-2xl border border-stone-100 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -149,10 +191,16 @@ export const CooperativeMemberManagementPage = () => {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => void handleApproveMember(member.id)}
+                        onClick={() => acceptMember(member)}
                         className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white"
                       >
-                        Approve
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => declineMember(member.id)}
+                        className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700"
+                      >
+                        Decline
                       </button>
                     </div>
                   </div>
@@ -173,26 +221,14 @@ export const CooperativeMemberManagementPage = () => {
             </div>
 
             <div className="space-y-3">
-              {loading && <p className="text-sm text-stone-500">Loading members...</p>}
-              {!loading && members.length === 0 && (
-                <p className="text-sm text-stone-500">No member records yet for this cooperative.</p>
-              )}
-              {members.filter((member) => member.status !== "PENDING").map((member) => (
+              {members.map((member) => (
                 <div key={member.id} className="rounded-2xl border border-stone-100 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-semibold text-stone-900">{member.name}</div>
                       <div className="text-sm text-stone-500">{member.phone} • {member.village}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{member.role}</span>
-                      <button
-                        onClick={() => void handleRemoveMember(member.id)}
-                        className="rounded-full border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-700"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{member.role}</span>
                   </div>
                 </div>
               ))}

@@ -1,18 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
-import { institutionApi, type InstitutionProfile } from "../api/institutions";
 import { farmerApi, type FarmerCreditScore, type FarmerLoan } from "../api/farmer";
 import { useToast } from "../context/ToastContext";
 
 const purposeOptions = ["SEEDS", "FERTILIZER", "EQUIPMENT", "IRRIGATION", "LIVESTOCK", "LAND_RENT", "LABOR", "TRANSPORT", "STORAGE", "OTHER"];
-const BASE_LOAN_LIMIT = 500000;
-const SCORE_MULTIPLIER = 15000;
-
-const getMaximumLoanAmountFromScore = (score?: number) => {
-  const normalizedScore = Math.max(0, Math.min(100, Math.round(score ?? 0)));
-  return BASE_LOAN_LIMIT + normalizedScore * SCORE_MULTIPLIER;
-};
 
 export const LoansPage = () => {
   const navigate = useNavigate();
@@ -20,7 +12,6 @@ export const LoansPage = () => {
   const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
   const [loans, setLoans] = useState<FarmerLoan[]>([]);
   const [creditScore, setCreditScore] = useState<FarmerCreditScore | null>(null);
-  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ requestedAmount: "", purpose: "SEEDS", purposeDescription: "", institutionId: "" });
@@ -28,28 +19,15 @@ export const LoansPage = () => {
   useEffect(() => {
     void (async () => {
       try {
-        const allInstitutionsPromise = institutionApi.getAvailableInstitutions().catch(async () => {
-          return institutionApi.getActiveInstitutions().catch(() => [] as InstitutionProfile[]);
-        });
-        const loadedApplicationsPromise = getLoanApplications().catch(() => [] as LoanApplicationUi[]);
-        const loadedLoansPromise = farmerApi.getLoans().catch(() => [] as FarmerLoan[]);
-        const latestScorePromise = farmerApi.getLatestCreditScore().catch(() => null);
-
-        const [allInstitutions, loadedApplications, loadedLoans, latestScore] = await Promise.all([
-          allInstitutionsPromise,
-          loadedApplicationsPromise,
-          loadedLoansPromise,
-          latestScorePromise,
+        const [loadedApplications, loadedLoans, latestScore] = await Promise.all([
+          getLoanApplications(),
+          farmerApi.getLoans(),
+          farmerApi.getLatestCreditScore().catch(() => null),
         ]);
 
         setApplications(loadedApplications);
         setLoans(loadedLoans);
         setCreditScore(latestScore);
-        setInstitutions(allInstitutions);
-        setForm((prev) => ({
-          ...prev,
-          institutionId: prev.institutionId || allInstitutions.find((institution) => institution.status === "ACTIVE")?.id || allInstitutions[0]?.id || "",
-        }));
       } catch {
         showToast("Unable to load loan data", "error");
       } finally {
@@ -59,7 +37,6 @@ export const LoansPage = () => {
   }, [showToast]);
 
   const activeLoans = useMemo(() => loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase())), [loans]);
-  const maximumLoanAmount = getMaximumLoanAmountFromScore(creditScore?.score);
 
   const handleSubmit = async () => {
     if (!form.requestedAmount || !form.purpose) {
@@ -67,41 +44,13 @@ export const LoansPage = () => {
       return;
     }
 
-    const requestedAmount = Number(form.requestedAmount);
-    if (Number.isNaN(requestedAmount) || requestedAmount <= 0) {
-      showToast("Requested amount must be greater than 0", "error");
-      return;
-    }
-
-    if (requestedAmount > maximumLoanAmount) {
-      showToast(`Your current loan limit is RWF ${maximumLoanAmount.toLocaleString()}`, "error");
-      return;
-    }
-
-    const selectedInstitution = institutions.find((institution) => institution.id === form.institutionId);
-
-    if (!form.institutionId) {
-      showToast("Please select a finance institution", "error");
-      return;
-    }
-
-    if (!selectedInstitution) {
-      showToast("Selected institution is not available", "error");
-      return;
-    }
-
-    if (selectedInstitution.status !== "ACTIVE") {
-      showToast("Please choose an active institution", "error");
-      return;
-    }
-
     setSubmitting(true);
     try {
       await farmerApi.createLoanApplication({
-        requestedAmount,
+        requestedAmount: Number(form.requestedAmount),
         purpose: form.purpose,
         purposeDescription: form.purposeDescription || undefined,
-        institutionId: form.institutionId,
+        institutionId: form.institutionId || undefined,
       });
 
       const nextApplications = await getLoanApplications();
@@ -143,47 +92,7 @@ export const LoansPage = () => {
         <StatCard label="Credit score" value={creditScore?.score || 0} helper={creditScore?.riskLevel || creditScore?.grade || "Pending"} />
         <StatCard label="Active loans" value={activeLoans.length} helper="Backend loan list" />
         <StatCard label="Applications" value={applications.length} helper="Submitted applications" />
-        <StatCard label="Eligible amount" value={maximumLoanAmount} helper="Increases with your latest credit score" currency />
-      </section>
-
-      <section className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Available institutions</p>
-            <h3 className="mt-2 text-xl font-semibold text-stone-900">Choose where to apply your loan</h3>
-          </div>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {institutions.length} total
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {institutions.map((institution) => (
-            <button
-              key={institution.id}
-              type="button"
-              onClick={() => institution.status === "ACTIVE" && setForm((prev) => ({ ...prev, institutionId: institution.id }))}
-              disabled={institution.status !== "ACTIVE"}
-              className={`rounded-2xl border p-4 text-left transition ${form.institutionId === institution.id ? "border-emerald-500 bg-emerald-50 shadow-sm" : institution.status === "ACTIVE" ? "border-stone-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40" : "cursor-not-allowed border-stone-200 bg-stone-50 opacity-70"}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-stone-900">{institution.name}</div>
-                  <div className="text-sm text-stone-500">{institution.type}{institution.district ? ` • ${institution.district}` : ""}</div>
-                </div>
-                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${institution.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : institution.status === "PENDING" ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-600"}`}>
-                  {institution.status || "PENDING"}
-                </span>
-              </div>
-              {institution.status !== "ACTIVE" && <p className="mt-3 text-xs text-stone-500">This institution is not active yet.</p>}
-            </button>
-          ))}
-          {institutions.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500 md:col-span-2 xl:col-span-3">
-              No institution is available right now.
-            </div>
-          )}
-        </div>
+        <StatCard label="Eligible amount" value={creditScore?.score ? Math.max(500000, creditScore.score * 1500) : 500000} helper="Estimate from credit score" currency />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.7fr)]">
@@ -201,15 +110,7 @@ export const LoansPage = () => {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="text-sm font-medium text-stone-700">Requested Amount (RWF)</span>
-                    <input
-                      value={form.requestedAmount}
-                      onChange={(e) => setForm((prev) => ({ ...prev, requestedAmount: e.target.value }))}
-                      className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
-                      placeholder={`e.g. ${Math.min(maximumLoanAmount, 800000).toLocaleString()}`}
-                    />
-                    <p className="mt-2 text-xs text-stone-500">
-                      Your current loan limit is {formatMoney(maximumLoanAmount)} based on your latest credit score.
-                    </p>
+                  <input value={form.requestedAmount} onChange={(e) => setForm((prev) => ({ ...prev, requestedAmount: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="e.g. 800000" />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-stone-700">Purpose</span>
@@ -224,21 +125,9 @@ export const LoansPage = () => {
                 <textarea value={form.purposeDescription} onChange={(e) => setForm((prev) => ({ ...prev, purposeDescription: e.target.value }))} className="mt-2 min-h-28 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Add context for your loan request..." />
               </label>
 
-              <label className="block md:col-span-2">
-                <span className="text-sm font-medium text-stone-700">Select Finance Institution</span>
-                <select
-                  value={form.institutionId}
-                  onChange={(e) => setForm((prev) => ({ ...prev, institutionId: e.target.value }))}
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
-                >
-                  <option value="">Choose a finance institution</option>
-                  {institutions.map((institution) => (
-                    <option key={institution.id} value={institution.id} disabled={institution.status !== "ACTIVE"}>
-                      {institution.name} ({institution.type}) - {institution.status || "PENDING"}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-xs text-stone-500">Only active institutions can be selected for loan applications, but all institutions are shown here.</p>
+              <label className="block">
+                <span className="text-sm font-medium text-stone-700">Optional Institution ID</span>
+                <input value={form.institutionId} onChange={(e) => setForm((prev) => ({ ...prev, institutionId: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Optional backend institution reference" />
               </label>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -289,7 +178,7 @@ export const LoansPage = () => {
 
             <div className="mt-4 rounded-2xl border border-white bg-white p-4 shadow-sm">
               <p className="text-sm text-stone-500">Recommended limit</p>
-              <p className="mt-1 text-2xl font-semibold text-stone-900">{formatMoney(maximumLoanAmount)}</p>
+              <p className="mt-1 text-2xl font-semibold text-stone-900">{creditScore?.score ? formatMoney(Math.max(500000, creditScore.score * 1500)) : formatMoney(500000)}</p>
             </div>
           </article>
 

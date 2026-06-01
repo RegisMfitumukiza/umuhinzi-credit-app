@@ -1,156 +1,122 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { cooperativeMembersApi } from "../api/cooperativeMembers";
-import { getCurrentUserProfile } from "../api/users";
-import { getLoanApplicationById, type LoanApplicationUi } from "../api/loanApplications";
-
-const statusStyles: Record<string, string> = {
-  Pending: "bg-stone-100 text-stone-700",
-  "Under Review": "bg-amber-100 text-amber-700",
-  Approved: "bg-emerald-100 text-emerald-700",
-  Rejected: "bg-rose-100 text-rose-700",
-  Cancelled: "bg-stone-200 text-stone-700",
-};
+import { useParams, useNavigate } from "react-router-dom";
+import { applications } from "./CooperativeApplicationsPage";
 
 export const CooperativeApplicationDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [application, setApplication] = useState<LoanApplicationUi | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        if (!id) {
-          setError("Application ID is missing.");
-          return;
-        }
-
-        const currentUser = await getCurrentUserProfile().catch(() => null);
-        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
-
-        if (!cooperativeId) {
-          setError("This cooperative manager does not have a cooperative profile linked yet.");
-          return;
-        }
-
-        const [memberRows, loanApplication] = await Promise.all([
-          cooperativeMembersApi.getMyCooperativeMembers().catch(() => []),
-          getLoanApplicationById(id),
-        ]);
-
-        const memberFarmerIds = new Set(memberRows.map((member) => member.farmerId));
-        if (!loanApplication.farmerId || !memberFarmerIds.has(loanApplication.farmerId)) {
-          setError("This application does not belong to your cooperative.");
-          return;
-        }
-
-        setApplication(loanApplication);
-      } catch {
-        setError("Unable to load the selected application.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id]);
-
-  const statusClass = useMemo(() => statusStyles[application?.status || "Pending"] || statusStyles.Pending, [application?.status]);
-
-  if (loading) {
-    return <div className="p-6 text-sm text-stone-500">Loading application details...</div>;
-  }
-
-  if (error || !application) {
-    return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
-        <div className="mx-auto max-w-[1200px]">
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <p className="text-sm text-stone-600">{error || "Application not found."}</p>
-            <button onClick={() => navigate(-1)} className="mt-4 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700">
-              Go back
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const app = applications.find((a) => a.id === id) || applications[0];
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
-      <div className="mx-auto max-w-[1200px] space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className="text-sm text-stone-500">← Back to Table</button>
-            <div>
-              <h1 className="text-2xl font-semibold text-stone-900">Application {application.id}</h1>
-              <p className="text-sm text-stone-500">Real cooperative loan application from the database</p>
-            </div>
+      <div className="mx-auto max-w-[1200px]">
+        <div className="mb-3 flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="text-sm text-stone-500">← Back to Table</button>
+          <h1 className="text-2xl font-semibold text-stone-900">App {app.id} • Under Review</h1>
+          <div className="ml-auto flex items-center gap-3">
+            <button className="rounded-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700">Schedule Site Visit</button>
+            <button className="rounded-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700">View Version History</button>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>{application.status}</span>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-          <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-2">
-              <InfoCard label="Farmer" value={application.farmer} />
-              <InfoCard label="Location" value={application.location} />
-              <InfoCard label="Primary Crop" value={application.crop} />
-              <InfoCard label="Requested Amount" value={`RWF ${application.requestedAmount?.toLocaleString() || application.amount}`} />
-              <InfoCard label="Recommended Amount" value={`RWF ${application.approvedAmount?.toLocaleString() || application.amount}`} />
-              <InfoCard label="Credit Score" value={application.scoreValue} helper={application.riskLevel || application.scoreLabel} />
-              <InfoCard label="Submission Date" value={application.date} />
-              <InfoCard label="Institution" value={application.institution || "-"} />
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-6">
+                <div className="h-24 w-24 rounded-full bg-stone-100 flex items-center justify-center text-3xl font-semibold">{app.farmer[0]}</div>
+                <div>
+                  <div className="text-xl font-semibold text-stone-900">{app.farmer}</div>
+                  <div className="text-xs text-stone-500">{app.location}</div>
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-700">Member since 2019</div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-stone-100 p-4">
+                  <div className="text-sm text-stone-500">Cooperative</div>
+                  <div className="mt-1 font-semibold text-stone-900">Tuzamurane Musanze</div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-100 p-4">
+                  <div className="text-sm text-stone-500">Farm Size</div>
+                  <div className="mt-1 font-semibold text-stone-900">2.5 Hectares</div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-100 p-4">
+                  <div className="text-sm text-stone-500">Primary Crop</div>
+                  <div className="mt-1 font-semibold text-stone-900">{app.crop}</div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-100 p-4">
+                  <div className="text-sm text-stone-500">Loan Amount</div>
+                  <div className="mt-1 font-semibold text-stone-900">RWF {app.amount}</div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
+                  <button className="text-sm font-semibold text-stone-900">Farm Productivity</button>
+                  <button className="text-sm text-stone-500">Document Viewer</button>
+                  <button className="text-sm text-stone-500">Financial Records</button>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-stone-100 p-6 text-center">
+                    <div className="text-sm text-stone-500">Land Title Cert #4421</div>
+                    <div className="mt-6 text-xs text-stone-400">PDF • Jun 2024</div>
+                  </div>
+                  <div className="rounded-2xl border border-stone-100 p-6 text-center">
+                    <div className="text-sm text-stone-500">National ID - Front/Back</div>
+                    <div className="mt-6 text-xs text-stone-400">Image • Jul 2024</div>
+                  </div>
+                  <div className="rounded-2xl border border-stone-100 p-6 text-center">
+                    <div className="text-sm text-stone-500">Crop Insurance Policy</div>
+                    <div className="mt-6 text-xs text-stone-400">PDF • Aug 2024</div>
+                  </div>
+                  <div className="rounded-2xl border border-stone-100 p-6 text-center">
+                    <div className="text-sm text-stone-500">Coop Reference Letter</div>
+                    <div className="mt-6 text-xs text-stone-400">PDF • Aug 2024</div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-stone-900">Verification Checklist</h4>
+                  <div className="mt-3 space-y-3 text-sm text-stone-600">
+                    <div className="flex items-center gap-3"><input type="checkbox" defaultChecked /> <span>Identity Verified</span></div>
+                    <div className="flex items-center gap-3"><input type="checkbox" defaultChecked /> <span>Collateral Value Confirmed</span></div>
+                    <div className="flex items-center gap-3"><input type="checkbox" defaultChecked /> <span>Yield Estimate Validation</span></div>
+                    <div className="flex items-center gap-3"><input type="checkbox" /> <span>Risk Assessment Complete</span></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {application.purposeDescription && (
-              <div className="mt-6 rounded-2xl border border-stone-100 bg-stone-50 p-4">
-                <div className="text-sm font-semibold text-stone-900">Purpose Description</div>
-                <p className="mt-2 text-sm text-stone-600">{application.purposeDescription}</p>
+            <aside className="space-y-4">
+              <div className="rounded-2xl border border-stone-100 p-5">
+                <div className="text-sm font-semibold text-stone-900">CREDIT READINESS SCORE</div>
+                <div className="mt-4 text-4xl font-semibold text-emerald-600">74</div>
+                <div className="mt-3 text-xs text-stone-500">Repayment Reliability · Production Capacity · Market Connectivity</div>
               </div>
-            )}
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-stone-100 p-4">
-                <div className="text-sm text-stone-500">Reviewed By</div>
-                <div className="mt-1 font-semibold text-stone-900">{application.reviewedBy || "Not reviewed yet"}</div>
+                <h5 className="text-sm font-semibold text-stone-900">Risk Indicators</h5>
+                <div className="mt-3 text-sm text-stone-600">• Regional vulnerability: Musanze area forecasted for heavy rainfall during harvest period (Oct).</div>
+                <div className="mt-2 text-sm text-stone-600">• Collateral depth: Asset valuation is slightly aggressive compared to market averages.</div>
               </div>
+
               <div className="rounded-2xl border border-stone-100 p-4">
-                <div className="text-sm text-stone-500">Reviewed At</div>
-                <div className="mt-1 font-semibold text-stone-900">{application.reviewedAt || "-"}</div>
+                <div className="text-sm font-semibold text-stone-900">Approver Notes</div>
+                <textarea className="mt-3 min-h-24 w-full rounded-xl border border-stone-200 p-3 text-sm" placeholder="Provide justification for your decision..." />
+                <div className="mt-3 flex gap-3">
+                  <button className="flex-1 rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-white">Approve Loan</button>
+                  <button className="rounded-full border border-stone-200 px-4 py-3 text-sm font-semibold text-rose-600">Reject</button>
+                </div>
               </div>
-            </div>
-          </section>
-
-          <aside className="space-y-4">
-            <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-stone-900">Application Status</h2>
-              <p className="mt-2 text-sm text-stone-600">This data comes directly from the backend and only shows applications that belong to your cooperative members.</p>
-              <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-sm text-stone-700">
-                Current status: <span className="font-semibold text-stone-900">{application.status}</span>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-stone-900">Decision Notes</h2>
-              <p className="mt-2 text-sm text-stone-600">Use the applications list to approve or reject this application. The detailed reason appears in the list after update.</p>
-              <button onClick={() => navigate("/cooperatives/applications")} className="mt-4 w-full rounded-full border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">
-                Back to Applications
-              </button>
-            </article>
-          </aside>
+            </aside>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-
-const InfoCard = ({ label, value, helper }: { label: string; value: string; helper?: string }) => (
-  <div className="rounded-2xl border border-stone-100 p-4">
-    <div className="text-sm text-stone-500">{label}</div>
-    <div className="mt-1 font-semibold text-stone-900">{value}</div>
-    {helper && <div className="mt-1 text-xs text-stone-500">{helper}</div>}
-  </div>
-);
 
 export default CooperativeApplicationDetailsPage;
