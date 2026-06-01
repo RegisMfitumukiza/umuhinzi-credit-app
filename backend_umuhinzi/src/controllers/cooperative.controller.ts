@@ -13,6 +13,7 @@ import {
   addCooperativeMemberService,
   getCooperativeMembersService,
   removeCooperativeMemberService,
+  updateCooperativeMemberService,
   updateCooperativeStatusService,
 } from "../services/cooperative.service.js";
 
@@ -134,6 +135,24 @@ export const addCooperativeMember = asyncHandler(async (req: Request, res: Respo
   res.status(201).json({
     success: true,
     message: "Joined cooperative successfully",
+    data: member,
+  });
+});
+
+export const updateCooperativeMember = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const member = await updateCooperativeMemberService(
+    String(req.params.id),
+    req.user.id,
+    req.user.role,
+    req.body,
+    getContext(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Cooperative member updated successfully",
     data: member,
   });
 });

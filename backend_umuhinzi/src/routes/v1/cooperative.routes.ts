@@ -10,6 +10,7 @@ import {
   addCooperativeMember,
   getCooperativeMembers,
   removeCooperativeMember,
+  updateCooperativeMember,
 } from "../../controllers/cooperative.controller.js";
 
 import {
@@ -26,6 +27,7 @@ import {
   updateCooperativeSchema,
   cooperativeIdParamSchema,
   addCooperativeMemberSchema,
+  updateCooperativeMemberSchema,
   cooperativeMemberIdParamSchema,
 } from "../../validators/cooperative.schema.js";
 
@@ -318,6 +320,14 @@ cooperativeMemberRouter.get(
   authenticate,
   authorizeRoles("ADMIN", "COOPERATIVE_MANAGER"),
   getCooperativeMembers
+);
+
+cooperativeMemberRouter.patch(
+  "/:id",
+  authenticate,
+  authorizeRoles("ADMIN", "COOPERATIVE_MANAGER"),
+  validate(updateCooperativeMemberSchema),
+  updateCooperativeMember
 );
 
 /**

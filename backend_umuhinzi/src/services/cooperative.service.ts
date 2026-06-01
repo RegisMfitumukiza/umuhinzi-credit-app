@@ -286,14 +286,33 @@ export const addCooperativeMemberService = async (
     throw new APIError("Farmer is already an active member of a cooperative.", 409);
   }
 
-  const member = await prisma.cooperativeMember.create({
+  const member = existing
+    ? await prisma.cooperativeMember.update({
+        where: { id: existing.id },
+        data: {
+          cooperativeId: input.cooperativeId,
+          status: "PENDING",
+          joinedAt: input.joinedAt ?? new Date(),
+          leftAt: null,
+        },
+        select: safeMemberSelect,
+      })
+    : await prisma.cooperativeMember.create({
+        data: {
+          cooperativeId: input.cooperativeId,
+          farmerId,
+          status: "PENDING",
+          joinedAt: input.joinedAt ?? new Date(),
+        },
+        select: safeMemberSelect,
+      });
+
+  await prisma.farmer.update({
+    where: { id: farmerId },
     data: {
       cooperativeId: input.cooperativeId,
-      farmerId,
-      status: "ACTIVE",
-      joinedAt: input.joinedAt ?? new Date(),
+      status: "PENDING",
     },
-    select: safeMemberSelect,
   });
 
   await writeAuditLog({
@@ -308,6 +327,85 @@ export const addCooperativeMemberService = async (
   });
 
   return member;
+};
+
+/* ─────────────────────────────────────────
+   UPDATE COOPERATIVE MEMBER
+───────────────────────────────────────── */
+
+export const updateCooperativeMemberService = async (
+  memberId: string,
+  userId: string,
+  userRole: string,
+  input: UpdateCooperativeMemberInput,
+  context: RequestContext = {}
+) => {
+  const member = await prisma.cooperativeMember.findUnique({
+    where: { id: memberId },
+    select: { id: true, cooperativeId: true, status: true, joinedAt: true, farmerId: true },
+  });
+  if (!member) throw new APIError("Cooperative member not found.", 404);
+
+  if (userRole === "COOPERATIVE_MANAGER") {
+    const manager = await resolveCooperativeManagerId(userId);
+    if (manager.cooperativeId !== member.cooperativeId) {
+      throw new APIError("Not authorized to update members in this cooperative.", 403);
+    }
+  }
+
+  const updated = await prisma.cooperativeMember.update({
+    where: { id: memberId },
+    data: {
+      status: input.status ?? member.status,
+      joinedAt:
+        input.joinedAt ??
+        (input.status === "ACTIVE" && !member.joinedAt ? new Date() : undefined),
+      leftAt: input.leftAt ?? (input.status === "LEFT" || input.status === "REMOVED" ? new Date() : undefined),
+    },
+    select: safeMemberSelect,
+  });
+
+  if (updated.status === "ACTIVE") {
+    await prisma.farmer.update({
+      where: { id: updated.farmerId },
+      data: {
+        cooperativeId: updated.cooperativeId,
+        status: "VERIFIED",
+      },
+    });
+  }
+
+  if (updated.status === "REMOVED" || updated.status === "LEFT") {
+    await prisma.farmer.update({
+      where: { id: updated.farmerId },
+      data: {
+        status: "PENDING",
+      },
+    });
+  }
+
+  if (updated.status === "ACTIVE") {
+    await prisma.farmer.update({
+      where: { id: member.farmerId },
+      data: {
+        cooperativeId: member.cooperativeId,
+        status: "VERIFIED",
+      },
+    });
+  }
+
+  await writeAuditLog({
+    actorId: context.actorId ?? userId,
+    action: "UPDATE",
+    resource: "COOPERATIVE",
+    resourceId: member.cooperativeId,
+    description: "Cooperative member updated",
+    metadata: { memberId, status: updated.status },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return updated;
 };
 
 /* ─────────────────────────────────────────

@@ -6,6 +6,13 @@ import { farmerApi, type FarmerCreditScore, type FarmerLoan } from "../api/farme
 import { useToast } from "../context/ToastContext";
 
 const purposeOptions = ["SEEDS", "FERTILIZER", "EQUIPMENT", "IRRIGATION", "LIVESTOCK", "LAND_RENT", "LABOR", "TRANSPORT", "STORAGE", "OTHER"];
+const BASE_LOAN_LIMIT = 500000;
+const SCORE_MULTIPLIER = 15000;
+
+const getMaximumLoanAmountFromScore = (score?: number) => {
+  const normalizedScore = Math.max(0, Math.min(100, Math.round(score ?? 0)));
+  return BASE_LOAN_LIMIT + normalizedScore * SCORE_MULTIPLIER;
+};
 
 export const LoansPage = () => {
   const navigate = useNavigate();
@@ -52,10 +59,22 @@ export const LoansPage = () => {
   }, [showToast]);
 
   const activeLoans = useMemo(() => loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase())), [loans]);
+  const maximumLoanAmount = getMaximumLoanAmountFromScore(creditScore?.score);
 
   const handleSubmit = async () => {
     if (!form.requestedAmount || !form.purpose) {
       showToast("Requested amount and purpose are required", "error");
+      return;
+    }
+
+    const requestedAmount = Number(form.requestedAmount);
+    if (Number.isNaN(requestedAmount) || requestedAmount <= 0) {
+      showToast("Requested amount must be greater than 0", "error");
+      return;
+    }
+
+    if (requestedAmount > maximumLoanAmount) {
+      showToast(`Your current loan limit is RWF ${maximumLoanAmount.toLocaleString()}`, "error");
       return;
     }
 
@@ -79,7 +98,7 @@ export const LoansPage = () => {
     setSubmitting(true);
     try {
       await farmerApi.createLoanApplication({
-        requestedAmount: Number(form.requestedAmount),
+        requestedAmount,
         purpose: form.purpose,
         purposeDescription: form.purposeDescription || undefined,
         institutionId: form.institutionId,
@@ -124,7 +143,7 @@ export const LoansPage = () => {
         <StatCard label="Credit score" value={creditScore?.score || 0} helper={creditScore?.riskLevel || creditScore?.grade || "Pending"} />
         <StatCard label="Active loans" value={activeLoans.length} helper="Backend loan list" />
         <StatCard label="Applications" value={applications.length} helper="Submitted applications" />
-        <StatCard label="Eligible amount" value={creditScore?.score ? Math.max(500000, creditScore.score * 1500) : 500000} helper="Estimate from credit score" currency />
+        <StatCard label="Eligible amount" value={maximumLoanAmount} helper="Increases with your latest credit score" currency />
       </section>
 
       <section className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
@@ -182,7 +201,15 @@ export const LoansPage = () => {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="text-sm font-medium text-stone-700">Requested Amount (RWF)</span>
-                  <input value={form.requestedAmount} onChange={(e) => setForm((prev) => ({ ...prev, requestedAmount: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="e.g. 800000" />
+                    <input
+                      value={form.requestedAmount}
+                      onChange={(e) => setForm((prev) => ({ ...prev, requestedAmount: e.target.value }))}
+                      className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
+                      placeholder={`e.g. ${Math.min(maximumLoanAmount, 800000).toLocaleString()}`}
+                    />
+                    <p className="mt-2 text-xs text-stone-500">
+                      Your current loan limit is {formatMoney(maximumLoanAmount)} based on your latest credit score.
+                    </p>
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-stone-700">Purpose</span>
@@ -262,7 +289,7 @@ export const LoansPage = () => {
 
             <div className="mt-4 rounded-2xl border border-white bg-white p-4 shadow-sm">
               <p className="text-sm text-stone-500">Recommended limit</p>
-              <p className="mt-1 text-2xl font-semibold text-stone-900">{creditScore?.score ? formatMoney(Math.max(500000, creditScore.score * 1500)) : formatMoney(500000)}</p>
+              <p className="mt-1 text-2xl font-semibold text-stone-900">{formatMoney(maximumLoanAmount)}</p>
             </div>
           </article>
 

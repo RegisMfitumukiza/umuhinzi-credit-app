@@ -19,7 +19,6 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { CooperativesPage } from "./pages/CooperativesPage";
 import { CooperativeApplicationsPage } from "./pages/CooperativeApplicationsPage";
-import { CooperativeRiskAnalyticsPage } from "./pages/CooperativeRiskAnalyticsPage";
 import { CooperativeReportsPage } from "./pages/CooperativeReportsPage";
 import { CooperativeApplicationDetailsPage } from "./pages/CooperativeApplicationDetailsPage";
 import { CooperativeMemberManagementPage } from "./pages/CooperativeMemberManagementPage";
@@ -124,7 +123,6 @@ export const App = () => {
           <Route path="/cooperatives/profile" element={<ProfilePage />} />
           <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
           <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
-          <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />
           <Route path="/cooperatives/groups" element={<CooperativesPage />} />
           <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
           <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />

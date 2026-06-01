@@ -87,6 +87,34 @@ const resolveInstitutionIdFromUser = async (userId: string) => {
   return institution.id;
 };
 
+const getMaximumLoanAmountFromScore = (score: number | null | undefined) => {
+  const normalizedScore = Math.max(0, Math.min(100, Math.round(score ?? 0)));
+
+  return 500_000 + normalizedScore * 15_000;
+};
+
+const resolveLoanCreditScore = async (farmerId: string, creditScoreId?: string) => {
+  if (creditScoreId) {
+    const creditScore = await prisma.creditScore.findUnique({
+      where: { id: creditScoreId },
+      select: { id: true, farmerId: true, score: true },
+    });
+
+    if (!creditScore) throw new APIError("Credit score not found", 404);
+    if (creditScore.farmerId !== farmerId) {
+      throw new APIError("Credit score does not belong to this farmer", 403);
+    }
+
+    return creditScore;
+  }
+
+  return prisma.creditScore.findFirst({
+    where: { farmerId },
+    orderBy: { generatedAt: "desc" },
+    select: { id: true, score: true },
+  });
+};
+
 /* ─────────────────────────────────────────
    CREATE LOAN APPLICATION
 ───────────────────────────────────────── */
@@ -98,6 +126,8 @@ export const createLoanApplicationService = async (
 ) => {
   const farmerId = await resolveFarmerIdFromUser(userId);
   let institutionId = input.institutionId;
+  const creditScore = await resolveLoanCreditScore(farmerId, input.creditScoreId);
+  const maximumLoanAmount = getMaximumLoanAmountFromScore(creditScore?.score);
 
   if (!institutionId) {
     const activeInstitutions = await prisma.institution.findMany({
@@ -134,23 +164,20 @@ export const createLoanApplicationService = async (
     }
   }
 
-  if (input.creditScoreId) {
-    const creditScore = await prisma.creditScore.findUnique({
-      where: { id: input.creditScoreId },
-      select: { id: true, farmerId: true },
-    });
-    if (!creditScore) throw new APIError("Credit score not found", 404);
-    if (creditScore.farmerId !== farmerId) {
-      throw new APIError("Credit score does not belong to this farmer", 403);
-    }
+  if (input.requestedAmount > maximumLoanAmount) {
+    throw new APIError(
+      `Requested amount exceeds your current eligible limit of RWF ${maximumLoanAmount.toLocaleString()}`,
+      400
+    );
   }
 
   const application = await prisma.loanApplication.create({
     data: {
       farmerId,
       institutionId,
-      creditScoreId: input.creditScoreId,
+      creditScoreId: creditScore?.id,
       requestedAmount: input.requestedAmount,
+      recommendedAmount: maximumLoanAmount,
       purpose: input.purpose,
       purposeDescription: input.purposeDescription,
     },
@@ -163,7 +190,12 @@ export const createLoanApplicationService = async (
     resource: "LOAN",
     resourceId: application.id,
     description: "Loan application submitted",
-    metadata: { purpose: input.purpose, requestedAmount: input.requestedAmount },
+    metadata: {
+      purpose: input.purpose,
+      requestedAmount: input.requestedAmount,
+      maximumLoanAmount,
+      creditScore: creditScore?.score ?? null,
+    },
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });

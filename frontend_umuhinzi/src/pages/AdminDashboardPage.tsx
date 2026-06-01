@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { applications } from "./CooperativeApplicationsPage";
+import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
 import { getUsers, type AdminUser } from "../api/users";
 import { institutionApi, type InstitutionProfile, type InstitutionStatus } from "../api/institutions";
 import { cooperativeApi, type CooperativeProfile, type CooperativeStatus } from "../api/cooperatives";
@@ -12,6 +12,7 @@ export const AdminDashboardPage = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
   const [cooperatives, setCooperatives] = useState<CooperativeProfile[]>([]);
+  const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
   const [savingInstitutionId, setSavingInstitutionId] = useState<string | null>(null);
   const [savingCooperativeId, setSavingCooperativeId] = useState<string | null>(null);
   const { user } = useAuth();
@@ -27,9 +28,11 @@ export const AdminDashboardPage = () => {
           institutionApi.getAllInstitutions(),
         ]);
         const cooperativeList = await cooperativeApi.getAllCooperatives();
+        const applicationList = await getLoanApplications().catch(() => [] as LoanApplicationUi[]);
         setUsers(userList);
         setInstitutions(institutionList);
         setCooperatives(cooperativeList);
+        setApplications(applicationList);
       } catch {
         showToast("Unable to fetch user stats", "error");
       }
@@ -54,7 +57,17 @@ export const AdminDashboardPage = () => {
     [cooperatives]
   );
 
-  const totalLoans = applications.reduce((sum, a) => sum + Number(a.amount.replace(/,/g, "")), 0);
+  const totalLoans = applications.reduce((sum: number, application) => sum + Number(application.amount.replace(/,/g, "")), 0);
+  const userDistribution = useMemo(
+    () => [
+      { label: "Farmers", value: counts.FARMER, tone: "bg-emerald-500" },
+      { label: "Cooperative Managers", value: counts.COOPERATIVE_MANAGER, tone: "bg-emerald-400" },
+      { label: "Institution Accounts", value: counts.INSTITUTION, tone: "bg-emerald-300" },
+      { label: "Government Partners", value: counts.GOVERNMENT_PARTNER, tone: "bg-emerald-200" },
+    ],
+    [counts]
+  );
+  const maxUserCount = Math.max(...userDistribution.map((item) => item.value), 1);
 
   const handleInstitutionStatus = async (id: string, status: InstitutionStatus) => {
     setSavingInstitutionId(id);
@@ -117,17 +130,31 @@ export const AdminDashboardPage = () => {
               <h3 className="text-lg font-semibold text-stone-900">User Distribution</h3>
               <div className="text-sm text-stone-500">Live</div>
             </div>
-            <div className="h-56">
-              <svg viewBox="0 0 400 160" className="w-full h-full" aria-hidden>
-                {/* simple bar chart */}
-                {Object.entries(counts).map(([k, v], i) => (
-                  <g key={k} transform={`translate(${30 + i * 90},0)`}> 
-                    <rect x={0} y={120 - v * 8} width={40} height={v * 8} fill="#10b981" rx={6} />
-                    <text x={20} y={138} textAnchor="middle" className="fill-stone-600 text-xs">{k.replace(/_/g, ' ')}</text>
-                    <text x={20} y={112 - v * 8} textAnchor="middle" className="fill-stone-700 text-sm font-semibold">{v}</text>
-                  </g>
+            <div className="space-y-4">
+              {userDistribution.map((item) => {
+                const width = `${(item.value / maxUserCount) * 100}%`;
+
+                return (
+                  <div key={item.label} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium text-stone-700">{item.label}</span>
+                      <span className="font-semibold text-stone-900">{item.value}</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-stone-100">
+                      <div className={`h-full rounded-full ${item.tone}`} style={{ width }} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="grid grid-cols-4 gap-3 pt-2 text-center text-xs text-stone-500">
+                {userDistribution.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="mx-auto h-2 w-8 rounded-full bg-stone-200" />
+                    <div>{item.label}</div>
+                  </div>
                 ))}
-              </svg>
+              </div>
             </div>
           </div>
 

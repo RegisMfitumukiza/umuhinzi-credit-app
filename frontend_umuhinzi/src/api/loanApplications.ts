@@ -25,6 +25,7 @@ type LoanApplicationRaw = {
   purpose?: string;
   purposeDescription?: string;
   createdAt?: string;
+  rejectionReason?: string;
   farmer?: FarmerLike;
   institution?: { name?: string; type?: string };
   reviewedBy?: { fullName?: string; email?: string };
@@ -55,6 +56,8 @@ export type LoanApplicationUi = {
   reviewedBy?: string;
   reviewedAt?: string;
   status: string;
+  createdAt?: string;
+  rejectionReason?: string;
 };
 
 const formatCurrencyAmount = (value?: number): string => {
@@ -96,6 +99,8 @@ const toUiModel = (row: LoanApplicationRaw): LoanApplicationUi => {
     reviewedBy: row.reviewedBy?.fullName || row.reviewedBy?.email,
     reviewedAt: row.reviewedAt ? new Date(row.reviewedAt).toLocaleString() : undefined,
     status: toUiStatus(row.status),
+    createdAt: row.createdAt,
+    rejectionReason: row.rejectionReason,
   };
 };
 

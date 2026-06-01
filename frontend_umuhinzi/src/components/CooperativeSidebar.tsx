@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { cooperativeApi, type CooperativeProfile } from "../api/cooperatives";
+import { getCurrentUserProfile } from "../api/users";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -7,6 +10,27 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
   ].join(" ");
 
 export const CooperativeSidebar = () => {
+  const [cooperative, setCooperative] = useState<CooperativeProfile | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const currentUser = await getCurrentUserProfile().catch(() => null);
+        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
+
+        if (!cooperativeId) {
+          setCooperative(null);
+          return;
+        }
+
+        const cooperatives = await cooperativeApi.getAllCooperatives().catch(() => [] as CooperativeProfile[]);
+        setCooperative(cooperatives.find((item) => item.id === cooperativeId) || null);
+      } catch {
+        setCooperative(null);
+      }
+    })();
+  }, []);
+
   return (
     <aside className="hidden w-72 flex-col border-r border-stone-200 bg-white px-5 py-6 shadow-[0_10px_40px_rgba(15,23,42,0.05)] lg:flex">
       <div className="mb-8 flex items-center gap-3 px-2">
@@ -19,6 +43,12 @@ export const CooperativeSidebar = () => {
         </div>
       </div>
 
+      <section className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">Current Cooperative</p>
+        <p className="mt-1 text-sm font-semibold text-stone-900">{cooperative?.name || "No cooperative linked"}</p>
+        <p className="mt-1 text-xs text-stone-500">{cooperative?.status || "Pending"}</p>
+      </section>
+
       <nav className="flex flex-1 flex-col gap-1">
         <NavLink to="/cooperatives" end className={navClass}>
           Dashboard
@@ -26,21 +56,18 @@ export const CooperativeSidebar = () => {
         <NavLink to="/cooperatives/profile" className={navClass}>
           Profile
         </NavLink>
-        <NavLink to="/cooperatives/applications" className={navClass}>
+        {/* <NavLink to="/cooperatives/applications" className={navClass}>
           Applications
-        </NavLink>
+        </NavLink> */}
         <NavLink to="/cooperatives/members" className={navClass}>
           Members
         </NavLink>
-        <NavLink to="/cooperatives/risk-analytics" className={navClass}>
-          Risk Analytics
-        </NavLink>
-        <NavLink to="/cooperatives/regional-map" className={navClass}>
-          Regional Map
-        </NavLink>
-        <NavLink to="/cooperatives/reports" className={navClass}>
+        {/* <NavLink to="/cooperatives/regional-map" className={navClass}> */}
+          {/* Regional Map
+        </NavLink> */}
+        {/* <NavLink to="/cooperatives/reports" className={navClass}>
           Reports
-        </NavLink>
+        </NavLink> */}
       </nav>
     </aside>
   );

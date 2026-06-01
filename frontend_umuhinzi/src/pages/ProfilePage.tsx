@@ -7,6 +7,7 @@ import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { getCurrentUserProfile } from "../api/users";
 import { isFarmerFrontendApproved, upsertPendingFarmerRequest } from "../utils/farmerApprovalQueue";
+import { cooperativeMembersApi } from "../api/cooperativeMembers";
 
 const genderOptions: Array<"MALE" | "FEMALE" | "OTHER"> = ["MALE", "FEMALE", "OTHER"];
 const institutionTypeOptions: InstitutionType[] = ["SACCO", "MICROFINANCE", "BANK", "NGO", "GOVERNMENT_PROGRAM", "OTHER"];
@@ -211,6 +212,9 @@ export const ProfilePage = () => {
       const saved = isCreating ? await farmerApi.createProfile(payload) : await farmerApi.updateProfile(payload);
       setProfile(saved);
       setIsCreating(false);
+      if (payload.cooperativeId) {
+        await cooperativeMembersApi.joinCooperative({ cooperativeId: payload.cooperativeId });
+      }
       showToast(isCreating ? "Farmer profile created successfully" : "Farmer profile updated successfully", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Failed to save farmer profile", "error");

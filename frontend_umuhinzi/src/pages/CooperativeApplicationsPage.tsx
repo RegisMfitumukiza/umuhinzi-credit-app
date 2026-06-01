@@ -1,69 +1,13 @@
 import { Link } from "react-router-dom";
 import React, { useEffect, useState } from "react";
+import { cooperativeMembersApi } from "../api/cooperativeMembers";
+import { getCurrentUserProfile } from "../api/users";
 import {
   getLoanApplications,
   type LoanApplicationUi,
   updateLoanApplicationStatus,
 } from "../api/loanApplications";
 import { useToast } from "../context/ToastContext";
-
-export const applications = [
-  {
-    id: "APP-4092",
-    farmer: "Emmanuel Munyaneza",
-    location: "Musanze, Northern Province",
-    crop: "Irish Potato",
-    amount: "1,250,000",
-    scoreLabel: "A",
-    scoreValue: "840",
-    date: "24 Oct 2023",
-    status: "Pending",
-  },
-  {
-    id: "APP-4093",
-    farmer: "Grace Uwimana",
-    location: "Kayonza, Eastern Province",
-    crop: "Coffee",
-    amount: "3,400,000",
-    scoreLabel: "B",
-    scoreValue: "710",
-    date: "23 Oct 2023",
-    status: "Approved",
-  },
-  {
-    id: "APP-4094",
-    farmer: "Pascal Nkurunziza",
-    location: "Rubavu, Western Province",
-    crop: "Maize",
-    amount: "850,000",
-    scoreLabel: "C",
-    scoreValue: "620",
-    date: "23 Oct 2023",
-    status: "Pending",
-  },
-  {
-    id: "APP-4095",
-    farmer: "Safi Mukamana",
-    location: "Nyamasheke, Southern Province",
-    crop: "Beans",
-    amount: "450,000",
-    scoreLabel: "A",
-    scoreValue: "890",
-    date: "22 Oct 2023",
-    status: "Rejected",
-  },
-  {
-    id: "APP-4096",
-    farmer: "Theophile Habimana",
-    location: "Gicumbi, Northern Province",
-    crop: "Wheat",
-    amount: "1,800,000",
-    scoreLabel: "B",
-    scoreValue: "755",
-    date: "22 Oct 2023",
-    status: "Pending",
-  },
-];
 
 const statusStyles: Record<string, string> = {
   Pending: "bg-stone-100 text-stone-700",
@@ -122,15 +66,29 @@ export const CooperativeApplicationsPage = ({
   useEffect(() => {
     void (async () => {
       try {
-        const data = await getLoanApplications();
-        setAppsState(data);
+        const currentUser = await getCurrentUserProfile().catch(() => null);
+        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
+
+        if (!cooperativeId) {
+          setAppsState([]);
+          return;
+        }
+
+        const [memberRows, data] = await Promise.all([
+          cooperativeMembersApi.getMyCooperativeMembers().catch(() => []),
+          getLoanApplications().catch(() => [] as LoanApplicationUi[]),
+        ]);
+
+        const farmerIds = new Set(memberRows.map((member) => member.farmerId));
+        setAppsState(data.filter((application) => application.farmerId ? farmerIds.has(application.farmerId) : false));
       } catch {
-        setAppsState(applications as LoanApplicationUi[]);
+        setAppsState([]);
+        showToast("Unable to load cooperative applications", "error");
       } finally {
         setIsLoading(false);
       }
     })();
-  }, []);
+  }, [showToast]);
 
   async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
     try {
