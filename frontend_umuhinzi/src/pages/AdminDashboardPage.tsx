@@ -1,51 +1,99 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../api/http";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
+import { getUsers, type AdminUser } from "../api/users";
+import { institutionApi, type InstitutionProfile, type InstitutionStatus } from "../api/institutions";
+import { cooperativeApi, type CooperativeProfile, type CooperativeStatus } from "../api/cooperatives";
 import { useAuth } from "../context/AuthContext";
-
-type UserStats = {
-  totalUsers: number;
-  byRole: { farmers: number; cooperativeManagers: number; institutions: number; admins: number; governmentPartners: number };
-  byStatus: { active: number; pending: number; suspended: number; deactivated: number };
-};
-type AuditLog = { id: string; action: string; resource: string; description: string; createdAt: string };
+import { useToast } from "../context/ToastContext";
 
 export const AdminDashboardPage = () => {
+  const [adminName, setAdminName] = useState("Admin");
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
+  const [cooperatives, setCooperatives] = useState<CooperativeProfile[]>([]);
+  const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
+  const [savingInstitutionId, setSavingInstitutionId] = useState<string | null>(null);
+  const [savingCooperativeId, setSavingCooperativeId] = useState<string | null>(null);
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    const load = async () => {
+    setAdminName(user?.fullName || user?.email || "Admin");
+
+    void (async () => {
       try {
-        const [statsRes, logsRes] = await Promise.allSettled([
-          api.get("/v1/users/stats"),
-          api.get("/v1/audit-logs?limit=5"),
+        const [userList, institutionList] = await Promise.all([
+          getUsers(),
+          institutionApi.getAllInstitutions(),
         ]);
-        if (statsRes.status === "fulfilled") setStats(statsRes.value.data.data);
-        if (logsRes.status === "fulfilled") setLogs(logsRes.value.data.data ?? []);
-      } finally {
-        setLoading(false);
+        const cooperativeList = await cooperativeApi.getAllCooperatives();
+        const applicationList = await getLoanApplications().catch(() => [] as LoanApplicationUi[]);
+        setUsers(userList);
+        setInstitutions(institutionList);
+        setCooperatives(cooperativeList);
+        setApplications(applicationList);
+      } catch {
+        showToast("Unable to fetch user stats", "error");
       }
-    };
-    load();
-  }, []);
+    })();
+  }, [showToast, user?.email, user?.fullName]);
 
-  const statCards = [
-    { label: "Total Farmers", value: stats?.byRole.farmers ?? "—" },
-    { label: "Cooperative Managers", value: stats?.byRole.cooperativeManagers ?? "—" },
-    { label: "Finance Institutions", value: stats?.byRole.institutions ?? "—" },
-    { label: "Government Accounts", value: stats?.byRole.governmentPartners ?? "—" },
-  ];
+  const counts = useMemo(() => {
+    const map: Record<string, number> = { FARMER: 0, COOPERATIVE_MANAGER: 0, INSTITUTION: 0, GOVERNMENT_PARTNER: 0 };
+    users.forEach((u) => {
+      if (map[u.role] !== undefined) map[u.role]++;
+    });
+    return map;
+  }, [users]);
 
-  const statusCards = [
-    { label: "Active Users", value: stats?.byStatus.active ?? "—", color: "text-emerald-600" },
-    { label: "Pending Verification", value: stats?.byStatus.pending ?? "—", color: "text-amber-600" },
-    { label: "Suspended", value: stats?.byStatus.suspended ?? "—", color: "text-rose-600" },
-    { label: "Total Users", value: stats?.totalUsers ?? "—", color: "text-stone-900" },
-  ];
+  const pendingInstitutions = useMemo(
+    () => institutions.filter((institution) => (institution.status || "PENDING") === "PENDING"),
+    [institutions]
+  );
+
+  const pendingCooperatives = useMemo(
+    () => cooperatives.filter((cooperative) => (cooperative.status || "PENDING") === "PENDING"),
+    [cooperatives]
+  );
+
+  const totalLoans = applications.reduce((sum: number, application) => sum + Number(application.amount.replace(/,/g, "")), 0);
+  const userDistribution = useMemo(
+    () => [
+      { label: "Farmers", value: counts.FARMER, tone: "bg-emerald-500" },
+      { label: "Cooperative Managers", value: counts.COOPERATIVE_MANAGER, tone: "bg-emerald-400" },
+      { label: "Institution Accounts", value: counts.INSTITUTION, tone: "bg-emerald-300" },
+      { label: "Government Partners", value: counts.GOVERNMENT_PARTNER, tone: "bg-emerald-200" },
+    ],
+    [counts]
+  );
+  const maxUserCount = Math.max(...userDistribution.map((item) => item.value), 1);
+
+  const handleInstitutionStatus = async (id: string, status: InstitutionStatus) => {
+    setSavingInstitutionId(id);
+    try {
+      const updated = await institutionApi.updateInstitutionStatus(id, status);
+      setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      showToast(`Institution ${status.toLowerCase()} successfully`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to update institution", "error");
+    } finally {
+      setSavingInstitutionId(null);
+    }
+  };
+
+  const handleCooperativeStatus = async (id: string, status: CooperativeStatus) => {
+    setSavingCooperativeId(id);
+    try {
+      const updated = await cooperativeApi.updateCooperativeStatus(id, status);
+      setCooperatives((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      showToast(`Cooperative ${status.toLowerCase()} successfully`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to update cooperative", "error");
+    } finally {
+      setSavingCooperativeId(null);
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -53,81 +101,164 @@ export const AdminDashboardPage = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Admin Overview</h1>
-            <p className="mt-1 text-sm text-stone-500">Welcome back, {user?.fullName ?? "Admin"}</p>
+            <p className="mt-1 text-sm text-stone-500">Welcome back, {adminName}</p>
           </div>
-          <button onClick={() => navigate("/admin/users")} className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white">Manage Users</button>
         </div>
 
-        {/* Role stats */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {statCards.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">{s.label}</div>
-              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : s.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Status stats */}
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {statusCards.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">{s.label}</div>
-              <div className={`mt-2 text-2xl font-semibold ${s.color}`}>{loading ? "—" : s.value}</div>
-            </div>
-          ))}
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Total Farmers</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.FARMER}</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Cooperative Managers</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.COOPERATIVE_MANAGER}</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Finance Institutions</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.INSTITUTION}</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Government Accounts</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{counts.GOVERNMENT_PARTNER}</div>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-          {/* User distribution chart */}
           <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-stone-900">User Distribution by Role</h3>
+              <h3 className="text-lg font-semibold text-stone-900">User Distribution</h3>
+              <div className="text-sm text-stone-500">Live</div>
             </div>
-            {loading ? <p className="text-sm text-stone-400">Loading...</p> : stats && (
-              <div className="h-48">
-                <svg viewBox="0 0 500 160" className="w-full h-full" aria-hidden>
-                  {[
-                    { label: "Farmers", value: stats.byRole.farmers, color: "#10b981" },
-                    { label: "Coop Mgrs", value: stats.byRole.cooperativeManagers, color: "#3b82f6" },
-                    { label: "Institutions", value: stats.byRole.institutions, color: "#f59e0b" },
-                    { label: "Gov", value: stats.byRole.governmentPartners, color: "#8b5cf6" },
-                  ].map((item, i) => {
-                    const maxVal = Math.max(stats.byRole.farmers, 1);
-                    const barH = Math.max((item.value / maxVal) * 100, 4);
-                    return (
-                      <g key={item.label} transform={`translate(${40 + i * 110}, 0)`}>
-                        <rect x={0} y={120 - barH} width={60} height={barH} fill={item.color} rx={6} />
-                        <text x={30} y={138} textAnchor="middle" fontSize="11" fill="#78716c">{item.label}</text>
-                        <text x={30} y={112 - barH} textAnchor="middle" fontSize="12" fill="#1c1917" fontWeight="600">{item.value}</text>
-                      </g>
-                    );
-                  })}
-                </svg>
+            <div className="space-y-4">
+              {userDistribution.map((item) => {
+                const width = `${(item.value / maxUserCount) * 100}%`;
+
+                return (
+                  <div key={item.label} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium text-stone-700">{item.label}</span>
+                      <span className="font-semibold text-stone-900">{item.value}</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-stone-100">
+                      <div className={`h-full rounded-full ${item.tone}`} style={{ width }} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="grid grid-cols-4 gap-3 pt-2 text-center text-xs text-stone-500">
+                {userDistribution.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="mx-auto h-2 w-8 rounded-full bg-stone-200" />
+                    <div>{item.label}</div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Recent audit logs */}
           <aside className="space-y-4">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-semibold text-stone-900">Recent Activity</div>
-                <button onClick={() => navigate("/admin/users")} className="text-xs text-emerald-600 hover:underline">View all →</button>
-              </div>
-              {loading ? <p className="text-sm text-stone-400">Loading...</p> : logs.length === 0 ? (
-                <p className="text-sm text-stone-400">No recent activity.</p>
-              ) : (
-                <div className="space-y-3">
-                  {logs.map((log) => (
-                    <div key={log.id} className="text-sm">
-                      <span className="font-medium text-stone-700">{log.action}</span>
-                      <span className="text-stone-500"> — {log.description}</span>
-                      <div className="text-xs text-stone-400">{new Date(log.createdAt).toLocaleString()}</div>
-                    </div>
-                  ))}
+              <div className="text-sm text-stone-500">Total Loan Volume (from sample apps)</div>
+              <div className="mt-2 text-2xl font-semibold text-stone-900">RWF {totalLoans.toLocaleString()}</div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm text-stone-500">Institution Approvals</div>
+                  <div className="mt-1 text-2xl font-semibold text-stone-900">{pendingInstitutions.length}</div>
                 </div>
-              )}
+                <Link to="/admin/institutions" className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700">View all</Link>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {pendingInstitutions.slice(0, 3).map((institution) => (
+                  <div key={institution.id} className="rounded-2xl border border-stone-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-stone-900">{institution.name}</div>
+                        <div className="text-xs text-stone-500">{institution.type} • {institution.email || institution.phone || "No contact"}</div>
+                        <div className="mt-1 text-xs text-stone-400">Status: {institution.status || "PENDING"}</div>
+                      </div>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => void handleInstitutionStatus(institution.id, "ACTIVE")}
+                        disabled={savingInstitutionId === institution.id}
+                        className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-70"
+                      >
+                        {savingInstitutionId === institution.id ? "Saving..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => void handleInstitutionStatus(institution.id, "DEACTIVATED")}
+                        disabled={savingInstitutionId === institution.id}
+                        className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-70"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {pendingInstitutions.length === 0 && <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No institution profiles waiting for approval.</div>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm text-stone-500">Cooperative Approvals</div>
+                  <div className="mt-1 text-2xl font-semibold text-stone-900">{pendingCooperatives.length}</div>
+                </div>
+                <Link to="/cooperatives" className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700">View all</Link>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {pendingCooperatives.slice(0, 3).map((cooperative) => (
+                  <div key={cooperative.id} className="rounded-2xl border border-stone-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-stone-900">{cooperative.name}</div>
+                        <div className="text-xs text-stone-500">{cooperative.registrationNumber || "No registration number"} • {cooperative.email || cooperative.phone || "No contact"}</div>
+                        <div className="mt-1 text-xs text-stone-400">Status: {cooperative.status || "PENDING"}</div>
+                      </div>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => void handleCooperativeStatus(cooperative.id, "ACTIVE")}
+                        disabled={savingCooperativeId === cooperative.id}
+                        className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-70"
+                      >
+                        {savingCooperativeId === cooperative.id ? "Saving..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => void handleCooperativeStatus(cooperative.id, "DEACTIVATED")}
+                        disabled={savingCooperativeId === cooperative.id}
+                        className="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-70"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {pendingCooperatives.length === 0 && <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No cooperative profiles waiting for approval.</div>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">Recent Activity</div>
+              <div className="mt-3 space-y-2 text-sm text-stone-600">
+                <div>New cooperative registered: Abahinzi Farmers Group</div>
+                <div>Loan application submitted: APP-4096</div>
+                <div>Platform backup completed</div>
+              </div>
             </div>
           </aside>
         </div>

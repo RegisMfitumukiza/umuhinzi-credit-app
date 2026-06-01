@@ -3,9 +3,10 @@ import { AppLayout } from "./layout/AppLayout";
 import { CooperativeLayout } from "./layout/CooperativeLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { FarmDashboardPage } from "./pages/FarmDashboardPage";
-import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
 import { FarmListPage } from "./pages/FarmListPage";
-import { FarmCreatePage } from "./pages/FarmCreatePage";
+import { CropRecordsPage } from "./pages/CropRecordsPage";
+import { HarvestsPage } from "./pages/HarvestsPage";
+import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
 import { FarmEditPage } from "./pages/FarmEditPage";
 import { FarmDetailsPage } from "./pages/FarmDetailsPage";
 import { LoansPage } from "./pages/LoansPage";
@@ -18,65 +19,71 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { CooperativesPage } from "./pages/CooperativesPage";
 import { CooperativeApplicationsPage } from "./pages/CooperativeApplicationsPage";
-import { CooperativeRiskAnalyticsPage } from "./pages/CooperativeRiskAnalyticsPage";
 import { CooperativeReportsPage } from "./pages/CooperativeReportsPage";
 import { CooperativeApplicationDetailsPage } from "./pages/CooperativeApplicationDetailsPage";
+import { CooperativeMemberManagementPage } from "./pages/CooperativeMemberManagementPage";
 import { InstitutionsPage } from "./pages/InstitutionsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { InputCostsPage } from "./pages/InputCostsPage";
 import { LivestockPage } from "./pages/LivestockPage";
 import { RegisterRolePage } from "./pages/RegisterRolePage";
 import { RegisterPersonalPage } from "./pages/RegisterPersonalPage";
-import { RegisterFarmPage } from "./pages/RegisterFarmPage";
-import { RegisterVerifyPage } from "./pages/RegisterVerifyPage";
 import { LandingPage } from "./pages/LandingPage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminLayout } from "./layout/AdminLayout";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminProfilePage } from "./pages/AdminProfilePage";
+import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
+import { AdminInstitutionsPage } from "./pages/AdminInstitutionsPage";
 import { FinanceLayout } from "./layout/FinanceLayout";
 import { FinanceDashboardPage } from "./pages/FinanceDashboardPage";
 import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
+import { FinanceApplicationDetailsPage } from "./pages/FinanceApplicationDetailsPage";
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
-import AccountNotifications from "./pages/AccountNotifications";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RequireAuth, RedirectAuthenticated } from "./components/RouteGuards";
 
 export const App = () => {
   return (
     <Routes>
-      {/* Public */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterRolePage />} />
-      <Route path="/register/personal" element={<RegisterPersonalPage />} />
-      <Route path="/register/farm" element={<RegisterFarmPage />} />
-      <Route path="/register/verify" element={<RegisterVerifyPage />} />
-      <Route path="/admin/login" element={<AdminLoginPage />} />
 
-      {/* Admin */}
-      <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+      <Route element={<RedirectAuthenticated />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      <Route>
+        <Route path="/register" element={<RegisterRolePage />} />
+        <Route path="/register/personal" element={<RegisterPersonalPage />} />
+      </Route>
+
+      <Route element={<RedirectAuthenticated />}>
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+      </Route>
+
+      <Route element={<RequireAuth roles={["ADMIN"]} />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/institutions" element={<AdminInstitutionsPage />} />
+          <Route path="/admin/seasons" element={<AdminSeasonsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/profile" element={<AdminProfilePage />} />
         </Route>
       </Route>
 
-      {/* Finance Institution */}
-      <Route element={<ProtectedRoute allowedRoles={["INSTITUTION"]} />}>
+      <Route element={<RequireAuth roles={["INSTITUTION"]} />}>
         <Route element={<FinanceLayout />}>
           <Route path="/finance" element={<FinanceDashboardPage />} />
           <Route path="/finance/applications" element={<FinanceApplicationsPage />} />
+          <Route path="/finance/applications/:id" element={<FinanceApplicationDetailsPage />} />
           <Route path="/finance/portfolio" element={<FinanceDashboardPage />} />
           <Route path="/finance/reports" element={<FinanceDashboardPage />} />
-          <Route path="/finance/profile" element={<FinanceDashboardPage />} />
+          <Route path="/finance/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
-      {/* Government */}
-      <Route element={<ProtectedRoute allowedRoles={["GOVERNMENT_PARTNER"]} />}>
+      <Route element={<RequireAuth roles={["GOVERNMENT_PARTNER"]} />}>
         <Route element={<GovernmentLayout />}>
           <Route path="/government" element={<GovernmentDashboardPage />} />
           <Route path="/government/regions" element={<GovernmentDashboardPage />} />
@@ -85,14 +92,16 @@ export const App = () => {
         </Route>
       </Route>
 
-      {/* Farmer */}
-      <Route element={<ProtectedRoute allowedRoles={["FARMER"]} />}>
+      <Route element={<RequireAuth roles={["FARMER"]} />}>
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<FinancialDashboardPage />} />
-          <Route path="/farms" element={<FarmDashboardPage />} />
-          <Route path="/farms/new" element={<FarmCreatePage />} />
+          <Route path="/dashboard" element={<Navigate to="/farmer/dashboard" replace />} />
+          <Route path="/farmer/dashboard" element={<FarmDashboardPage />} />
+          <Route path="/farms" element={<FarmListPage />} />
+          <Route path="/farms/new" element={<Navigate to="/farms?new=1" replace />} />
           <Route path="/farms/:id" element={<FarmDetailsPage />} />
           <Route path="/farms/:id/edit" element={<FarmEditPage />} />
+          <Route path="/crops" element={<CropRecordsPage />} />
+          <Route path="/harvests" element={<HarvestsPage />} />
           <Route path="/loans" element={<LoansPage />} />
           <Route path="/loans/:id" element={<LoanDetailsPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
@@ -108,27 +117,21 @@ export const App = () => {
         </Route>
       </Route>
 
-      {/* Cooperative Manager */}
-      <Route element={<ProtectedRoute allowedRoles={["COOPERATIVE_MANAGER"]} />}>
+      <Route element={<RequireAuth roles={["COOPERATIVE_MANAGER"]} />}>
         <Route element={<CooperativeLayout />}>
           <Route path="/cooperatives" element={<CooperativesPage />} />
+          <Route path="/cooperatives/profile" element={<ProfilePage />} />
           <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
           <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
-          <Route path="/cooperatives/risk-analytics" element={<CooperativeRiskAnalyticsPage />} />
           <Route path="/cooperatives/groups" element={<CooperativesPage />} />
           <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
           <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
-          <Route path="/cooperatives/member-list" element={<CooperativesPage />} />
+          <Route path="/cooperatives/member-list" element={<CooperativeMemberManagementPage />} />
+          <Route path="/cooperatives/members" element={<CooperativeMemberManagementPage />} />
           <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
           <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
           <Route path="/cooperatives/settings" element={<CooperativesPage />} />
         </Route>
-      </Route>
-
-      {/* Shared authenticated */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/account" element={<AccountNotifications />} />
-        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,41 +1,44 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/http";
-
-export type AuthUser = {
-  id: string;
-  fullName: string;
-  email: string;
-  phone?: string;
-  role: string;
-  profileImageUrl?: string;
-};
+import type { AuthSession, AuthUser } from "../types/auth";
+import { normalizeRole } from "../utils/auth";
+import { getCurrentAuthUser } from "../api/auth";
 
 type AuthState = {
-  user: AuthUser | null;
   token: string | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  setUser: (user: AuthUser) => void;
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  login: (value: string | AuthSession) => void;
+  setUser: (user: AuthUser | null) => void;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const ROLE_REDIRECT: Record<string, string> = {
-  ADMIN: "/admin",
-  COOPERATIVE_MANAGER: "/cooperatives",
-  INSTITUTION: "/finance",
-  GOVERNMENT_PARTNER: "/government",
-  FARMER: "/farms",
+const parseStoredUser = (): AuthUser | null => {
+  const raw = localStorage.getItem("umuhinzi_user");
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthUser>;
+
+    if (!parsed.id || !parsed.email || !parsed.fullName || !parsed.role) {
+      return null;
+    }
+
+    return {
+      ...parsed,
+      role: normalizeRole(parsed.role),
+    } as AuthUser;
+  } catch {
+    return null;
+  }
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("umuhinzi_token"));
-  const [user, setUserState] = useState<AuthUser | null>(() => {
-    try { return JSON.parse(localStorage.getItem("umuhinzi_user") || "null"); } catch { return null; }
-  });
-  const [loading, setLoading] = useState(false);
+  const [user, setUserState] = useState<AuthUser | null>(() => parseStoredUser());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,32 +52,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user) {
       localStorage.setItem("umuhinzi_user", JSON.stringify(user));
+      localStorage.setItem("umuhinzi_last_role", user.role);
     } else {
       localStorage.removeItem("umuhinzi_user");
     }
   }, [user]);
 
-  const setUser = (u: AuthUser) => setUserState(u);
+  useEffect(() => {
+    if (!token || user) return;
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      const res = await api.post("/v1/auth/login", { email, password });
-      const { user: u, accessToken, refreshToken } = res.data.data;
-      setToken(accessToken);
-      setUserState(u);
-      localStorage.setItem("umuhinzi_refresh_token", refreshToken);
-      const redirect = ROLE_REDIRECT[u.role] ?? "/farms";
-      navigate(redirect);
-    } finally {
-      setLoading(false);
+    void getCurrentAuthUser()
+      .then((nextUser) => {
+        setUser(nextUser);
+      })
+      .catch(() => {
+        setToken(null);
+        setUserState(null);
+      });
+  }, [token, user]);
+
+  const setUser = (nextUser: AuthUser | null) => {
+    if (!nextUser) {
+      setUserState(null);
+      return;
     }
+
+    setUserState({
+      ...nextUser,
+      role: normalizeRole(nextUser.role),
+    });
   };
 
-  const logout = async () => {
-    try {
-      await api.post("/v1/auth/logout");
-    } catch {}
+  const login = (value: string | AuthSession) => {
+    if (typeof value === "string") {
+      setToken(value);
+      return;
+    }
+
+    setToken(value.accessToken);
+    setUser(value.user);
+  };
+
+  const logout = () => {
+    // clear token and user, then redirect to landing page
     setToken(null);
     setUserState(null);
     localStorage.removeItem("umuhinzi_refresh_token");
@@ -82,7 +102,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        isAuthenticated: Boolean(token),
+        login,
+        setUser,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -90,6 +119,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+
   return context;
 };

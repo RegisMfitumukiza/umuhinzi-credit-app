@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { farmApi } from "../api/farms";
 import { StatusBadge } from "../components/StatusBadge";
+import { useToast } from "../context/ToastContext";
 import type { Farm } from "../types/farm";
 
 export const FarmDetailsPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [farm, setFarm] = useState<Farm | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -16,13 +19,30 @@ export const FarmDetailsPage = () => {
       try {
         const response = await farmApi.getById(id);
         setFarm(response);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Failed to load farm", "error");
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, [id]);
+  }, [id, showToast]);
+
+  const handleDelete = async () => {
+    if (!farm) return;
+
+    const confirmed = window.confirm(`Delete ${farm.name}? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await farmApi.remove(farm.id);
+      showToast("Farm deleted successfully", "success");
+      navigate("/farms");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to delete farm", "error");
+    }
+  };
 
   if (loading) {
     return <p className="text-sm text-stone-500">Loading farm...</p>;
@@ -60,6 +80,7 @@ export const FarmDetailsPage = () => {
 
       <div className="flex gap-3">
         <Link to={`/farms/${farm.id}/edit`} className="rounded-full bg-brand-700 px-5 py-3 text-sm font-semibold text-white">Edit farm</Link>
+        <button type="button" onClick={() => void handleDelete()} className="rounded-full border border-red-200 px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-50">Delete farm</button>
         <Link to="/farms" className="rounded-full border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">Back to farms</Link>
       </div>
     </div>

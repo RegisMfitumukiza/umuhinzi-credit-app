@@ -1,49 +1,135 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/http";
+import { useState } from "react";
+import axios from "axios";
+import { registerRequest } from "../api/auth";
+import { updateMyProfile } from "../api/users";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { homeRouteByRole } from "../utils/auth";
+import type { BackendRole } from "../types/auth";
+
+const roleOptions: Array<{ value: BackendRole; label: string }> = [
+  { value: "FARMER", label: "Farmer" },
+  { value: "COOPERATIVE_MANAGER", label: "Cooperative Manager" },
+  { value: "INSTITUTION", label: "Finance Institution" },
+  { value: "GOVERNMENT_PARTNER", label: "Government Partner" },
+];
 
 export const RegisterPersonalPage = () => {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<BackendRole>(() => {
+    const prev = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
+    return (prev.role as BackendRole) || "FARMER";
+  });
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [sector, setSector] = useState("");
+  const [cell, setCell] = useState("");
+  const [village, setVillage] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, setUser } = useAuth();
+  const { showToast } = useToast();
 
-  const role = (() => {
-    try { return JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}").role ?? "FARMER"; } catch { return "FARMER"; }
-  })();
+  const isValidEmail = (value: string) => /^(?:[^\s@]+)@(?:[^\s@]+)\.[^\s@]+$/.test(value);
+  const isValidPhone = (value: string) => /^(\+?[0-9]{10,15})$/.test(value);
+  const isStrongPassword = (value: string) =>
+    value.length >= 8 &&
+    /[A-Z]/.test(value) &&
+    /[a-z]/.test(value) &&
+    /\d/.test(value) &&
+    /[!@#$%^&*(),.?":{}|<>]/.test(value);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setError("Full name, email and password are required.");
+  const handleNext = async () => {
+    const prev = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
+    const nextRole = (role || prev.role || "FARMER") as BackendRole;
+    const next = {
+      ...prev,
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      password,
+      role: nextRole,
+      province: province.trim(),
+      district: district.trim(),
+      sector: sector.trim(),
+      cell: cell.trim(),
+      village: village.trim(),
+    };
+
+    if (next.fullName.length < 2 || next.fullName.length > 100) {
+      showToast("Full name must be between 2 and 100 characters", "error");
       return;
     }
-    setLoading(true);
+
+    if (!isValidEmail(next.email)) {
+      showToast("Enter a valid email address", "error");
+      return;
+    }
+
+    if (next.phone && !isValidPhone(next.phone)) {
+      showToast("Phone must be 10 to 15 digits, optionally starting with +", "error");
+      return;
+    }
+
+    if (!next.province || !next.district || !next.sector || !next.village) {
+      showToast("Province, district, sector, and village are required", "error");
+      return;
+    }
+
+    if (!isStrongPassword(next.password)) {
+      showToast("Password must include upper, lower, number and special character", "error");
+      return;
+    }
+
+    localStorage.setItem("umuhinzi_registration", JSON.stringify(next));
+
+    setIsSubmitting(true);
+
     try {
-      const res = await api.post("/v1/auth/register", {
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim() || undefined,
-        password,
-        role,
+      const session = await registerRequest({
+        fullName: next.fullName,
+        email: next.email,
+        phone: next.phone,
+        password: next.password,
+        role: next.role,
       });
-      const { user, accessToken, refreshToken } = res.data.data;
-      localStorage.setItem("umuhinzi_token", accessToken);
-      localStorage.setItem("umuhinzi_refresh_token", refreshToken);
-      localStorage.setItem("umuhinzi_user", JSON.stringify(user));
-      setUser(user);
+
+      localStorage.setItem("umuhinzi_token", session.accessToken);
+      if (session.refreshToken) {
+        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
+      }
+
+      login(session);
+
+      const updatedUser = await updateMyProfile({
+        fullName: next.fullName,
+        phone: next.phone,
+        province: next.province,
+        district: next.district,
+        sector: next.sector,
+        cell: next.cell || undefined,
+        village: next.village,
+      });
+
+      setUser(updatedUser);
+
       localStorage.removeItem("umuhinzi_registration");
-      navigate("/register/verify");
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Registration failed. Please try again.");
+      showToast("Registration successful", "success");
+      navigate(homeRouteByRole(session.user.role), { replace: true });
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.message
+        : error instanceof Error
+          ? error.message
+          : "Registration failed. Please check your details.";
+
+      showToast(message, "error");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -55,37 +141,112 @@ export const RegisterPersonalPage = () => {
           <p className="mt-2 text-sm text-stone-500">Provide basic account details.</p>
         </div>
 
-        {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
+        <div className="mt-8 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-stone-900">Role</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as BackendRole)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            >
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Full name</span>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
           </label>
 
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Email</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-stone-900">Phone <span className="text-stone-400">(optional)</span></span>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+250788..." className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
+            <span className="text-sm font-medium text-stone-900">Phone</span>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
           </label>
 
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
-            <p className="mt-1 text-xs text-stone-400">Min 8 chars, uppercase, lowercase, number & special character.</p>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
           </label>
 
-          <div className="flex justify-between pt-2">
-            <button type="button" onClick={() => navigate("/register")} className="text-sm text-stone-500 hover:underline">← Back</button>
-            <button type="submit" disabled={loading} className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-60 hover:bg-emerald-600 transition">
-              {loading ? "Registering..." : "Next →"}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Province</span>
+              <input
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">District</span>
+              <input
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Sector</span>
+              <input
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-stone-900">Cell</span>
+              <input
+                value={cell}
+                onChange={(e) => setCell(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-sm font-medium text-stone-900">Village</span>
+              <input
+                value={village}
+                onChange={(e) => setVillage(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-center pt-2">
+              <button onClick={() => void handleNext()} disabled={isSubmitting} className="rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white disabled:opacity-70">
+                {isSubmitting ? "Creating account..." : "Create Account"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

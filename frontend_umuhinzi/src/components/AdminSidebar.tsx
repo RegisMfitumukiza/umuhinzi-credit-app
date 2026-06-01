@@ -23,11 +23,14 @@ export const AdminSidebar = () => {
         <NavLink to="/admin" end className={navClass}>
           Overview
         </NavLink>
+        <NavLink to="/admin/seasons" className={navClass}>
+          Seasons
+        </NavLink>
         <NavLink to="/admin/users" className={navClass}>
           User Management
         </NavLink>
-        <NavLink to="/account" className={navClass}>
-          Account & Notifications
+        <NavLink to="/admin/profile" className={navClass}>
+          Profile
         </NavLink>
       </nav>
     </aside>

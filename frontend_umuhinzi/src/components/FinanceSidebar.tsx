@@ -24,7 +24,7 @@ export const FinanceSidebar = () => {
         <NavLink to="/finance/applications" className={navClass}>Applications</NavLink>
         <NavLink to="/finance/portfolio" className={navClass}>Portfolio</NavLink>
         <NavLink to="/finance/reports" className={navClass}>Reports</NavLink>
-        <NavLink to="/account" className={navClass}>Account & Notifications</NavLink>
+        <NavLink to="/finance/profile" className={navClass}>Profile</NavLink>
       </nav>
     </aside>
   );

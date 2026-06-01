@@ -1,159 +1,184 @@
-import { useEffect, useState } from "react";
-import { api } from "../api/http";
-
-type Repayment = { id: string; amount: number; paidAt: string; method: string; status: string; transactionRef?: string };
-type Schedule = { id: string; dueDate: string; amount: number; status: string; loanId: string };
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { farmerApi, type FarmerLoan, type FarmerRepayment, type FarmerRepaymentSchedule } from "../api/farmer";
+import { useToast } from "../context/ToastContext";
 
 export const PaymentsPage = () => {
-  const [repayments, setRepayments] = useState<Repayment[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [loans, setLoans] = useState<FarmerLoan[]>([]);
+  const [repayments, setRepayments] = useState<FarmerRepayment[]>([]);
+  const [schedules, setSchedules] = useState<FarmerRepaymentSchedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [payingId, setPayingId] = useState<string | null>(null);
-  const [payMsg, setPayMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ loanId: "", amountPaid: "", paymentMethod: "MOBILE_MONEY", paidAt: "", transactionReference: "" });
 
   useEffect(() => {
-    const load = async () => {
+    void (async () => {
       try {
-        const [repRes, schRes] = await Promise.allSettled([
-          api.get("/v1/repayments/me"),
-          api.get("/v1/repayment-schedules/me"),
+        const [loadedLoans, loadedRepayments, loadedSchedules] = await Promise.all([
+          farmerApi.getLoans(),
+          farmerApi.getRepayments(),
+          farmerApi.getRepaymentSchedules(),
         ]);
-        if (repRes.status === "fulfilled") setRepayments(repRes.value.data.data ?? []);
-        if (schRes.status === "fulfilled") setSchedules(schRes.value.data.data ?? []);
+
+        setLoans(loadedLoans);
+        setRepayments(loadedRepayments);
+        setSchedules(loadedSchedules);
+      } catch {
+        showToast("Unable to load payment data", "error");
       } finally {
         setLoading(false);
       }
-    };
-    load();
-  }, []);
+    })();
+  }, [showToast]);
 
-  const totalPaid = repayments.filter((r) => r.status === "SUCCESS").reduce((s, r) => s + r.amount, 0);
-  const nextDue = schedules.find((s) => s.status === "PENDING");
+  const totalDue = useMemo(() => schedules.reduce((sum, schedule) => sum + Number(schedule.amountDue || 0), 0), [schedules]);
+  const totalPaid = useMemo(() => repayments.reduce((sum, repayment) => sum + Number(repayment.amountPaid || 0), 0), [repayments]);
 
-  const handlePayNow = async (scheduleId: string) => {
-    setPayingId(scheduleId);
-    setPayMsg("");
+  const handleSubmit = async () => {
+    if (!form.loanId || !form.amountPaid || !form.paidAt) {
+      showToast("Loan, amount paid, and payment date are required", "error");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await api.post("/v1/repayments", { scheduleId });
-      setPayMsg("Payment recorded successfully!");
-      const [repRes, schRes] = await Promise.all([api.get("/v1/repayments/me"), api.get("/v1/repayment-schedules/me")]);
-      setRepayments(repRes.data.data ?? []);
-      setSchedules(schRes.data.data ?? []);
-    } catch (err: any) {
-      setPayMsg(err?.response?.data?.message ?? "Payment failed.");
+      await farmerApi.createRepayment({
+        loanId: form.loanId,
+        amountPaid: Number(form.amountPaid),
+        paymentMethod: form.paymentMethod,
+        paidAt: form.paidAt,
+        transactionReference: form.transactionReference || undefined,
+      });
+
+      const nextRepayments = await farmerApi.getRepayments();
+      const nextSchedules = await farmerApi.getRepaymentSchedules();
+      setRepayments(nextRepayments);
+      setSchedules(nextSchedules);
+      setForm({ loanId: "", amountPaid: "", paymentMethod: "MOBILE_MONEY", paidAt: "", transactionReference: "" });
+      showToast("Repayment saved successfully", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to save repayment", "error");
     } finally {
-      setPayingId(null);
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <div className="p-6 text-sm text-stone-500">Loading repayment records...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-3xl font-semibold text-stone-900">Repayment Dashboard</h2>
-          <p className="mt-2 text-sm text-stone-500">Manage your loan obligations and track payment history.</p>
+          <h2 className="text-3xl font-semibold text-stone-900">Repayments</h2>
+          <p className="mt-2 text-sm text-stone-500">Record payments and track repayment schedules from the backend.</p>
         </div>
+        <button onClick={() => navigate("/farmer/dashboard")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">Back to dashboard</button>
       </section>
 
-      {payMsg && <p className={`rounded-lg px-4 py-2 text-sm ${payMsg.includes("success") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{payMsg}</p>}
-
-      {/* Stats */}
       <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
-          <p className="text-sm text-stone-500">Total Paid</p>
-          <h3 className="mt-3 text-3xl font-semibold text-stone-900">{loading ? "—" : `RWF ${totalPaid.toLocaleString()}`}</h3>
-        </article>
-        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
-          <p className="text-sm text-stone-500">Next Due Date</p>
-          <h3 className="mt-3 text-2xl font-semibold text-stone-900">{loading ? "—" : nextDue ? new Date(nextDue.dueDate).toLocaleDateString() : "None"}</h3>
-          {nextDue && <p className="mt-1 text-xs text-stone-400">RWF {nextDue.amount?.toLocaleString()}</p>}
-        </article>
-        <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
-          <p className="text-sm text-stone-500">Pending Installments</p>
-          <h3 className="mt-3 text-3xl font-semibold text-stone-900">{loading ? "—" : schedules.filter((s) => s.status === "PENDING").length}</h3>
-        </article>
+        <StatCard label="Loans" value={loans.length} helper="Backend loan list" />
+        <StatCard label="Due amount" value={totalDue} helper="From repayment schedules" currency />
+        <StatCard label="Paid amount" value={totalPaid} helper="From repayment history" currency />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.7fr)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
+        <article className="rounded-[1.5rem] border border-stone-200 bg-white p-6 shadow-panel">
+          <h3 className="text-xl font-semibold text-stone-900">Record a Payment</h3>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium text-stone-700">Loan</span>
+              <select value={form.loanId} onChange={(e) => setForm((prev) => ({ ...prev, loanId: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500">
+                <option value="">Select loan</option>
+                {loans.map((loan) => <option key={loan.id} value={loan.id}>{loan.purpose || loan.id} • {loan.status || "UNKNOWN"}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-stone-700">Amount Paid (RWF)</span>
+              <input type="number" value={form.amountPaid} onChange={(e) => setForm((prev) => ({ ...prev, amountPaid: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="e.g. 200000" />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-stone-700">Payment Method</span>
+              <select value={form.paymentMethod} onChange={(e) => setForm((prev) => ({ ...prev, paymentMethod: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500">
+                <option value="MOBILE_MONEY">Mobile Money</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CASH">Cash</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-stone-700">Paid At</span>
+              <input type="date" value={form.paidAt} onChange={(e) => setForm((prev) => ({ ...prev, paidAt: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium text-stone-700">Transaction Reference</span>
+              <input value={form.transactionReference} onChange={(e) => setForm((prev) => ({ ...prev, transactionReference: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500" placeholder="Optional receipt or reference code" />
+            </label>
+          </div>
+          <div className="mt-5 flex justify-end gap-3">
+            <button onClick={() => navigate("/farmer/dashboard")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Review Loans</button>
+            <button onClick={() => void handleSubmit()} disabled={submitting} className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 disabled:opacity-70">
+              {submitting ? "Saving..." : "Save Payment"}
+            </button>
+          </div>
+        </article>
+
         <div className="space-y-4">
-          {/* Upcoming schedule */}
           <article className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
-            <h3 className="text-xl font-semibold text-stone-900 mb-4">Upcoming Schedule</h3>
-            {loading ? <p className="text-sm text-stone-400">Loading...</p> : schedules.filter((s) => s.status === "PENDING").length === 0 ? (
-              <p className="text-sm text-stone-400">No pending installments.</p>
-            ) : (
-              <div className="space-y-3">
-                {schedules.filter((s) => s.status === "PENDING").slice(0, 3).map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-stone-200 p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-stone-900">{new Date(item.dueDate).toLocaleDateString()}</p>
-                        <p className="mt-1 text-sm text-stone-600">RWF {item.amount?.toLocaleString()}</p>
-                      </div>
-                      <button
-                        onClick={() => handlePayNow(item.id)}
-                        disabled={payingId === item.id}
-                        className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                      >
-                        {payingId === item.id ? "Processing..." : "Pay Now"}
-                      </button>
+            <h3 className="text-lg font-semibold text-stone-900">Upcoming Schedules</h3>
+            <div className="mt-4 space-y-3">
+              {schedules.slice(0, 5).map((schedule) => (
+                <div key={schedule.id} className="rounded-2xl border border-stone-200 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-stone-900">Installment {schedule.installmentNumber || "-"}</p>
+                      <p className="text-sm text-stone-500">{schedule.loan?.purpose || "Loan repayment"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-stone-900">RWF {Number(schedule.amountDue || 0).toLocaleString()}</p>
+                      <p className="text-xs text-stone-500">{schedule.dueDate || "No date"}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+              {schedules.length === 0 && <p className="text-sm text-stone-500">No repayment schedules yet.</p>}
+            </div>
           </article>
 
-          {/* Payment history */}
           <article className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
-            <h3 className="text-xl font-semibold text-stone-900 mb-4">Payment History</h3>
-            {loading ? <p className="text-sm text-stone-400">Loading...</p> : repayments.length === 0 ? (
-              <p className="text-sm text-stone-400">No payment history yet.</p>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-stone-200">
-                <table className="min-w-full divide-y divide-stone-200 text-sm">
-                  <thead className="bg-stone-50 text-left text-xs uppercase tracking-[0.2em] text-stone-400">
-                    <tr>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Method</th>
-                      <th className="px-4 py-3">Ref</th>
-                      <th className="px-4 py-3">Amount</th>
-                      <th className="px-4 py-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100 bg-white text-stone-700">
-                    {repayments.map((row) => (
-                      <tr key={row.id}>
-                        <td className="px-4 py-4">{new Date(row.paidAt).toLocaleDateString()}</td>
-                        <td className="px-4 py-4">{row.method ?? "—"}</td>
-                        <td className="px-4 py-4">{row.transactionRef ?? "—"}</td>
-                        <td className="px-4 py-4 font-semibold text-stone-900">RWF {row.amount?.toLocaleString()}</td>
-                        <td className="px-4 py-4">
-                          <span className={row.status === "SUCCESS" ? "rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700" : "rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"}>
-                            {row.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </article>
-        </div>
-
-        <div className="space-y-4">
-          <article className="rounded-[1.5rem] border border-brand-100 bg-brand-50 p-5 shadow-panel">
-            <h3 className="text-lg font-semibold text-brand-900">Repayment Policy</h3>
-            <p className="mt-2 text-sm text-brand-800">Payments are processed within 5-10 minutes. If your balance doesn't update after an hour, contact support with your transaction reference.</p>
-          </article>
-          <article className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
-            <h3 className="text-lg font-semibold text-stone-900">Having trouble paying?</h3>
-            <p className="mt-2 text-sm text-stone-600">Contact your cooperative manager before the due date to discuss restructuring options.</p>
-            <p className="mt-3 text-lg font-semibold text-brand-700">0800 123 456</p>
+            <h3 className="text-lg font-semibold text-stone-900">Payment History</h3>
+            <div className="mt-4 space-y-3">
+              {repayments.slice(0, 5).map((repayment) => (
+                <div key={repayment.id} className="rounded-2xl border border-stone-200 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-stone-900">RWF {Number(repayment.amountPaid || 0).toLocaleString()}</p>
+                      <p className="text-sm text-stone-500">{repayment.paymentMethod || "Payment"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">{repayment.status || "Recorded"}</p>
+                      <p className="text-xs text-stone-500">{repayment.paidAt || "No date"}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {repayments.length === 0 && <p className="text-sm text-stone-500">No repayments recorded yet.</p>}
+            </div>
           </article>
         </div>
       </section>
     </div>
   );
 };
+
+const StatCard = ({ label, value, helper, currency = false }: { label: string; value: number; helper: string; currency?: boolean }) => (
+  <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <div className="text-sm text-stone-500">{label}</div>
+    <div className="mt-2 text-2xl font-semibold text-stone-900">{currency ? `RWF ${Number(value).toLocaleString()}` : value}</div>
+    <div className="mt-1 text-xs text-stone-400">{helper}</div>
+  </div>
+);
+
+export default PaymentsPage;

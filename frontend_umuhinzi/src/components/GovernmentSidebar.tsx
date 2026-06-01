@@ -23,7 +23,7 @@ export const GovernmentSidebar = () => {
         <NavLink to="/government" end className={navClass}>Overview</NavLink>
         <NavLink to="/government/regions" className={navClass}>Regions</NavLink>
         <NavLink to="/government/reports" className={navClass}>Reports</NavLink>
-        <NavLink to="/account" className={navClass}>Account & Notifications</NavLink>
+        <NavLink to="/government/profile" className={navClass}>Profile</NavLink>
       </nav>
     </aside>
   );

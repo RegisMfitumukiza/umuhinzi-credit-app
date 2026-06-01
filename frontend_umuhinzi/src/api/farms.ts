@@ -1,6 +1,19 @@
 import { api } from "./http";
 import type { Farm, FarmFormValues, FarmListResponse, FarmQuery } from "../types/farm";
 
+type RawFarmListResponse = {
+  success: boolean;
+  message: string;
+  data: Farm[];
+  pagination?: {
+    page?: number;
+    currentPage?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+};
+
 const mapFormValues = (values: FarmFormValues) => ({
   ...values,
   landSize: Number(values.landSize),
@@ -23,12 +36,32 @@ const toQueryString = (query: FarmQuery) => {
 
 export const farmApi = {
   listMine: async (query: FarmQuery = {}) => {
-    const response = await api.get<FarmListResponse>(`/farms/me${toQueryString(query)}`);
-    return response.data;
+    const response = await api.get<RawFarmListResponse>(`/farms${toQueryString(query)}`);
+    const pagination = response.data.pagination;
+
+    return {
+      farms: response.data.data || [],
+      meta: {
+        page: pagination?.page ?? pagination?.currentPage ?? query.page ?? 1,
+        limit: pagination?.limit ?? query.limit ?? 10,
+        total: pagination?.total ?? 0,
+        totalPages: pagination?.totalPages ?? 1,
+      },
+    } satisfies FarmListResponse;
   },
   listAll: async (query: FarmQuery = {}) => {
-    const response = await api.get<FarmListResponse>(`/admin/farms${toQueryString(query)}`);
-    return response.data;
+    const response = await api.get<RawFarmListResponse>(`/farms${toQueryString(query)}`);
+    const pagination = response.data.pagination;
+
+    return {
+      farms: response.data.data || [],
+      meta: {
+        page: pagination?.page ?? pagination?.currentPage ?? query.page ?? 1,
+        limit: pagination?.limit ?? query.limit ?? 10,
+        total: pagination?.total ?? 0,
+        totalPages: pagination?.totalPages ?? 1,
+      },
+    } satisfies FarmListResponse;
   },
   getById: async (farmId: string) => {
     const response = await api.get<{ data: Farm }>(`/farms/${farmId}`);

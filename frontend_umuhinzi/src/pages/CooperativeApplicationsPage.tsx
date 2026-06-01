@@ -1,193 +1,284 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../api/http";
-
-type Application = {
-  id: string; amount: number; purpose: string; status: string; createdAt: string;
-  repaymentPeriodMonths: number;
-  farmer?: { fullName: string; email: string; district?: string };
-  creditScore?: { score: number; tier: string };
-};
+import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { cooperativeMembersApi } from "../api/cooperativeMembers";
+import { getCurrentUserProfile } from "../api/users";
+import {
+  getLoanApplications,
+  type LoanApplicationUi,
+  updateLoanApplicationStatus,
+} from "../api/loanApplications";
+import { useToast } from "../context/ToastContext";
 
 const statusStyles: Record<string, string> = {
-  PENDING: "bg-stone-100 text-stone-700",
-  UNDER_REVIEW: "bg-blue-50 text-blue-700",
-  APPROVED: "bg-emerald-100 text-emerald-700",
-  REJECTED: "bg-rose-100 text-rose-700",
-  DISBURSED: "bg-purple-100 text-purple-700",
+  Pending: "bg-stone-100 text-stone-700",
+  "Under Review": "bg-amber-100 text-amber-700",
+  Approved: "bg-emerald-100 text-emerald-700",
+  Rejected: "bg-rose-100 text-rose-700",
+  Cancelled: "bg-stone-200 text-stone-700",
 };
 
-export const CooperativeApplicationsPage = () => {
-  const navigate = useNavigate();
-  const [apps, setApps] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+const cropStyles: Record<string, string> = {
+  "Irish Potato": "bg-emerald-100 text-emerald-700",
+  Coffee: "bg-emerald-100 text-emerald-700",
+  Maize: "bg-emerald-100 text-emerald-700",
+  Beans: "bg-emerald-100 text-emerald-700",
+  Wheat: "bg-emerald-100 text-emerald-700",
+};
 
-  const load = async () => {
-    setLoading(true);
+const parseAmount = (value: string) => Number(value.replace(/,/g, "")) || 0;
+
+const getStats = (apps: LoanApplicationUi[]) => {
+  const totalRequests = apps.length;
+  const pendingReview = apps.filter((application) => application.status === "Pending" || application.status === "Under Review").length;
+  const approvedThisList = apps.filter((application) => application.status === "Approved").length;
+  const scores = apps
+    .map((application) => Number(application.scoreValue))
+    .filter((score) => Number.isFinite(score) && score > 0);
+  const averageScore = scores.length > 0 ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
+
+  return [
+    { label: "Total Requests", value: String(totalRequests), tone: `${totalRequests} total` },
+    { label: "Pending Review", value: String(pendingReview), tone: pendingReview > 0 ? `${pendingReview} Urgent` : "No pending" },
+    { label: "Approved (MTD)", value: String(approvedThisList), tone: `${approvedThisList} approved` },
+    { label: "Avg. Credit Score", value: averageScore ? String(averageScore) : "N/A", tone: averageScore ? "Live data" : "No score yet" },
+  ];
+};
+
+type CooperativeApplicationsPageProps = {
+  showActions?: boolean;
+  title?: string;
+  subtitle?: string;
+  emptyStateMessage?: string;
+  scope?: "cooperative" | "institution";
+};
+
+export const CooperativeApplicationsPage = ({
+  showActions = false,
+  title = "Loan Applications",
+  subtitle = "Manage and review agricultural loan requests from cooperatives across Rwanda.",
+  emptyStateMessage = "No applications submitted yet.",
+  scope = "cooperative",
+}: CooperativeApplicationsPageProps) => {
+  const [appsState, setAppsState] = useState<LoanApplicationUi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
+
+  const stats = getStats(appsState);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const currentUser = await getCurrentUserProfile().catch(() => null);
+
+        if (scope === "institution") {
+          const institutionId = currentUser?.institutionProfile?.id;
+          if (!institutionId) {
+            setAppsState([]);
+            return;
+          }
+
+          const data = await getLoanApplications().catch(() => [] as LoanApplicationUi[]);
+          setAppsState(data);
+          return;
+        }
+
+        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
+        if (!cooperativeId) {
+          setAppsState([]);
+          return;
+        }
+
+        const [memberRows, data] = await Promise.all([
+          cooperativeMembersApi.getMyCooperativeMembers().catch(() => []),
+          getLoanApplications().catch(() => [] as LoanApplicationUi[]),
+        ]);
+
+        const farmerIds = new Set(memberRows.map((member) => member.farmerId));
+        setAppsState(data.filter((application) => application.farmerId ? farmerIds.has(application.farmerId) : false));
+      } catch {
+        setAppsState([]);
+        showToast("Unable to load cooperative applications", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [scope, showToast]);
+
+  async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
     try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      const res = await api.get(`/v1/loan-applications?${params.toString()}`);
-      setApps(res.data.data ?? []);
-    } finally {
-      setLoading(false);
+      const needsReviewStep = currentStatus === "Pending" || currentStatus === "PENDING";
+      let rejectionReason: string | undefined;
+
+      if (status === "REJECTED") {
+        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
+        if (!rejectionReason) {
+          showToast("Rejection reason is required", "error");
+          return;
+        }
+      }
+
+      const updated = needsReviewStep
+        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status, rejectionReason))
+        : await updateLoanApplicationStatus(id, status, rejectionReason);
+      setAppsState((p) => p.map((x) => (x.id === id ? updated : x)));
+      showToast(`Application ${status.toLowerCase()} successfully`, "success");
+    } catch {
+      showToast("Unable to update application status", "error");
     }
-  };
+  }
 
-  useEffect(() => { load(); }, []);
-
-  const handleAction = async (id: string, action: "APPROVED" | "REJECTED" | "DISBURSED", notes = "") => {
-    setActionLoading(id + action);
-    try {
-      await api.patch(`/v1/loan-applications/${id}/status`, { status: action, reviewNotes: notes });
-      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: action } : a));
-    } catch {}
-    finally { setActionLoading(null); }
-  };
-
-  const handleExport = async () => {
-    try {
-      const res = await api.get("/v1/exports/loan-applications", { responseType: "blob" });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement("a");
-      a.href = url; a.download = "loan-applications.csv"; a.click();
-      URL.revokeObjectURL(url);
-    } catch {}
-  };
-
-  const pending = apps.filter((a) => a.status === "PENDING").length;
-  const approved = apps.filter((a) => a.status === "APPROVED").length;
-  const avgScore = apps.length ? Math.round(apps.reduce((s, a) => s + (a.creditScore?.score ?? 0), 0) / apps.length) : 0;
+  if (isLoading) {
+    return <div className="p-6 text-sm text-stone-500">Loading applications...</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-[1400px]">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-stone-900">Loan Applications</h1>
-            <p className="mt-1 text-sm text-stone-500">Review and manage agricultural loan requests.</p>
+            <h1 className="text-3xl font-semibold text-stone-900">{title}</h1>
+            <p className="mt-1 text-sm text-stone-500">{subtitle}</p>
           </div>
+
           <div className="flex gap-3">
-            <button onClick={handleExport} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
+            <button onClick={() => { const csv = window.confirm("Export CSV?"); if (csv) { const blob = new Blob([JSON.stringify(appsState)], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "applications.json"; a.click(); URL.revokeObjectURL(url); } }} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export Data</button>
+            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">New Application</button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: "Total Requests", value: apps.length },
-            { label: "Pending Review", value: pending },
-            { label: "Approved (Total)", value: approved },
-            { label: "Avg. Credit Score", value: avgScore || "—" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">{s.label}</div>
-              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : s.value}</div>
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-stone-50 text-stone-700">+</div>
+                <span className="rounded-full border border-stone-200 px-2 py-1 text-[11px] text-stone-500">{stat.tone}</span>
+              </div>
+              <div className="text-sm text-stone-500">{stat.label}</div>
+              <div className="mt-1 text-2xl font-semibold text-stone-900">{stat.value}</div>
             </div>
           ))}
         </div>
 
-        {/* Filters */}
         <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && load()}
-              className="flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
-              placeholder="Search by farmer name..."
-            />
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); }}
-              className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400">
-              <option value="">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="UNDER_REVIEW">Under Review</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="DISBURSED">Disbursed</option>
-            </select>
-            <button onClick={load} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white">Search</button>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex-1">
+              <input
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                placeholder="Search by ID, name, or cooperative..."
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">All Statuses</button>
+              <button className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">All Crops</button>
+              <button className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">All Regions</button>
+              <button className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">⇩</button>
+            </div>
           </div>
 
-          {/* Table */}
           <div className="mt-4 overflow-x-auto">
-            {loading ? <p className="py-6 text-sm text-stone-400">Loading...</p> : apps.length === 0 ? (
-              <p className="py-6 text-center text-sm text-stone-400">No applications found.</p>
-            ) : (
-              <table className="min-w-full border-separate border-spacing-y-2 text-left text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-[0.15em] text-stone-400">
-                    <th className="px-3 py-2">Farmer</th>
-                    <th className="px-3 py-2">Purpose</th>
-                    <th className="px-3 py-2">Amount (RWF)</th>
-                    <th className="px-3 py-2">Score</th>
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {apps.map((app) => (
-                    <tr key={app.id} className="rounded-2xl border border-stone-200 bg-white shadow-sm">
-                      <td className="px-3 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-700">
-                            {app.farmer?.fullName?.[0] ?? "?"}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-stone-900">{app.farmer?.fullName ?? "—"}</div>
-                            <div className="text-xs text-stone-500">{app.farmer?.district ?? app.farmer?.email ?? ""}</div>
-                          </div>
+            <table className="min-w-full border-separate border-spacing-y-3 text-left text-sm">
+              <thead>
+                <tr className="text-xs uppercase tracking-[0.15em] text-stone-400">
+                  <th className="px-3 py-2"><input type="checkbox" /></th>
+                  <th className="px-3 py-2">ID</th>
+                  <th className="px-3 py-2">Farmer Details</th>
+                  <th className="px-3 py-2">Crop</th>
+                  <th className="px-3 py-2">Amount (RWF)</th>
+                  <th className="px-3 py-2">Score</th>
+                  <th className="px-3 py-2">Submission Date</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appsState.map((application, index) => (
+                  <tr key={application.id} className={`rounded-2xl border ${index === appsState.length - 1 ? "border-violet-300 ring-1 ring-violet-200" : "border-stone-200"} bg-white shadow-sm`}>
+                    <td className="px-3 py-5"><input type="checkbox" /></td>
+                    <td className="px-3 py-5 font-medium text-stone-500">
+                      <div>{application.id.split("-")[0]}.</div>
+                      <div>{application.id.split("-")[1]}</div>
+                    </td>
+                    <td className="px-3 py-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-xs font-semibold text-stone-700">
+                          {application.farmer.slice(0, 1)}
                         </div>
-                      </td>
-                      <td className="px-3 py-4 text-stone-600">{app.purpose}</td>
-                      <td className="px-3 py-4 font-semibold text-stone-900">{app.amount?.toLocaleString()}</td>
-                      <td className="px-3 py-4">
-                        {app.creditScore
-                          ? <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">{app.creditScore.tier}</div>
-                          : <span className="text-stone-400">—</span>}
-                      </td>
-                      <td className="px-3 py-4 text-stone-500">{new Date(app.createdAt).toLocaleDateString()}</td>
-                      <td className="px-3 py-4">
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[app.status] ?? "bg-stone-100 text-stone-600"}`}>{app.status}</span>
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => navigate(`/cooperatives/applications/${app.id}`)} className="rounded-full border border-stone-200 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50">Review</button>
-                          {app.status === "PENDING" || app.status === "UNDER_REVIEW" ? (
+                        <div>
+                          <div className="font-semibold text-stone-900">{application.farmer}</div>
+                          <div className="text-xs text-stone-500">{application.location}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-5">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${cropStyles[application.crop]}`}>{application.crop}</span>
+                    </td>
+                    <td className="px-3 py-5">
+                      <div className="font-semibold text-stone-900">{application.amount}</div>
+                      <div className="text-xs text-stone-500">RWF</div>
+                    </td>
+                    <td className="px-3 py-5">
+                      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">{application.scoreLabel}</div>
+                      <div className="mt-1 text-xs text-stone-500">{application.scoreValue}</div>
+                    </td>
+                    <td className="px-3 py-5 text-stone-600">{application.date}</td>
+                    <td className="px-3 py-5">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[application.status]}`}>{application.status}</span>
+                    </td>
+                    <td className="px-3 py-5 text-right">
+                      {showActions ? (
+                        <div className="flex items-center gap-2 justify-end">
+                          <Link to={`/finance/applications/${application.id}`} state={{ application }}>
+                            <button className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700">View</button>
+                          </Link>
+                          {application.status !== "Approved" && application.status !== "Rejected" && application.status !== "Cancelled" && (
                             <>
-                              <button
-                                onClick={() => handleAction(app.id, "APPROVED")}
-                                disabled={actionLoading === app.id + "APPROVED"}
-                                className="rounded-full border border-emerald-200 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleAction(app.id, "REJECTED")}
-                                disabled={actionLoading === app.id + "REJECTED"}
-                                className="rounded-full border border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
-                                Reject
-                              </button>
+                              <button onClick={() => void handleUpdate(application.id, "APPROVED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
+                              <button onClick={() => void handleUpdate(application.id, "REJECTED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
                             </>
-                          ) : app.status === "APPROVED" ? (
-                            <button
-                              onClick={() => handleAction(app.id, "DISBURSED")}
-                              disabled={actionLoading === app.id + "DISBURSED"}
-                              className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700 disabled:opacity-50">
-                              Disburse
-                            </button>
-                          ) : null}
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                      ) : (
+                        <Link to={`/cooperatives/applications/${application.id}`}>
+                          <button className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700">Review</button>
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {appsState.length === 0 && <div className="mt-4 text-sm text-stone-500">{emptyStateMessage}</div>}
+
+          <div className="mt-4 flex flex-col gap-3 border-t border-stone-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-sm text-stone-500">Showing 1-5 of {appsState.length} applications</p>
+            <div className="flex items-center gap-2 text-sm text-stone-500">
+              <span>Rows per page:</span>
+              <button className="rounded-lg border border-stone-200 px-3 py-2">10</button>
+              <div className="flex items-center gap-1">
+                <button className="rounded-lg border border-stone-200 px-3 py-2">‹</button>
+                <button className="rounded-lg bg-emerald-500 px-3 py-2 font-semibold text-white">1</button>
+                <button className="rounded-lg border border-stone-200 px-3 py-2">2</button>
+                <button className="rounded-lg border border-stone-200 px-3 py-2">3</button>
+                <span className="px-2">...</span>
+                <button className="rounded-lg border border-stone-200 px-3 py-2">12</button>
+                <button className="rounded-lg border border-stone-200 px-3 py-2">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-lg font-semibold text-emerald-900">Automated Risk Scoring Engine is active</div>
+              <p className="mt-1 max-w-3xl text-sm text-emerald-900/70">
+                Scores are calculated based on historical harvest yields, satellite weather data, and repayment behavior from previous micro-loans.
+                High-risk profiles (Score D) are flagged automatically for manual onsite verification.
+              </p>
+            </div>
+            <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">View Methodology →</button>
           </div>
         </div>
       </div>

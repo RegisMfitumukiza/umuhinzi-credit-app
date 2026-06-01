@@ -1,63 +1,84 @@
-import { useEffect, useState } from "react";
-import { api } from "../api/http";
+import { useEffect, useMemo, useState } from "react";
+import { cooperativeMembersApi, type CooperativeMemberApi } from "../api/cooperativeMembers";
+import { getLoanApplications, type LoanApplicationUi } from "../api/loanApplications";
+import { getCurrentUserProfile } from "../api/users";
 
-type PortfolioStats = { totalPortfolio: number; avgRepaymentRate: number; totalFarmers: number; activeCooperatives: number };
-type TopCooperative = { id: string; name: string; totalLoans: number };
+const parseAmount = (value?: string) => {
+  if (!value) return 0;
+  return Number(value.replace(/,/g, "")) || 0;
+};
 
 export const CooperativeReportsPage = () => {
-  const [stats, setStats] = useState<PortfolioStats | null>(null);
-  const [topCoops, setTopCoops] = useState<TopCooperative[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [format, setFormat] = useState("csv");
-  const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState("");
+  const [members, setMembers] = useState<CooperativeMemberApi[]>([]);
+  const [applications, setApplications] = useState<LoanApplicationUi[]>([]);
 
   useEffect(() => {
-    const load = async () => {
+    void (async () => {
       try {
-        const [statsRes, coopsRes] = await Promise.allSettled([
-          api.get("/v1/analytics/portfolio-stats"),
-          api.get("/v1/cooperatives?limit=4&sortBy=totalLoans"),
+        const currentUser = await getCurrentUserProfile().catch(() => null);
+        const cooperativeId = currentUser?.cooperativeManagerProfile?.cooperativeId;
+
+        if (!cooperativeId) {
+          setMembers([]);
+          setApplications([]);
+          return;
+        }
+
+        const [memberRows, loanRows] = await Promise.all([
+          cooperativeMembersApi.getMyCooperativeMembers().catch(() => [] as CooperativeMemberApi[]),
+          getLoanApplications().catch(() => [] as LoanApplicationUi[]),
         ]);
-        if (statsRes.status === "fulfilled") setStats(statsRes.value.data.data);
-        if (coopsRes.status === "fulfilled") setTopCoops(coopsRes.value.data.data ?? []);
+
+        const farmerIds = new Set(memberRows.map((member) => member.farmerId));
+        const filteredApplications = loanRows.filter((application) => application.farmerId ? farmerIds.has(application.farmerId) : false);
+
+        setMembers(memberRows);
+        setApplications(filteredApplications);
+      } catch {
+        setMembers([]);
+        setApplications([]);
       } finally {
         setLoading(false);
       }
-    };
-    load();
+    })();
   }, []);
 
-  const handleExport = async () => {
-    setExporting(true);
-    setExportMsg("");
-    try {
-      const params = new URLSearchParams();
-      if (fromDate) params.set("from", fromDate);
-      if (toDate) params.set("to", toDate);
-      params.set("format", format);
-      const res = await api.get(`/v1/exports/portfolio-report?${params.toString()}`, { responseType: "blob" });
-      const ext = format === "pdf" ? "pdf" : "csv";
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement("a");
-      a.href = url; a.download = `portfolio-report.${ext}`; a.click();
-      URL.revokeObjectURL(url);
-      setExportMsg("Report downloaded successfully.");
-    } catch {
-      setExportMsg("Export failed. Please try again.");
-    } finally {
-      setExporting(false);
-    }
-  };
+  const metrics = useMemo(() => {
+    const totalLoanVolume = applications.reduce((sum, application) => sum + parseAmount(application.amount), 0);
+    const approvedApplications = applications.filter((application) => application.status === "Approved").length;
+    const rejectedApplications = applications.filter((application) => application.status === "Rejected").length;
+    const pendingApplications = applications.filter((application) => application.status === "Pending" || application.status === "Under Review").length;
+    const activeMembers = members.filter((member) => (member.status || "PENDING").toUpperCase() === "ACTIVE").length;
+    const scoreValues = applications.map((application) => Number(application.scoreValue)).filter((value) => Number.isFinite(value) && value > 0);
+    const averageScore = scoreValues.length > 0 ? Math.round(scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length) : 0;
 
-  const topStats = [
-    { label: "Total Portfolio Value", value: stats ? `RWF ${(stats.totalPortfolio / 1_000_000_000).toFixed(1)}B` : "—" },
-    { label: "Avg. Repayment Rate", value: stats ? `${stats.avgRepaymentRate?.toFixed(1)}%` : "—" },
-    { label: "Farmer Inclusion", value: stats ? stats.totalFarmers?.toLocaleString() : "—" },
-    { label: "Active Cooperatives", value: stats ? stats.activeCooperatives?.toLocaleString() : "—" },
-  ];
+    return {
+      totalLoanVolume,
+      approvedApplications,
+      rejectedApplications,
+      pendingApplications,
+      activeMembers,
+      averageScore,
+    };
+  }, [applications, members]);
+
+  const topApplications = useMemo(
+    () => [...applications].sort((a, b) => parseAmount(b.amount) - parseAmount(a.amount)).slice(0, 5),
+    [applications]
+  );
+
+  const statusBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    applications.forEach((application) => {
+      map.set(application.status, (map.get(application.status) || 0) + 1);
+    });
+    return Array.from(map.entries());
+  }, [applications]);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-stone-500">Loading cooperative reports...</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f7f8fa] px-4 py-6 lg:px-8">
@@ -65,66 +86,107 @@ export const CooperativeReportsPage = () => {
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Reports & Analytics</h1>
-            <p className="mt-1 text-sm text-stone-500">Strategic oversight and data-driven impact assessment.</p>
+            <p className="mt-1 text-sm text-stone-500">All figures below are loaded from the cooperative’s live database records.</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Filter Views</button>
+            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">Share Dashboard</button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {topStats.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">{s.label}</div>
-              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : s.value}</div>
-            </div>
-          ))}
+          <StatCard label="Total Loan Volume" value={`RWF ${metrics.totalLoanVolume.toLocaleString()}`} tone="+live" />
+          <StatCard label="Approved Applications" value={metrics.approvedApplications} tone="database" />
+          <StatCard label="Pending Applications" value={metrics.pendingApplications} tone="database" />
+          <StatCard label="Average Credit Score" value={metrics.averageScore || "N/A"} tone="backend" />
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[1.45fr_0.65fr]">
-          {/* Top cooperatives */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-stone-900 mb-4">Top Performing Cooperatives</h2>
-            {loading ? <p className="text-sm text-stone-400">Loading...</p> : topCoops.length === 0 ? (
-              <p className="text-sm text-stone-400">No data available.</p>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900">Application Status Breakdown</h2>
+                <p className="text-xs text-stone-500">Current cooperative loan applications by backend status</p>
+              </div>
+              <div className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Live</div>
+            </div>
+
+            {statusBreakdown.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-stone-200 p-4 text-sm text-stone-500">No loan applications linked to this cooperative yet.</div>
             ) : (
-              <div className="space-y-3">
-                {topCoops.map((coop, i) => (
-                  <div key={coop.id} className="flex items-center justify-between rounded-xl border border-stone-100 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-stone-400">#{i + 1}</span>
-                      <span className="text-sm font-semibold text-stone-900">{coop.name}</span>
+              <div className="space-y-4">
+                {statusBreakdown.map(([status, count]) => (
+                  <div key={status} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-stone-700">{status}</span>
+                      <span className="font-semibold text-stone-900">{count}</span>
                     </div>
-                    <span className="text-sm font-semibold text-stone-700">RWF {(coop.totalLoans / 1_000_000).toFixed(1)}M</span>
+                    <div className="h-3 rounded-full bg-stone-100">
+                      <div className={`h-full rounded-full ${status === "Approved" ? "bg-emerald-500" : status === "Rejected" ? "bg-rose-500" : status === "Under Review" ? "bg-amber-500" : "bg-stone-500"}`} style={{ width: `${Math.max(15, (count / applications.length) * 100)}%` }} />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Export engine */}
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm text-center">
+              <div className="text-sm text-stone-500">Active Members</div>
+              <div className="mt-4 text-3xl font-semibold text-stone-900">{metrics.activeMembers}</div>
+              <div className="mt-1 text-xs text-stone-500">Database member records</div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-stone-900">Top Cooperative Applications</h3>
+                <button className="text-xs text-stone-500">Export</button>
+              </div>
+              <div className="space-y-2">
+                {topApplications.length === 0 && <div className="rounded-xl border border-dashed border-stone-200 p-3 text-sm text-stone-500">No application data available.</div>}
+                {topApplications.map((application) => (
+                  <div key={application.id} className="flex items-center justify-between rounded-xl border border-stone-100 px-3 py-2">
+                    <div className="text-sm text-stone-900">{application.farmer}</div>
+                    <div className="text-sm font-semibold text-stone-900">RWF {application.amount}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-stone-900">Latest Applications</h2>
+              <button className="text-xs text-stone-500">View cooperative table</button>
+            </div>
+
+            <div className="space-y-2">
+              {topApplications.length === 0 && <p className="text-sm text-stone-500">No live application records available.</p>}
+              {topApplications.map((application) => (
+                <div key={application.id} className="flex items-center justify-between rounded-xl border border-stone-100 px-3 py-2">
+                  <div>
+                    <div className="text-sm font-semibold text-stone-900">{application.farmer}</div>
+                    <div className="text-xs text-stone-500">{application.crop} • {application.date}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-stone-900">{application.status}</div>
+                    <div className="text-xs text-stone-500">RWF {application.amount}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-stone-900">Export Engine</h3>
-            <p className="mt-1 text-xs text-stone-500">Generate CSV or PDF exports for analysis</p>
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs text-stone-500">From</label>
-                  <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
-                </div>
-                <div>
-                  <label className="text-xs text-stone-500">To</label>
-                  <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <select value={format} onChange={(e) => setFormat(e.target.value)} className="rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-emerald-400">
-                  <option value="csv">CSV</option>
-                  <option value="pdf">PDF</option>
-                </select>
-                <button onClick={handleExport} disabled={exporting} className="flex-1 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                  {exporting ? "Exporting..." : "Download Report"}
-                </button>
-              </div>
-              {exportMsg && <p className={`text-xs ${exportMsg.includes("failed") ? "text-red-500" : "text-green-600"}`}>{exportMsg}</p>}
+            <p className="mt-1 text-xs text-stone-500">The values here are real database records ready for download or sharing.</p>
+            <div className="mt-3 space-y-3 text-sm text-stone-600">
+              <div className="rounded-xl border border-stone-100 px-3 py-2">Member records loaded: {members.length}</div>
+              <div className="rounded-xl border border-stone-100 px-3 py-2">Application records loaded: {applications.length}</div>
+              <div className="rounded-xl border border-stone-100 px-3 py-2">Rejected applications: {metrics.rejectedApplications}</div>
             </div>
           </div>
         </div>
@@ -132,5 +194,15 @@ export const CooperativeReportsPage = () => {
     </div>
   );
 };
+
+const StatCard = ({ label, value, tone }: { label: string; value: string | number; tone: string }) => (
+  <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex items-center justify-between">
+      <div className="text-sm text-stone-500">{label}</div>
+      <span className="rounded-full border border-stone-200 px-2 py-1 text-[11px] text-stone-500">{tone}</span>
+    </div>
+    <div className="text-2xl font-semibold text-stone-900">{value}</div>
+  </div>
+);
 
 export default CooperativeReportsPage;

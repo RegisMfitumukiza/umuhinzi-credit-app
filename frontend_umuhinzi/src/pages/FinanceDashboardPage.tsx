@@ -1,60 +1,135 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../api/http";
-import { useAuth } from "../context/AuthContext";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  getLoanApplications,
+  type LoanApplicationUi,
+  updateLoanApplicationStatus,
+} from "../api/loanApplications";
+import { institutionApi, type InstitutionProfile } from "../api/institutions";
+import { farmerApi, type FarmerLoan } from "../api/farmer";
+import { useToast } from "../context/ToastContext";
 
-type PortfolioStats = { totalPortfolio: number; totalFarmers: number; nplRatio: number; recoveryRate: number };
-type LoanApp = { id: string; amount: number; purpose: string; status: string; createdAt: string; farmer?: { fullName: string; district?: string } };
+const exportApplicationsCSV = (apps: LoanApplicationUi[]) => {
+  const header = ["id", "farmer", "institution", "purpose", "amount", "score", "date", "status"];
+  const rows = apps.map((a) => [a.id, a.farmer, a.institution || "", a.purpose || a.crop, a.amount, a.scoreValue, a.date, a.status]);
+  return [header, ...rows]
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+};
+
+const parseMoney = (value?: string | number | null) => {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
+};
+
+const metricsFromData = (apps: LoanApplicationUi[], loans: FarmerLoan[]) => {
+  const totalApplications = apps.length;
+  const pendingApplications = apps.filter((a) => a.status === "Pending" || a.status === "Under Review").length;
+  const approvedApplications = apps.filter((a) => a.status === "Approved").length;
+  const uniqueFarmers = new Set(apps.map((a) => a.farmerId || a.farmer)).size;
+  const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
+  const defaultedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "DEFAULTED").length;
+  const completedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "COMPLETED").length;
+  const portfolioValue = activeLoans.reduce((sum, loan) => sum + parseMoney(loan.approvedAmount ?? loan.requestedAmount ?? 0), 0);
+  const totalLoans = loans.length || 1;
+  return {
+    totalApplications,
+    pendingApplications,
+    approvedApplications,
+    uniqueFarmers,
+    activeLoans: activeLoans.length,
+    completedLoans,
+    nplRatio: `${((defaultedLoans / totalLoans) * 100).toFixed(1)}%`,
+    recoveryRate: `${((completedLoans / totalLoans) * 100).toFixed(1)}%`,
+    portfolioValue: `RWF ${portfolioValue.toLocaleString()}`,
+  };
+};
 
 export const FinanceDashboardPage = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<PortfolioStats | null>(null);
-  const [apps, setApps] = useState<LoanApp[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [apps, setApps] = useState<LoanApplicationUi[]>([]);
+  const [loans, setLoans] = useState<FarmerLoan[]>([]);
+  const [institution, setInstitution] = useState<InstitutionProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    const load = async () => {
+    void (async () => {
       try {
-        const [statsRes, appsRes] = await Promise.allSettled([
-          api.get("/v1/analytics/portfolio-stats"),
-          api.get("/v1/loan-applications?limit=5&status=PENDING"),
+        const [loadedApplications, loadedLoans] = await Promise.all([
+          getLoanApplications(),
+          farmerApi.getLoans().catch(() => [] as FarmerLoan[]),
         ]);
-        if (statsRes.status === "fulfilled") setStats(statsRes.value.data.data);
-        if (appsRes.status === "fulfilled") setApps(appsRes.value.data.data ?? []);
+        const currentInstitution = await institutionApi.getMyInstitution().catch(() => null);
+        setApps(loadedApplications);
+        setLoans(loadedLoans);
+        setInstitution(currentInstitution);
+      } catch {
+        showToast("Unable to load applications", "error");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
-    };
-    load();
+    })();
   }, []);
 
-  const handleAction = async (id: string, status: "APPROVED" | "REJECTED") => {
-    setActionLoading(id + status);
-    try {
-      await api.patch(`/v1/loan-applications/${id}/status`, { status });
-      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
-    } catch {}
-    finally { setActionLoading(null); }
-  };
+  const metrics = useMemo(() => metricsFromData(apps, loans), [apps, loans]);
 
-  const handleExport = async () => {
-    try {
-      const res = await api.get("/v1/exports/loan-applications", { responseType: "blob" });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement("a");
-      a.href = url; a.download = "applications.csv"; a.click();
-      URL.revokeObjectURL(url);
-    } catch {}
-  };
+  const institutionApps = useMemo(() => {
+    if (!institution?.id) {
+      return apps;
+    }
 
-  const metricCards = [
-    { label: "Active Portfolio", value: stats ? `RWF ${(stats.totalPortfolio / 1_000_000).toFixed(1)}M` : "—" },
-    { label: "Active Farmers", value: stats?.totalFarmers?.toLocaleString() ?? "—" },
-    { label: "NPL Ratio", value: stats ? `${stats.nplRatio?.toFixed(1)}%` : "—" },
-    { label: "Loan Recovery", value: stats ? `${stats.recoveryRate?.toFixed(1)}%` : "—" },
-  ];
+    return apps.filter((app) => !app.institutionId || app.institutionId === institution.id);
+  }, [apps, institution?.id]);
+
+  const applicationBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    institutionApps.forEach((app) => {
+      const key = app.purpose || app.crop || "Other";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [institutionApps]);
+
+  const recentActivity = useMemo(() => institutionApps.slice(0, 4), [institutionApps]);
+
+  async function handleUpdateStatus(id: string, status: "APPROVED" | "REJECTED") {
+    try {
+      let rejectionReason: string | undefined;
+
+      if (status === "REJECTED") {
+        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
+        if (!rejectionReason) {
+          showToast("Rejection reason is required", "error");
+          return;
+        }
+      }
+
+      const updated = await updateLoanApplicationStatus(id, status, rejectionReason);
+      setApps((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      showToast(`Application ${status.toLowerCase()} successfully`, "success");
+    } catch {
+      showToast("Unable to update application status", "error");
+    }
+  }
+
+  function handleExportCSV() {
+    const csv = exportApplicationsCSV(apps);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "applications.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-stone-500">Loading finance dashboard...</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
@@ -62,49 +137,128 @@ export const FinanceDashboardPage = () => {
         <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Financial Dashboard</h1>
-            <p className="mt-1 text-sm text-stone-500">Welcome back, {user?.fullName ?? "—"}. Loan portfolio overview.</p>
+            <p className="mt-1 text-sm text-stone-500">Welcome back. Here is the overview of the loan portfolio for Q3 2024.</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleExport} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
-            <button onClick={() => navigate("/finance/applications")} className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">View All Applications</button>
+            <button onClick={handleExportCSV} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
+            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">New Review Process</button>
           </div>
         </div>
 
-        {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metricCards.map((m) => (
-            <div key={m.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">{m.label}</div>
-              <div className="mt-2 text-2xl font-semibold text-stone-900">{loading ? "—" : m.value}</div>
-            </div>
-          ))}
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Active Portfolio</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.portfolioValue}</div>
+            <div className="mt-1 text-xs text-stone-400">From active loans</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Farmers in Pipeline</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.uniqueFarmers}</div>
+            <div className="mt-1 text-xs text-stone-400">Unique farmers with applications</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">NPL Ratio</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.nplRatio}</div>
+            <div className="mt-1 text-xs text-stone-400">Based on loan status</div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-stone-500">Loan Recovery</div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.recoveryRate}</div>
+            <div className="mt-1 text-xs text-stone-400">Completed loans / all loans</div>
+          </div>
         </div>
 
-        {/* Recent applications */}
-        <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-stone-900">Pending Applications</h3>
-            <button onClick={() => navigate("/finance/applications")} className="text-sm text-emerald-600 hover:underline">View all →</button>
+        <div className="mt-6 grid gap-4 xl:grid-cols-[1.6fr_0.9fr]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-stone-900">Financial Performance</h2>
+              <div className="text-sm text-stone-500">Live</div>
+            </div>
+            <div className="space-y-3 rounded-lg border border-stone-100 bg-stone-50 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-stone-600">Pending review</span>
+                <span className="font-semibold text-stone-900">{metrics.pendingApplications}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-stone-600">Approved applications</span>
+                <span className="font-semibold text-stone-900">{metrics.approvedApplications}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-stone-600">Active loans</span>
+                <span className="font-semibold text-stone-900">{metrics.activeLoans}</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${Math.min(100, (metrics.approvedApplications / Math.max(metrics.totalApplications, 1)) * 100)}%` }}
+                />
+              </div>
+            </div>
           </div>
-          {loading ? <p className="text-sm text-stone-400">Loading...</p> : apps.length === 0 ? (
-            <p className="text-sm text-stone-400">No pending applications.</p>
-          ) : (
+
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">Portfolio by Purpose</div>
+              <div className="mt-3 space-y-3 text-sm">
+                {applicationBreakdown.length > 0 ? applicationBreakdown.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3">
+                    <span className="text-stone-700">{item.label}</span>
+                    <span className="font-semibold text-stone-900">{item.count}</span>
+                  </div>
+                )) : <div className="text-stone-500">No applications yet.</div>}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="text-sm text-stone-500">Application Status Mix</div>
+              <div className="mt-3 space-y-2 text-sm text-stone-600">
+                <div className="flex items-center justify-between"><span>Awaiting review</span><span>{metrics.pendingApplications}</span></div>
+                <div className="flex items-center justify-between"><span>Approved</span><span>{metrics.approvedApplications}</span></div>
+                <div className="flex items-center justify-between"><span>Rejected</span><span>{apps.filter((a) => a.status === "Rejected").length}</span></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.45fr]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-stone-900">Recent Applications</h3>
+              <Link className="text-sm text-emerald-600" to="/finance/applications">View All</Link>
+            </div>
+
             <div className="space-y-3">
-              {apps.map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-4 rounded-xl border border-stone-100 p-4">
+              {recentActivity.map((a) => (
+                <div key={a.id} className="flex items-center justify-between gap-4 border-b border-stone-100 py-3">
                   <div>
-                    <div className="font-semibold text-stone-900">{a.farmer?.fullName ?? "—"}</div>
-                    <div className="text-xs text-stone-500">RWF {a.amount?.toLocaleString()} • {a.purpose} • {a.farmer?.district ?? ""}</div>
+                    <div className="font-semibold text-stone-900">{a.farmer}</div>
+                    <div className="text-xs text-stone-500">
+                      {a.amount} • {a.purpose || a.crop} • {a.institution || "Assigned institution"}
+                    </div>
+                    {a.purposeDescription && <div className="mt-1 text-xs text-stone-400">{a.purposeDescription}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{a.status}</span>
-                    <button onClick={() => handleAction(a.id, "APPROVED")} disabled={actionLoading === a.id + "APPROVED"} className="rounded-full border border-emerald-200 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve</button>
-                    <button onClick={() => handleAction(a.id, "REJECTED")} disabled={actionLoading === a.id + "REJECTED"} className="rounded-full border border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">Reject</button>
+                    <div className="text-sm text-stone-500">{a.status}</div>
+                    {a.status !== "Approved" && a.status !== "Rejected" && a.status !== "Cancelled" && (
+                      <>
+                        <button onClick={() => void handleUpdateStatus(a.id, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-emerald-700">Approve</button>
+                        <button onClick={() => void handleUpdateStatus(a.id, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-rose-700">Reject</button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
+              {recentActivity.length === 0 && <div className="py-4 text-sm text-stone-500">No loan applications found for this institution yet.</div>}
             </div>
-          )}
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="text-sm text-stone-500">Notifications</div>
+            <div className="mt-3 space-y-2 text-sm text-stone-600">
+              <div>{metrics.pendingApplications} applications awaiting review</div>
+              <div>{metrics.approvedApplications} applications approved from farmer submissions</div>
+              <div>{metrics.completedLoans} completed loans in the active portfolio</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

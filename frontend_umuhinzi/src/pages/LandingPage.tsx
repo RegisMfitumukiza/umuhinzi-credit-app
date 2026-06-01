@@ -100,7 +100,7 @@ export const LandingPage = () => {
               <button onClick={() => navigate("/register")} className="rounded-lg bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(34,197,94,0.24)] transition hover:bg-emerald-600">
                 Apply for Loan
               </button>
-              <button onClick={() => navigate("/login")} className="rounded-lg border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-400">
+              <button onClick={() => navigate("/register")} className="rounded-lg border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-400">
                 Get Started
               </button>
             </div>

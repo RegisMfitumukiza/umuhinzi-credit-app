@@ -10,8 +10,8 @@ const roles = [
   },
   {
     key: "INSTITUTION",
-    label: "Institution",
-    desc: "Banks or MFIs looking to invest in local agricultural projects.",
+    label: "Finance Institution",
+    desc: "Banks and microfinance institutions looking to invest in local agricultural projects.",
     icon: "🏢",
   },
   {
@@ -30,13 +30,9 @@ const roles = [
 
 export const RegisterRolePage = () => {
   const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("FARMER");
 
   const handleNext = () => {
-    if (!selectedRole) {
-      return;
-    }
-
     localStorage.setItem("umuhinzi_registration", JSON.stringify({ role: selectedRole }));
     localStorage.setItem("umuhinzi_last_role", selectedRole);
     navigate("/register/personal");
@@ -58,10 +54,6 @@ export const RegisterRolePage = () => {
           <div className="flex flex-col items-center gap-2 opacity-60">
             <div className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 bg-white text-sm font-semibold text-stone-500">2</div>
             <span className="text-xs font-semibold text-stone-500">Personal Info</span>
-          </div>
-          <div className="flex flex-col items-center gap-2 opacity-60">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 bg-white text-sm font-semibold text-stone-500">3</div>
-            <span className="text-xs font-semibold text-stone-500">Farm Details</span>
           </div>
         </div>
 
@@ -96,8 +88,7 @@ export const RegisterRolePage = () => {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={!selectedRole}
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70 enabled:bg-emerald-500 enabled:hover:bg-emerald-600"
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
               >
                 Next Step <span aria-hidden>›</span>
               </button>
