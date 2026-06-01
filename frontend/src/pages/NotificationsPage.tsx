@@ -22,7 +22,7 @@ export const NotificationsPage = () => {
   useEffect(() => {
     api
       .get("/notifications?limit=50")
-      .then((r) => setNotifications(r.data.data.notifications ?? []))
+      .then((r) => setNotifications(r.data.data ?? []))
       .catch(() => showToast("Failed to load notifications.", "error"))
       .finally(() => setLoading(false));
   }, [showToast]);
@@ -75,7 +75,7 @@ export const NotificationsPage = () => {
             disabled={markingAll}
             className="text-sm text-brand-600 font-semibold hover:underline disabled:opacity-60"
           >
-            {markingAll ? "Markingâ€¦" : "Mark all as read"}
+            {markingAll ? "Marking…" : "Mark all as read"}
           </button>
         )}
       </div>
@@ -133,3 +133,6 @@ export const NotificationsPage = () => {
     </div>
   );
 };
+
+
+
