@@ -12,10 +12,9 @@ if (!connectionString) {
 const pool = new Pool({
   connectionString,
 
- /* ssl: { 
+  ssl: { 
     rejectUnauthorized: false 
   },
-  */
 
   max: Number(process.env.DB_POOL_MAX) || 5,
   idleTimeoutMillis: 30000,
