@@ -2,25 +2,15 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import axios from "axios";
 import { registerRequest } from "../api/auth";
-import { updateMyProfile } from "../api/users";
-import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { homeRouteByRole } from "../utils/auth";
 import type { BackendRole } from "../types/auth";
-
-const roleOptions: Array<{ value: BackendRole; label: string }> = [
-  { value: "FARMER", label: "Farmer" },
-  { value: "COOPERATIVE_MANAGER", label: "Cooperative Manager" },
-  { value: "INSTITUTION", label: "Finance Institution" },
-  { value: "GOVERNMENT_PARTNER", label: "Government Partner" },
-];
 
 export const RegisterPersonalPage = () => {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<BackendRole>(() => {
+  const [role] = useState<BackendRole>(() => {
     const prev = JSON.parse(localStorage.getItem("umuhinzi_registration") || "{}");
     return (prev.role as BackendRole) || "FARMER";
   });
@@ -31,7 +21,6 @@ export const RegisterPersonalPage = () => {
   const [village, setVillage] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, setUser } = useAuth();
   const { showToast } = useToast();
 
   const isValidEmail = (value: string) => /^(?:[^\s@]+)@(?:[^\s@]+)\.[^\s@]+$/.test(value);
@@ -90,7 +79,7 @@ export const RegisterPersonalPage = () => {
     setIsSubmitting(true);
 
     try {
-      const session = await registerRequest({
+      await registerRequest({
         fullName: next.fullName,
         email: next.email,
         phone: next.phone,
@@ -98,28 +87,10 @@ export const RegisterPersonalPage = () => {
         role: next.role,
       });
 
-      localStorage.setItem("umuhinzi_token", session.accessToken);
-      if (session.refreshToken) {
-        localStorage.setItem("umuhinzi_refresh_token", session.refreshToken);
-      }
-
-      login(session);
-
-      const updatedUser = await updateMyProfile({
-        fullName: next.fullName,
-        phone: next.phone,
-        province: next.province,
-        district: next.district,
-        sector: next.sector,
-        cell: next.cell || undefined,
-        village: next.village,
-      });
-
-      setUser(updatedUser);
-
       localStorage.removeItem("umuhinzi_registration");
-      showToast("Registration successful", "success");
-      navigate(homeRouteByRole(session.user.role), { replace: true });
+      localStorage.setItem("umuhinzi_verify_email", next.email);
+      showToast("Account created! Please check your email to verify.", "success");
+      navigate("/check-email", { state: { email: next.email } });
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? error.response?.data?.message || error.message
@@ -142,21 +113,6 @@ export const RegisterPersonalPage = () => {
         </div>
 
         <div className="mt-8 space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium text-stone-900">Role</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as BackendRole)}
-              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-            >
-              {roleOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Full name</span>
             <input

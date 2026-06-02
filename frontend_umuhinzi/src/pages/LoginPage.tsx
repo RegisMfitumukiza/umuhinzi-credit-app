@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -55,8 +56,16 @@ export const LoginPage = () => {
 
       showToast("Welcome back", "success");
       navigate(homeRouteByRole(session.user.role));
-    } catch {
-      showToast("Login failed. Check your credentials and account status.", "error");
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.message as string | undefined) ?? "Login failed."
+        : "Login failed.";
+
+      if (message.toLowerCase().includes("verify")) {
+        showToast("Please verify your email first. Check your inbox.", "error");
+      } else {
+        showToast(message, "error");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -97,7 +106,7 @@ export const LoginPage = () => {
               className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-emerald-400"
               placeholder="Enter your password"
             />
-            <button type="button" onClick={() => {}} className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-emerald-600">Forgot password?</button>
+            <button type="button" onClick={() => navigate("/forgot-password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-emerald-600">Forgot password?</button>
           </div>
         </label>
 
@@ -113,7 +122,7 @@ export const LoginPage = () => {
           disabled={isSubmitting}
           className="mt-6 w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-70 flex items-center justify-center gap-2"
         >
-          {isSubmitting ? "Signing in..." : "Login to Dashboard"} <span aria-hidden>→</span>
+          {isSubmitting ? "Signing in..." : "Login"} <span aria-hidden>→</span>
         </button>
 
         <div className="my-4 flex items-center">
