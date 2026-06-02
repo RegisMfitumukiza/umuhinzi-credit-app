@@ -44,6 +44,10 @@ import { FinanceApplicationDetailsPage } from "./pages/FinanceApplicationDetails
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
 import { RequireAuth, RedirectAuthenticated } from "./components/RouteGuards";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { CheckEmailPage } from "./pages/CheckEmailPage";
 
 export const App = () => {
   return (
@@ -53,6 +57,11 @@ export const App = () => {
       <Route element={<RedirectAuthenticated />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
+
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/check-email" element={<CheckEmailPage />} />
 
       <Route>
         <Route path="/register" element={<RegisterRolePage />} />

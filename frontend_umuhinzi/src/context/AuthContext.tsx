@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useNavigate } from "react-router-dom";
 import type { AuthSession, AuthUser } from "../types/auth";
 import { normalizeRole } from "../utils/auth";
-import { getCurrentAuthUser } from "../api/auth";
+import { getCurrentAuthUser, logoutRequest } from "../api/auth";
 
 type AuthState = {
   token: string | null;
@@ -28,9 +28,26 @@ const parseStoredUser = (): AuthUser | null => {
     }
 
     return {
-      ...parsed,
+      id: parsed.id,
+      fullName: parsed.fullName,
+      email: parsed.email,
+      phone: parsed.phone ?? null,
       role: normalizeRole(parsed.role),
-    } as AuthUser;
+      status: parsed.status ?? "ACTIVE",
+      isEmailVerified: parsed.isEmailVerified ?? false,
+      isPhoneVerified: parsed.isPhoneVerified ?? false,
+      province: parsed.province ?? null,
+      district: parsed.district ?? null,
+      sector: parsed.sector ?? null,
+      cell: parsed.cell ?? null,
+      village: parsed.village ?? null,
+      profileImageUrl: parsed.profileImageUrl ?? null,
+      profileImagePublicId: parsed.profileImagePublicId ?? null,
+      lastLoginAt: parsed.lastLoginAt ?? null,
+      passwordChangedAt: parsed.passwordChangedAt ?? null,
+      createdAt: parsed.createdAt ?? "",
+      updatedAt: parsed.updatedAt ?? "",
+    };
   } catch {
     return null;
   }
@@ -94,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    // clear token and user, then redirect to landing page
+    void logoutRequest().catch(() => {});
     setToken(null);
     setUserState(null);
     localStorage.removeItem("umuhinzi_refresh_token");
