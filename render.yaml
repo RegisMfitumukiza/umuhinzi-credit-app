@@ -3,7 +3,7 @@ services:
     name: umuhinzi-credit-api
     runtime: node
     rootDir: backend_umuhinzi
-    buildCommand: npm ci --include=dev && npm run build
+    buildCommand: npm ci --include=dev && npx prisma migrate deploy && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
