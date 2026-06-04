@@ -14,6 +14,9 @@ import {
   updateFarmerStatusService,
   updateFarmerCredibilityService,
   getFarmerStatsService,
+  getFarmerProfileCompletenessService,
+  joinCooperativeService,
+  leaveCooperativeService,
 } from "../services/farmer.service.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -207,6 +210,66 @@ export const getFarmerStats = asyncHandler(
       success: true,
       message: "Farmer statistics fetched successfully",
       data: stats,
+    });
+  }
+);
+
+/* ─── profile completeness ─── */
+
+export const getFarmerProfileCompleteness = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const completeness = await getFarmerProfileCompletenessService(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile completeness fetched successfully",
+      data: completeness,
+    });
+  }
+);
+
+/* ─── join cooperative ─── */
+
+export const joinCooperative = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const farmer = await joinCooperativeService(
+      req.user.id,
+      String(req.params.cooperativeId),
+      { actorId: req.user.id, ipAddress: req.ip, userAgent: req.headers["user-agent"] }
+    );
+
+    logger.info("Farmer requested cooperative membership", { userId: req.user.id });
+
+    res.status(200).json({
+      success: true,
+      message: "Cooperative membership request submitted successfully",
+      data: farmer,
+    });
+  }
+);
+
+/* ─── leave cooperative ─── */
+
+export const leaveCooperative = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const farmer = await leaveCooperativeService(req.user.id, {
+      actorId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    logger.info("Farmer left cooperative", { userId: req.user.id });
+
+    res.status(200).json({
+      success: true,
+      message: "You have left the cooperative successfully",
+      data: farmer,
     });
   }
 );

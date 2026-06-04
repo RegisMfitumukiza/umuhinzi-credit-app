@@ -9,6 +9,9 @@ import {
   updateFarmerStatus,
   updateFarmerCredibility,
   getFarmerStats,
+  getFarmerProfileCompleteness,
+  joinCooperative,
+  leaveCooperative,
 } from "../../controllers/farmer.controller.js";
 
 import {
@@ -128,6 +131,62 @@ router.patch(
   validate(updateFarmerSchema),
   updateMyFarmerProfile
 );
+
+/**
+ * @swagger
+ * /api/v1/farmers/me/completeness:
+ *   get:
+ *     summary: Get profile completeness
+ *     description: Returns a checklist showing which profile fields are filled and the overall completion percentage.
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile completeness fetched successfully
+ */
+router.get("/me/completeness", authenticate, requireFarmer, getFarmerProfileCompleteness);
+
+/**
+ * @swagger
+ * /api/v1/farmers/me/cooperative/{cooperativeId}:
+ *   post:
+ *     summary: Join a cooperative
+ *     description: Submits a membership request to join a cooperative. Request starts in PENDING status until approved by the cooperative manager.
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: cooperativeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Cooperative membership request submitted successfully
+ *       409:
+ *         description: Already a member or pending membership exists
+ */
+router.post("/me/cooperative/:cooperativeId", authenticate, requireFarmer, joinCooperative);
+
+/**
+ * @swagger
+ * /api/v1/farmers/me/cooperative:
+ *   delete:
+ *     summary: Leave current cooperative
+ *     description: Leaves the current cooperative membership. Sets membership status to LEFT.
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully left the cooperative
+ *       400:
+ *         description: No active or pending cooperative membership found
+ */
+router.delete("/me/cooperative", authenticate, requireFarmer, leaveCooperative);
 
 /**
  * @swagger

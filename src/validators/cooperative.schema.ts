@@ -6,6 +6,7 @@ import { registry } from "../docs/registry.js";
 export const cooperativeStatusSchema = z.enum([
     "PENDING",
     "ACTIVE",
+    "REJECTED",
     "SUSPENDED",
     "DEACTIVATED",
 ]);
@@ -47,8 +48,7 @@ export const createCooperativeSchema = z.object({
             .string()
             .trim()
             .min(3, "Registration number must be at least 3 characters")
-            .max(100, "Registration number must not exceed 100 characters")
-            .optional(),
+            .max(100, "Registration number must not exceed 100 characters"),
 
         description: z.string().trim().max(500).optional(),
 
@@ -97,8 +97,33 @@ export const updateCooperativeStatusSchema = z.object({
         id: uuidSchema("Invalid cooperative ID"),
     }),
 
-    body: z.object({
-        status: cooperativeStatusSchema,
+    body: z
+        .object({
+            status: cooperativeStatusSchema,
+            rejectionReason: z
+                .string()
+                .trim()
+                .min(10, "Rejection reason must be at least 10 characters")
+                .max(500)
+                .optional(),
+        })
+        .superRefine((val, ctx) => {
+            if (val.status === "REJECTED" && !val.rejectionReason) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "rejectionReason is required when rejecting a cooperative",
+                    path: ["rejectionReason"],
+                });
+            }
+        }),
+});
+
+export const discoverCooperativesQuerySchema = z.object({
+    query: z.object({
+        scope: z.enum(["district", "province", "national"]).optional(),
+        search: z.string().trim().max(100).optional(),
+        page: z.coerce.number().int().positive().optional(),
+        limit: z.coerce.number().int().positive().max(100).optional(),
     }),
 });
 
@@ -200,9 +225,5 @@ export type AddCooperativeMemberInput = z.infer<typeof addCooperativeMemberSchem
 
 export type UpdateCooperativeMemberInput = z.infer<typeof updateCooperativeMemberSchema>["body"];
 
-/*for now let us stop here, i will tell you when to continue. 
-so i have services and controller i want to start implementing the codes. 
-
-
-let me show an example of how i want it to be*/ 
+export type DiscoverCooperativesQuery = z.infer<typeof discoverCooperativesQuerySchema>["query"];
 

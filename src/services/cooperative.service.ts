@@ -32,6 +32,7 @@ const safeCooperativeSelect = {
   cell: true,
   village: true,
   status: true,
+  rejectionReason: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.CooperativeSelect;
@@ -39,6 +40,34 @@ const safeCooperativeSelect = {
 const cooperativeWithCountsSelect = {
   ...safeCooperativeSelect,
   _count: { select: { members: true, managers: true } },
+} satisfies Prisma.CooperativeSelect;
+
+const cooperativeDiscoverySelect = {
+  id: true,
+  name: true,
+  description: true,
+  district: true,
+  province: true,
+  sector: true,
+  phone: true,
+  email: true,
+  status: true,
+  createdAt: true,
+  _count: { select: { members: true } },
+} satisfies Prisma.CooperativeSelect;
+
+const pendingCooperativeSelect = {
+  ...safeCooperativeSelect,
+  _count: { select: { members: true, managers: true } },
+  managers: {
+    take: 1,
+    select: {
+      position: true,
+      user: {
+        select: { id: true, fullName: true, email: true, phone: true },
+      },
+    },
+  },
 } satisfies Prisma.CooperativeSelect;
 
 const safeMemberSelect = {
@@ -93,15 +122,10 @@ const assertCooperativeCanAcceptMembers = async (cooperativeId: string) => {
 };
 
 const assertCooperativeActivationReady = (cooperative: {
-  registrationNumber: string | null;
   district: string | null;
   phone: string | null;
   email: string | null;
 }) => {
-  if (!cooperative.registrationNumber) {
-    throw new APIError("Registration number is required before cooperative activation.", 400);
-  }
-
   if (!cooperative.district) {
     throw new APIError("District is required before cooperative activation.", 400);
   }
@@ -132,13 +156,11 @@ export const createCooperativeService = async (
     throw new APIError("This account already manages a cooperative.", 409);
   }
 
-  if (input.registrationNumber) {
-    const dup = await prisma.cooperative.findUnique({
-      where: { registrationNumber: input.registrationNumber },
-      select: { id: true },
-    });
-    if (dup) throw new APIError("Registration number already in use.", 409);
-  }
+  const dup = await prisma.cooperative.findUnique({
+    where: { registrationNumber: input.registrationNumber },
+    select: { id: true },
+  });
+  if (dup) throw new APIError("Registration number already in use.", 409);
 
   const cooperative = await prisma.$transaction(async (tx) => {
     const created = await tx.cooperative.create({
@@ -251,16 +273,21 @@ export const updateCooperativeService = async (
     if (dup) throw new APIError("Registration number already in use.", 409);
   }
 
+  // REJECTED → PENDING on any manager edit (manager fixing issues after rejection)
+  // ACTIVE → PENDING only when identity fields (name/registrationNumber) change
   const shouldReturnToPending =
     userRole === "COOPERATIVE_MANAGER" &&
-    cooperative.status === "ACTIVE" &&
-    cooperativeIdentityChanged(input);
+    (cooperative.status === "REJECTED" ||
+      (cooperative.status === "ACTIVE" && cooperativeIdentityChanged(input)));
 
   const updated = await prisma.cooperative.update({
     where: { id: cooperativeId },
     data: {
       ...input,
-      ...(shouldReturnToPending && { status: "PENDING" as const }),
+      ...(shouldReturnToPending && {
+        status: "PENDING" as const,
+        rejectionReason: null,
+      }),
     },
     select: cooperativeWithCountsSelect,
   });
@@ -618,7 +645,7 @@ export const removeCooperativeMemberService = async (
 export const updateCooperativeStatusService = async (
   cooperativeId: string,
   userId: string,
-  status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED",
+  input: { status: "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED" | "DEACTIVATED"; rejectionReason?: string },
   context: RequestContext = {}
 ) => {
   const cooperative = await prisma.cooperative.findUnique({
@@ -626,13 +653,14 @@ export const updateCooperativeStatusService = async (
     select: {
       id: true,
       status: true,
-      registrationNumber: true,
       district: true,
       phone: true,
       email: true,
     },
   });
   if (!cooperative) throw new APIError("Cooperative not found.", 404);
+
+  const { status, rejectionReason } = input;
 
   if (status === "ACTIVE") {
     assertCooperativeActivationReady(cooperative);
@@ -641,7 +669,11 @@ export const updateCooperativeStatusService = async (
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.cooperative.update({
       where: { id: cooperativeId },
-      data: { status },
+      data: {
+        status,
+        ...(status === "REJECTED" && { rejectionReason }),
+        ...(status === "ACTIVE" && { rejectionReason: null }),
+      },
       select: safeCooperativeSelect,
     });
 
@@ -665,10 +697,122 @@ export const updateCooperativeStatusService = async (
     resource: "COOPERATIVE",
     resourceId: cooperativeId,
     description: `Cooperative status changed to ${status}`,
-    metadata: { previousStatus: cooperative.status, newStatus: status },
+    metadata: {
+      previousStatus: cooperative.status,
+      newStatus: status,
+      ...(rejectionReason && { rejectionReason }),
+    },
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
 
   return updated;
+};
+
+/* ─────────────────────────────────────────
+   DISCOVER COOPERATIVES (FARMER)
+───────────────────────────────────────── */
+
+export const discoverCooperativesService = async (
+  userId: string,
+  options: {
+    scope?: "district" | "province" | "national";
+    skip?: number;
+    limit?: number;
+    search?: string;
+  } = {}
+) => {
+  const { scope = "district", skip = 0, limit = 10, search } = options;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { district: true, province: true },
+  });
+  if (!user) throw new APIError("User not found", 404);
+
+  let locationFilter: Prisma.CooperativeWhereInput = {};
+
+  if (scope === "district") {
+    if (!user.district) {
+      throw new APIError(
+        "Your district is not set on your profile. Update your profile or use scope=national to browse all cooperatives.",
+        400
+      );
+    }
+    locationFilter = { district: { equals: user.district, mode: "insensitive" } };
+  } else if (scope === "province") {
+    if (!user.province) {
+      throw new APIError(
+        "Your province is not set on your profile. Update your profile or use scope=national to browse all cooperatives.",
+        400
+      );
+    }
+    locationFilter = { province: { equals: user.province, mode: "insensitive" } };
+  }
+
+  const where: Prisma.CooperativeWhereInput = {
+    status: "ACTIVE",
+    ...locationFilter,
+    ...(search && { name: { contains: search, mode: "insensitive" } }),
+  };
+
+  const [cooperatives, total] = await Promise.all([
+    prisma.cooperative.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { name: "asc" },
+      select: cooperativeDiscoverySelect,
+    }),
+    prisma.cooperative.count({ where }),
+  ]);
+
+  return {
+    cooperatives,
+    scope,
+    userLocation: { district: user.district, province: user.province },
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
+};
+
+/* ─────────────────────────────────────────
+   PENDING COOPERATIVES QUEUE (ADMIN)
+───────────────────────────────────────── */
+
+export const getPendingCooperativesService = async (
+  options: { skip?: number; limit?: number } = {}
+) => {
+  const { skip = 0, limit = 10 } = options;
+
+  const [cooperatives, total] = await Promise.all([
+    prisma.cooperative.findMany({
+      where: { status: "PENDING" },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "asc" },
+      select: pendingCooperativeSelect,
+    }),
+    prisma.cooperative.count({ where: { status: "PENDING" } }),
+  ]);
+
+  return {
+    cooperatives,
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
 };

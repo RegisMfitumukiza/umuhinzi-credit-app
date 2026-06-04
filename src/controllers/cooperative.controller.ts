@@ -15,6 +15,8 @@ import {
   updateCooperativeMemberService,
   removeCooperativeMemberService,
   updateCooperativeStatusService,
+  discoverCooperativesService,
+  getPendingCooperativesService,
 } from "../services/cooperative.service.js";
 
 const getContext = (req: Request) => ({
@@ -103,12 +105,10 @@ export const deleteCooperative = asyncHandler(async (req: Request, res: Response
 export const updateCooperativeStatus = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new APIError("User not authenticated", 401);
 
-  const { status } = req.body as { status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED" };
-
   const cooperative = await updateCooperativeStatusService(
     String(req.params.id),
     req.user.id,
-    status,
+    req.body,
     getContext(req)
   );
 
@@ -116,6 +116,41 @@ export const updateCooperativeStatus = asyncHandler(async (req: Request, res: Re
     success: true,
     message: "Cooperative status updated successfully",
     data: cooperative,
+  });
+});
+
+export const discoverCooperatives = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const scope = req.query.scope as "district" | "province" | "national" | undefined;
+  const search = req.query.search ? String(req.query.search) : undefined;
+  const page = req.query.page ? Number(req.query.page) : 1;
+  const limit = req.query.limit ? Number(req.query.limit) : 10;
+  const skip = (page - 1) * limit;
+
+  const result = await discoverCooperativesService(req.user.id, { scope, skip, limit, search });
+
+  res.status(200).json({
+    success: true,
+    message: "Cooperatives fetched successfully",
+    data: result.cooperatives,
+    meta: { scope: result.scope, userLocation: result.userLocation },
+    pagination: { page, ...result.pagination },
+  });
+});
+
+export const getPendingCooperatives = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
+
+  const result = await getPendingCooperativesService({ skip, limit });
+
+  res.status(200).json({
+    success: true,
+    message: "Pending cooperatives fetched successfully",
+    data: result.cooperatives,
+    pagination: { page, ...result.pagination },
   });
 });
 

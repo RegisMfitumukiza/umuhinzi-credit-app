@@ -42,11 +42,39 @@ export const farmerWithUserSelect = {
       profileImageUrl: true,
     },
   },
+  cooperativeMembership: {
+    select: {
+      id: true,
+      status: true,
+      joinedAt: true,
+      cooperative: {
+        select: {
+          id: true,
+          name: true,
+          district: true,
+          status: true,
+        },
+      },
+    },
+  },
+  creditScores: {
+    take: 1,
+    orderBy: { generatedAt: "desc" as const },
+    select: {
+      id: true,
+      score: true,
+      riskLevel: true,
+      summary: true,
+      generatedAt: true,
+    },
+  },
   _count: {
     select: {
       farms: true,
       livestock: true,
       loanApplications: true,
+      loans: true,
+      creditScores: true,
     },
   },
 } satisfies Prisma.FarmerSelect;

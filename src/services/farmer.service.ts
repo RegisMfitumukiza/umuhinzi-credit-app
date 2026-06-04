@@ -312,6 +312,8 @@ export const updateFarmerStatusService = async (
       status: true,
       nationalId: true,
       dateOfBirth: true,
+      gender: true,
+      primaryCrop: true,
     },
   });
 
@@ -319,8 +321,21 @@ export const updateFarmerStatusService = async (
     throw new APIError("Farmer not found", 404);
   }
 
-  if (input.status === "VERIFIED" && !existing.dateOfBirth) {
-    throw new APIError("Farmer date of birth is required before verification.", 400);
+  if (input.status === "VERIFIED") {
+    const missing: string[] = [];
+    if (!existing.dateOfBirth) missing.push("date of birth");
+    if (!existing.gender) missing.push("gender");
+    if (!existing.primaryCrop) missing.push("primary crop");
+
+    const farmCount = await prisma.farm.count({ where: { farmerId } });
+    if (farmCount === 0) missing.push("at least one registered farm");
+
+    if (missing.length > 0) {
+      throw new APIError(
+        `Cannot verify farmer. Missing required information: ${missing.join(", ")}.`,
+        400
+      );
+    }
   }
 
   const updated = await prisma.farmer.update({
@@ -404,4 +419,141 @@ export const getFarmerStatsService = async () => {
     byStatus: { pending, verified, suspended },
     byCredibility: { low, medium, high, trusted },
   };
+};
+
+/* ─── profile completeness ─── */
+
+export const getFarmerProfileCompletenessService = async (userId: string) => {
+  const farmer = await prisma.farmer.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      dateOfBirth: true,
+      gender: true,
+      farmingExperienceYears: true,
+      primaryCrop: true,
+      user: {
+        select: {
+          phone: true,
+          province: true,
+          district: true,
+          profileImageUrl: true,
+        },
+      },
+    },
+  });
+
+  if (!farmer) throw new APIError("Farmer profile not found", 404);
+
+  const [farmCount, cropCount] = await Promise.all([
+    prisma.farm.count({ where: { farmerId: farmer.id } }),
+    prisma.crop.count({ where: { farm: { farmerId: farmer.id } } }),
+  ]);
+
+  const checks = [
+    { key: "dateOfBirth",            label: "Date of birth",          done: !!farmer.dateOfBirth },
+    { key: "gender",                 label: "Gender",                 done: !!farmer.gender },
+    { key: "farmingExperienceYears", label: "Farming experience",     done: (farmer.farmingExperienceYears ?? 0) > 0 },
+    { key: "primaryCrop",            label: "Primary crop",           done: !!farmer.primaryCrop },
+    { key: "phone",                  label: "Phone number",           done: !!farmer.user.phone },
+    { key: "province",               label: "Province",               done: !!farmer.user.province },
+    { key: "district",               label: "District",               done: !!farmer.user.district },
+    { key: "profileImage",           label: "Profile photo",          done: !!farmer.user.profileImageUrl },
+    { key: "farm",                   label: "At least one farm",      done: farmCount > 0 },
+    { key: "crop",                   label: "At least one crop",      done: cropCount > 0 },
+  ];
+
+  const completedCount = checks.filter((c) => c.done).length;
+  const percentage = Math.round((completedCount / checks.length) * 100);
+  const missing = checks.filter((c) => !c.done).map((c) => c.label);
+
+  return {
+    percentage,
+    completedCount,
+    totalChecks: checks.length,
+    isReadyForVerification: missing.filter((l) =>
+      ["Date of birth", "Gender", "Primary crop", "At least one farm"].includes(l)
+    ).length === 0,
+    items: checks,
+    missing,
+  };
+};
+
+/* ─── join cooperative (farmer) ─── */
+
+export const joinCooperativeService = async (
+  userId: string,
+  cooperativeId: string,
+  context: RequestContext = {}
+) => {
+  const farmerId = await resolvefarmerIdFromUser(userId);
+
+  await prisma.$transaction(async (tx) => {
+    await requestCooperativeMembership(farmerId, cooperativeId, tx);
+  });
+
+  await writeAuditLog({
+    actorId: context.actorId ?? userId,
+    action: "UPDATE",
+    resource: "FARMER",
+    resourceId: farmerId,
+    description: "Farmer requested cooperative membership",
+    metadata: { cooperativeId },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: farmerId },
+    select: farmerWithUserSelect,
+  });
+
+  return farmer;
+};
+
+/* ─── leave cooperative (farmer) ─── */
+
+export const leaveCooperativeService = async (
+  userId: string,
+  context: RequestContext = {}
+) => {
+  const farmerId = await resolvefarmerIdFromUser(userId);
+
+  const membership = await prisma.cooperativeMember.findUnique({
+    where: { farmerId },
+    select: { id: true, status: true, cooperativeId: true },
+  });
+
+  if (!membership || !["ACTIVE", "PENDING"].includes(membership.status)) {
+    throw new APIError("No active or pending cooperative membership found.", 400);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.cooperativeMember.update({
+      where: { id: membership.id },
+      data: { status: "LEFT", leftAt: new Date() },
+    });
+    await tx.farmer.update({
+      where: { id: farmerId },
+      data: { cooperativeId: null },
+    });
+  });
+
+  await writeAuditLog({
+    actorId: context.actorId ?? userId,
+    action: "UPDATE",
+    resource: "FARMER",
+    resourceId: farmerId,
+    description: "Farmer left cooperative",
+    metadata: { cooperativeId: membership.cooperativeId },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: farmerId },
+    select: farmerWithUserSelect,
+  });
+
+  return farmer;
 };

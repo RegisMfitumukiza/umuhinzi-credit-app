@@ -7,6 +7,8 @@ import {
   updateCooperative,
   deleteCooperative,
   updateCooperativeStatus,
+  discoverCooperatives,
+  getPendingCooperatives,
   addCooperativeMember,
   getCooperativeMembers,
   updateCooperativeMember,
@@ -26,6 +28,7 @@ import {
   createCooperativeSchema,
   updateCooperativeSchema,
   updateCooperativeStatusSchema,
+  discoverCooperativesQuerySchema,
   cooperativeIdParamSchema,
   addCooperativeMemberSchema,
   updateCooperativeMemberSchema,
@@ -114,6 +117,76 @@ cooperativeRouter.post(
  *         description: Cooperatives fetched successfully
  */
 cooperativeRouter.get("/", authenticate, getCooperatives);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/discover:
+ *   get:
+ *     summary: Discover cooperatives (Farmer)
+ *     description: Returns active cooperatives filtered by the farmer's location. Default scope is district. Use scope=province or scope=national to expand.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: scope
+ *         schema:
+ *           type: string
+ *           enum: [district, province, national]
+ *           default: district
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Cooperatives fetched successfully
+ *       400:
+ *         description: Location not set on profile
+ */
+cooperativeRouter.get(
+  "/discover",
+  authenticate,
+  validate(discoverCooperativesQuerySchema),
+  discoverCooperatives
+);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/pending:
+ *   get:
+ *     summary: Get pending cooperatives (Admin)
+ *     description: Returns all cooperatives awaiting admin review, ordered oldest first. Includes the cooperative manager's contact details.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Pending cooperatives fetched successfully
+ */
+cooperativeRouter.get(
+  "/pending",
+  authenticate,
+  requireAdmin,
+  getPendingCooperatives
+);
 
 /**
  * @swagger
@@ -231,7 +304,10 @@ cooperativeRouter.delete(
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [PENDING, ACTIVE, SUSPENDED, DEACTIVATED]
+ *                 enum: [PENDING, ACTIVE, REJECTED, SUSPENDED, DEACTIVATED]
+ *               rejectionReason:
+ *                 type: string
+ *                 description: Required when status is REJECTED
  *     responses:
  *       200:
  *         description: Cooperative status updated successfully

@@ -403,6 +403,13 @@ function getRiskLevel(score: number): RiskLevel {
   return "VERY_HIGH";
 }
 
+function resolveCredibilityFromScore(score: number) {
+  if (score >= 75) return "TRUSTED";
+  if (score >= 50) return "HIGH";
+  if (score >= 30) return "MEDIUM";
+  return "LOW";
+}
+
 function buildRiskReason(
   factorResults: Record<CreditScoreFactorType, { score: number; description: string }>
 ): string {
@@ -602,13 +609,20 @@ export const generateCreditScoreService = async (
     return score;
   });
 
+  // Auto-update farmer credibility status based on the new score
+  const newCredibility = resolveCredibilityFromScore(totalScore);
+  await prisma.farmer.update({
+    where: { id: farmerId },
+    data: { credibilityStatus: newCredibility },
+  });
+
   await writeAuditLog({
     actorId: context.actorId,
     action: "CREATE",
     resource: "CREDIT_SCORE",
     resourceId: creditScore.id,
-    description: `Credit score generated: ${totalScore}/100 (${riskLevel})`,
-    metadata: { farmerId, score: totalScore, riskLevel },
+    description: `Credit score generated: ${totalScore}/100 (${riskLevel}) — credibility set to ${newCredibility}`,
+    metadata: { farmerId, score: totalScore, riskLevel, credibilityStatus: newCredibility },
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
