@@ -1,0 +1,51 @@
+model Farmer {
+  id                     String               @id @default(uuid())
+  userId                 String               @unique
+  nationalId             String               @unique
+  dateOfBirth            DateTime?
+  gender                 Gender?
+  farmingExperienceYears Int?                 @default(0)
+  primaryCrop            String?
+  credibilityStatus      CredibilityStatus    @default(LOW)
+  status                 FarmerStatus         @default(PENDING)
+  cooperativeId          String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  cooperativeMembership  CooperativeMember?
+  creditScores           CreditScore[]
+  farms                  Farm[]
+  farmExpenses           FarmExpense[]
+  cooperative            Cooperative?         @relation(fields: [cooperativeId], references: [id])
+  user                   User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  financialSummaries     FinancialSummary[]
+  livestock              Livestock[]
+  loans                  Loan[]
+  loanApplications       LoanApplication[]
+  productivityRecords    ProductivityRecord[]
+  recommendations        Recommendation[]
+  riskAssessments        RiskAssessment[]
+
+  @@index([cooperativeId])
+  @@index([credibilityStatus])
+  @@index([status])
+  @@index([primaryCrop])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum FarmerStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
+enum CredibilityStatus {
+  LOW
+  MEDIUM
+  HIGH
+  TRUSTED
+}
