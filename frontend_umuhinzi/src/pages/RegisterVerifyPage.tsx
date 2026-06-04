@@ -78,7 +78,7 @@ export const RegisterVerifyPage = () => {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xl">📱</div>
           <h2 className="mt-4 text-xl font-semibold text-stone-900">Verify Your Identity</h2>
           <p className="mt-2 text-sm text-stone-600 text-center">We've sent a 6-digit verification code to</p>
-          <p className="mt-1 font-medium text-stone-900">{maskPhone(reg?.phone)}</p>
+          <p className="mt-1 font-medium text-stone-900">{maskPhone(typeof reg?.phone === 'string' ? reg.phone : undefined)}</p>
         </div>
 
         <div className="mt-6 flex justify-center">

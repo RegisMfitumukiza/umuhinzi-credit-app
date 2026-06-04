@@ -1,10 +1,16 @@
 import type { Request, Response } from "express";
 import { Role, UserStatus, type Prisma } from "../generated/prisma/client.js";
+import bcrypt from "bcryptjs";
 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { APIError } from "../utils/ApiError.js";
 import { logger } from "../utils/logger.js";
 import { getPagination } from "../utils/pagination.js";
+import { prisma } from "../lib/prisma.js";
+import { sendEmail } from "../services/email.service.js";
+import { provisionedAccountTemplate } from "../templates/auth-email.template.js";
+import { safeUserSelect } from "../utils/selects/user.select.js";
+import { writeAuditLog } from "../utils/audit.helper.js";
 
 import {
   deleteUserService,
@@ -260,5 +266,78 @@ export const getUserStats = asyncHandler(async (_req: Request, res: Response) =>
     success: true,
     message: "User statistics fetched successfully",
     data: stats,
+  });
+});
+
+/* ─────────────────────────────────────────
+   PROVISION ACCOUNT (Admin creates INSTITUTION or GOVERNMENT_PARTNER)
+   POST /api/v1/users/provision
+───────────────────────────────────────── */
+export const provisionAccount = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("Not authenticated", 401);
+
+  const { fullName, email, password, phone, role } = req.body as {
+    fullName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    role: "INSTITUTION" | "GOVERNMENT_PARTNER";
+  };
+
+  if (!fullName || !email || !password || !role) {
+    throw new APIError("fullName, email, password, and role are required", 400);
+  }
+
+  if (!["INSTITUTION", "GOVERNMENT_PARTNER"].includes(role)) {
+    throw new APIError("Role must be INSTITUTION or GOVERNMENT_PARTNER", 400);
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (existing) throw new APIError("An account with this email already exists", 409);
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  const user = await prisma.user.create({
+    data: {
+      fullName,
+      email,
+      ...(phone ? { phone } : {}),
+      password: hashedPassword,
+      role,
+      status: "ACTIVE",
+      isEmailVerified: true,
+      isPhoneVerified: false,
+    },
+    select: safeUserSelect,
+  });
+
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const loginUrl = role === "INSTITUTION"
+    ? `${frontendUrl}/login`
+    : `${frontendUrl}/login`;
+
+  await sendEmail({
+    to: email,
+    subject: `Your Umuhinzi Credit ${role === "INSTITUTION" ? "Institution" : "Government"} Account`,
+    html: provisionedAccountTemplate({ fullName, email, temporaryPassword: password, role, loginUrl }),
+  });
+
+  await writeAuditLog({
+    actorId: req.user.id,
+    action: "CREATE",
+    resource: "USER",
+    resourceId: user.id,
+    description: `Admin provisioned ${role} account for ${email}`,
+    metadata: { role, email },
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
+  logger.info("Account provisioned", { provisionedBy: req.user.id, email, role });
+
+  res.status(201).json({
+    success: true,
+    message: `Account created and credentials sent to ${email}`,
+    data: user,
   });
 });

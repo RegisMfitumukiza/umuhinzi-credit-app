@@ -16,6 +16,7 @@ export type CooperativeMemberApi = {
     user?: {
       fullName?: string;
       email?: string;
+
     };
   };
 };

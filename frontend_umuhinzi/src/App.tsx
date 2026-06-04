@@ -22,6 +22,8 @@ import { CooperativeApplicationsPage } from "./pages/CooperativeApplicationsPage
 import { CooperativeReportsPage } from "./pages/CooperativeReportsPage";
 import { CooperativeApplicationDetailsPage } from "./pages/CooperativeApplicationDetailsPage";
 import { CooperativeMemberManagementPage } from "./pages/CooperativeMemberManagementPage";
+import { CooperativeHarvestVerificationPage } from "./pages/CooperativeHarvestVerificationPage";
+import { CooperativeAnalyticsPage } from "./pages/CooperativeAnalyticsPage";
 import { InstitutionsPage } from "./pages/InstitutionsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { InputCostsPage } from "./pages/InputCostsPage";
@@ -36,12 +38,15 @@ import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminProfilePage } from "./pages/AdminProfilePage";
 import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
 import { AdminInstitutionsPage } from "./pages/AdminInstitutionsPage";
+import { AdminAuditPage } from "./pages/AdminAuditPage";
+import { AdminGovernmentAccountsPage } from "./pages/AdminGovernmentAccountsPage";
 import { FinanceLayout } from "./layout/FinanceLayout";
 import { FinanceDashboardPage } from "./pages/FinanceDashboardPage";
 import { FinanceApplicationsPage } from "./pages/FinanceApplicationsPage";
 import { FinanceApplicationDetailsPage } from "./pages/FinanceApplicationDetailsPage";
 import { GovernmentLayout } from "./layout/GovernmentLayout";
 import { GovernmentDashboardPage } from "./pages/GovernmentDashboardPage";
+import { GovernmentReportsPage } from "./pages/GovernmentReportsPage";
 import { RequireAuth, RedirectAuthenticated } from "./components/RouteGuards";
 
 export const App = () => {
@@ -68,6 +73,8 @@ export const App = () => {
           <Route path="/admin/institutions" element={<AdminInstitutionsPage />} />
           <Route path="/admin/seasons" element={<AdminSeasonsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/government" element={<AdminGovernmentAccountsPage />} />
+          <Route path="/admin/audit" element={<AdminAuditPage />} />
           <Route path="/admin/profile" element={<AdminProfilePage />} />
         </Route>
       </Route>
@@ -87,8 +94,8 @@ export const App = () => {
         <Route element={<GovernmentLayout />}>
           <Route path="/government" element={<GovernmentDashboardPage />} />
           <Route path="/government/regions" element={<GovernmentDashboardPage />} />
-          <Route path="/government/reports" element={<GovernmentDashboardPage />} />
-          <Route path="/government/profile" element={<GovernmentDashboardPage />} />
+          <Route path="/government/reports" element={<GovernmentReportsPage />} />
+          <Route path="/government/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
@@ -121,16 +128,13 @@ export const App = () => {
         <Route element={<CooperativeLayout />}>
           <Route path="/cooperatives" element={<CooperativesPage />} />
           <Route path="/cooperatives/profile" element={<ProfilePage />} />
+          <Route path="/cooperatives/harvest-verification" element={<CooperativeHarvestVerificationPage />} />
+          <Route path="/cooperatives/analytics" element={<CooperativeAnalyticsPage />} />
           <Route path="/cooperatives/applications" element={<CooperativeApplicationsPage />} />
           <Route path="/cooperatives/applications/:id" element={<CooperativeApplicationDetailsPage />} />
-          <Route path="/cooperatives/groups" element={<CooperativesPage />} />
-          <Route path="/cooperatives/regional-map" element={<CooperativesPage />} />
           <Route path="/cooperatives/reports" element={<CooperativeReportsPage />} />
           <Route path="/cooperatives/member-list" element={<CooperativeMemberManagementPage />} />
           <Route path="/cooperatives/members" element={<CooperativeMemberManagementPage />} />
-          <Route path="/cooperatives/loan-status" element={<CooperativesPage />} />
-          <Route path="/cooperatives/productivity" element={<CooperativesPage />} />
-          <Route path="/cooperatives/settings" element={<CooperativesPage />} />
         </Route>
       </Route>
 

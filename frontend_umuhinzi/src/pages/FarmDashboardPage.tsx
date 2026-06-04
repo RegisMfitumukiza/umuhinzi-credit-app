@@ -100,7 +100,7 @@ export const FarmDashboardPage = () => {
   };
 
   const displayName = profile?.fullName || authUser?.fullName || "Farmer";
-  const location = [profile?.district || authUser?.district, profile?.province || authUser?.province].filter(Boolean).join(", ") || "Your registered location";
+  const location = [profile?.district, profile?.province].filter(Boolean).join(", ") || "Your registered location";
   const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
   const pendingReminders = schedules.filter((schedule) => ["UPCOMING", "SCHEDULED", "DUE"].includes(String(schedule.status || "").toUpperCase()));
   const activeCropCount = crops.length;
@@ -140,7 +140,7 @@ export const FarmDashboardPage = () => {
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-stone-500">
                 <span>{location}</span>
-                <span>{profile?.sector || authUser?.sector || "Registered farmer"}</span>
+                <span>{profile?.sector || "Registered farmer"}</span>
                 <span className="font-medium text-brand-600">Credit Score: {hasCreditScore ? scoreValue : "Generating your score..."}</span>
               </div>
               <p className="mt-2 max-w-2xl text-sm text-stone-500">{scoreSummary}</p>

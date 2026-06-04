@@ -104,8 +104,9 @@ const toUiModel = (row: LoanApplicationRaw): LoanApplicationUi => {
   };
 };
 
-export const getLoanApplications = async (): Promise<LoanApplicationUi[]> => {
-  const response = await api.get<ApiResponse<LoanApplicationRaw[]>>("/loan-applications");
+export const getLoanApplications = async (institutionId?: string): Promise<LoanApplicationUi[]> => {
+  const qs = institutionId ? `?institutionId=${institutionId}` : "";
+  const response = await api.get<ApiResponse<LoanApplicationRaw[]>>(`/loan-applications${qs}`);
   return (response.data.data || []).map(toUiModel);
 };
 

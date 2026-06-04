@@ -1,264 +1,357 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  getLoanApplications,
-  type LoanApplicationUi,
-  updateLoanApplicationStatus,
-} from "../api/loanApplications";
+import { getLoanApplications, updateLoanApplicationStatus, type LoanApplicationUi } from "../api/loanApplications";
 import { institutionApi, type InstitutionProfile } from "../api/institutions";
-import { farmerApi, type FarmerLoan } from "../api/farmer";
+import { farmerApi } from "../api/farmer";
 import { useToast } from "../context/ToastContext";
 
-const exportApplicationsCSV = (apps: LoanApplicationUi[]) => {
-  const header = ["id", "farmer", "institution", "purpose", "amount", "score", "date", "status"];
-  const rows = apps.map((a) => [a.id, a.farmer, a.institution || "", a.purpose || a.crop, a.amount, a.scoreValue, a.date, a.status]);
-  return [header, ...rows]
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
-};
+const parseMoney = (v?: string | number | null) =>
+  typeof v === "number" ? v : Number(String(v ?? "0").replace(/[^0-9.-]/g, "")) || 0;
 
-const parseMoney = (value?: string | number | null) => {
-  if (typeof value === "number") return value;
-  if (!value) return 0;
-  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
-};
-
-const metricsFromData = (apps: LoanApplicationUi[], loans: FarmerLoan[]) => {
-  const totalApplications = apps.length;
-  const pendingApplications = apps.filter((a) => a.status === "Pending" || a.status === "Under Review").length;
-  const approvedApplications = apps.filter((a) => a.status === "Approved").length;
-  const uniqueFarmers = new Set(apps.map((a) => a.farmerId || a.farmer)).size;
-  const activeLoans = loans.filter((loan) => ["ACTIVE", "DISBURSED", "APPROVED"].includes(String(loan.status || "").toUpperCase()));
-  const defaultedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "DEFAULTED").length;
-  const completedLoans = loans.filter((loan) => String(loan.status || "").toUpperCase() === "COMPLETED").length;
-  const portfolioValue = activeLoans.reduce((sum, loan) => sum + parseMoney(loan.approvedAmount ?? loan.requestedAmount ?? 0), 0);
-  const totalLoans = loans.length || 1;
-  return {
-    totalApplications,
-    pendingApplications,
-    approvedApplications,
-    uniqueFarmers,
-    activeLoans: activeLoans.length,
-    completedLoans,
-    nplRatio: `${((defaultedLoans / totalLoans) * 100).toFixed(1)}%`,
-    recoveryRate: `${((completedLoans / totalLoans) * 100).toFixed(1)}%`,
-    portfolioValue: `RWF ${portfolioValue.toLocaleString()}`,
-  };
+type DisburseForm = {
+  appId: string;
+  loanId: string;
+  farmerName: string;
+  requestedAmount: number;
+  disbursedAmount: string;
+  startDate: string;
+  durationMonths: string;
+  interestRate: string;
 };
 
 export const FinanceDashboardPage = () => {
+  const { showToast } = useToast();
   const [apps, setApps] = useState<LoanApplicationUi[]>([]);
-  const [loans, setLoans] = useState<FarmerLoan[]>([]);
   const [institution, setInstitution] = useState<InstitutionProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { showToast } = useToast();
+  const [disburseForm, setDisburseForm] = useState<DisburseForm | null>(null);
+  const [disbursing, setDisbursing] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     void (async () => {
       try {
-        const [loadedApplications, loadedLoans] = await Promise.all([
+        const [loadedApps, inst] = await Promise.all([
           getLoanApplications(),
-          farmerApi.getLoans().catch(() => [] as FarmerLoan[]),
+          institutionApi.getMyInstitution().catch(() => null),
         ]);
-        const currentInstitution = await institutionApi.getMyInstitution().catch(() => null);
-        setApps(loadedApplications);
-        setLoans(loadedLoans);
-        setInstitution(currentInstitution);
-      } catch {
-        showToast("Unable to load applications", "error");
+        setInstitution(inst);
+        // Only show applications sent to THIS institution
+        const filtered = inst?.id
+          ? loadedApps.filter((a) => a.institutionId === inst.id)
+          : loadedApps;
+        setApps(filtered);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Unable to load dashboard", "error");
       } finally {
         setIsLoading(false);
       }
     })();
   }, []);
 
-  const metrics = useMemo(() => metricsFromData(apps, loans), [apps, loans]);
+  const metrics = useMemo(() => {
+    const pending = apps.filter((a) => a.status === "Pending" || a.status === "Under Review").length;
+    const approved = apps.filter((a) => a.status === "Approved").length;
+    const rejected = apps.filter((a) => a.status === "Rejected").length;
+    const totalVolume = apps.reduce((s, a) => s + parseMoney(a.requestedAmount ?? a.amount), 0);
+    return { pending, approved, rejected, total: apps.length, totalVolume };
+  }, [apps]);
 
-  const institutionApps = useMemo(() => {
-    if (!institution?.id) {
-      return apps;
-    }
-
-    return apps.filter((app) => !app.institutionId || app.institutionId === institution.id);
-  }, [apps, institution?.id]);
-
-  const applicationBreakdown = useMemo(() => {
-    const counts = new Map<string, number>();
-    institutionApps.forEach((app) => {
-      const key = app.purpose || app.crop || "Other";
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-    return Array.from(counts.entries())
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
-  }, [institutionApps]);
-
-  const recentActivity = useMemo(() => institutionApps.slice(0, 4), [institutionApps]);
-
-  async function handleUpdateStatus(id: string, status: "APPROVED" | "REJECTED") {
+  const handleApprove = async (app: LoanApplicationUi) => {
     try {
-      let rejectionReason: string | undefined;
-
-      if (status === "REJECTED") {
-        rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
-        if (!rejectionReason) {
-          showToast("Rejection reason is required", "error");
-          return;
-        }
-      }
-
-      const updated = await updateLoanApplicationStatus(id, status, rejectionReason);
-      setApps((prev) => prev.map((p) => (p.id === id ? updated : p)));
-      showToast(`Application ${status.toLowerCase()} successfully`, "success");
-    } catch {
-      showToast("Unable to update application status", "error");
+      const needsReview = app.status === "Pending";
+      if (needsReview) await updateLoanApplicationStatus(app.id, "UNDER_REVIEW");
+      await updateLoanApplicationStatus(app.id, "APPROVED");
+      setApps((prev) => prev.map((a) => a.id === app.id ? { ...a, status: "Approved" } : a));
+      showToast(`Loan application approved for ${app.farmer}`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to approve application", "error");
     }
-  }
+  };
 
-  function handleExportCSV() {
-    const csv = exportApplicationsCSV(apps);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "applications.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const handleReject = async (id: string) => {
+    if (!rejectReason.trim()) {
+      showToast("Please enter a rejection reason before rejecting", "error");
+      return;
+    }
+    try {
+      await updateLoanApplicationStatus(id, "REJECTED", rejectReason.trim());
+      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: "Rejected" } : a));
+      setRejectingId(null);
+      setRejectReason("");
+      showToast("Application rejected", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to reject application", "error");
+    }
+  };
 
-  if (isLoading) {
-    return <div className="p-6 text-sm text-stone-500">Loading finance dashboard...</div>;
-  }
+  const openDisburseForm = (app: LoanApplicationUi) => {
+    setDisburseForm({
+      appId: app.id,
+      loanId: app.id,
+      farmerName: app.farmer,
+      requestedAmount: parseMoney(app.requestedAmount ?? app.amount),
+      disbursedAmount: String(parseMoney(app.requestedAmount ?? app.amount)),
+      startDate: new Date().toISOString().split("T")[0],
+      durationMonths: "12",
+      interestRate: "15",
+    });
+  };
+
+  const handleDisburse = async () => {
+    if (!disburseForm) return;
+    const { loanId, disbursedAmount, startDate, durationMonths } = disburseForm;
+
+    if (!disbursedAmount || Number(disbursedAmount) <= 0) {
+      showToast("Disbursed amount must be greater than 0", "error");
+      return;
+    }
+    if (!startDate) {
+      showToast("Please select a repayment start date", "error");
+      return;
+    }
+    if (!durationMonths || Number(durationMonths) < 1) {
+      showToast("Duration must be at least 1 month", "error");
+      return;
+    }
+
+    setDisbursing(true);
+    try {
+      await farmerApi.disburseLoan(loanId, {
+        disbursedAmount: Number(disbursedAmount),
+        startDate: disburseForm.startDate,
+        durationMonths: Number(durationMonths),
+      });
+
+      const monthly = Math.ceil(Number(disbursedAmount) * (1 + Number(disburseForm.interestRate) / 100) / Number(durationMonths));
+      showToast(
+        `Loan disbursed! ${durationMonths} monthly installments of RWF ${monthly.toLocaleString()} scheduled for ${disburseForm.farmerName}.`,
+        "success"
+      );
+      setDisburseForm(null);
+      setApps((prev) => prev.map((a) => a.id === loanId ? { ...a, status: "Approved" } : a));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to disburse loan", "error");
+    } finally {
+      setDisbursing(false);
+    }
+  };
+
+  const monthly = disburseForm
+    ? Math.ceil(
+        Number(disburseForm.disbursedAmount) *
+          (1 + Number(disburseForm.interestRate) / 100) /
+          Math.max(Number(disburseForm.durationMonths), 1)
+      )
+    : 0;
+
+  if (isLoading) return <div className="p-6 text-sm text-stone-500">Loading finance dashboard...</div>;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-6 py-8">
-      <div className="mx-auto max-w-[1400px]">
-        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto max-w-[1400px] space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-stone-900">Financial Dashboard</h1>
-            <p className="mt-1 text-sm text-stone-500">Welcome back. Here is the overview of the loan portfolio for Q3 2024.</p>
+            <h1 className="text-3xl font-semibold text-stone-900">
+              {institution?.name || "Financial Institution Dashboard"}
+            </h1>
+            <p className="mt-1 text-sm text-stone-500">
+              Showing only loan applications submitted to your institution.
+            </p>
           </div>
-          <div className="flex gap-3">
-            <button onClick={handleExportCSV} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm">Export CSV</button>
-            <button className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">New Review Process</button>
-          </div>
+          {institution?.status !== "ACTIVE" && (
+            <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+              Status: {institution?.status || "PENDING"} — waiting for admin approval
+            </div>
+          )}
         </div>
 
+        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Active Portfolio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.portfolioValue}</div>
-            <div className="mt-1 text-xs text-stone-400">From active loans</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Farmers in Pipeline</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.uniqueFarmers}</div>
-            <div className="mt-1 text-xs text-stone-400">Unique farmers with applications</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">NPL Ratio</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.nplRatio}</div>
-            <div className="mt-1 text-xs text-stone-400">Based on loan status</div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-stone-500">Loan Recovery</div>
-            <div className="mt-2 text-2xl font-semibold text-stone-900">{metrics.recoveryRate}</div>
-            <div className="mt-1 text-xs text-stone-400">Completed loans / all loans</div>
-          </div>
+          {[
+            { label: "Total Applications", value: metrics.total, note: "Sent to your institution" },
+            { label: "Pending Review", value: metrics.pending, note: "Awaiting your decision" },
+            { label: "Approved", value: metrics.approved, note: "Ready to disburse" },
+            { label: "Total Volume", value: `RWF ${metrics.totalVolume.toLocaleString()}`, note: "Requested amount" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-stone-500">{s.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-stone-900">{s.value}</p>
+              <p className="mt-1 text-xs text-stone-400">{s.note}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-[1.6fr_0.9fr]">
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Financial Performance</h2>
-              <div className="text-sm text-stone-500">Live</div>
-            </div>
-            <div className="space-y-3 rounded-lg border border-stone-100 bg-stone-50 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Pending review</span>
-                <span className="font-semibold text-stone-900">{metrics.pendingApplications}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Approved applications</span>
-                <span className="font-semibold text-stone-900">{metrics.approvedApplications}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-600">Active loans</span>
-                <span className="font-semibold text-stone-900">{metrics.activeLoans}</span>
-              </div>
-              <div className="h-3 overflow-hidden rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${Math.min(100, (metrics.approvedApplications / Math.max(metrics.totalApplications, 1)) * 100)}%` }}
-                />
-              </div>
-            </div>
-          </div>
+        {/* Disburse modal */}
+        {disburseForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+              <h2 className="text-xl font-semibold text-stone-900">Set Repayment Schedule</h2>
+              <p className="mt-1 text-sm text-stone-500">
+                Fill in the disbursement details for <strong>{disburseForm.farmerName}</strong>.
+                The farmer will see their monthly payment amount and schedule immediately.
+              </p>
 
-          <aside className="space-y-4">
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Portfolio by Purpose</div>
-              <div className="mt-3 space-y-3 text-sm">
-                {applicationBreakdown.length > 0 ? applicationBreakdown.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between gap-3">
-                    <span className="text-stone-700">{item.label}</span>
-                    <span className="font-semibold text-stone-900">{item.count}</span>
-                  </div>
-                )) : <div className="text-stone-500">No applications yet.</div>}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="text-sm text-stone-500">Application Status Mix</div>
-              <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <div className="flex items-center justify-between"><span>Awaiting review</span><span>{metrics.pendingApplications}</span></div>
-                <div className="flex items-center justify-between"><span>Approved</span><span>{metrics.approvedApplications}</span></div>
-                <div className="flex items-center justify-between"><span>Rejected</span><span>{apps.filter((a) => a.status === "Rejected").length}</span></div>
-              </div>
-            </div>
-          </aside>
-        </div>
+              <div className="mt-5 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-stone-700">Disbursed Amount (RWF)</span>
+                    <input
+                      type="number"
+                      value={disburseForm.disbursedAmount}
+                      onChange={(e) => setDisburseForm((p) => p ? { ...p, disbursedAmount: e.target.value } : p)}
+                      className="mt-2 w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                    />
+                    <p className="mt-1 text-xs text-stone-400">Requested: RWF {disburseForm.requestedAmount.toLocaleString()}</p>
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-stone-700">Interest Rate (%)</span>
+                    <input
+                      type="number"
+                      value={disburseForm.interestRate}
+                      onChange={(e) => setDisburseForm((p) => p ? { ...p, interestRate: e.target.value } : p)}
+                      className="mt-2 w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-stone-700">Repayment Start Date</span>
+                    <input
+                      type="date"
+                      value={disburseForm.startDate}
+                      onChange={(e) => setDisburseForm((p) => p ? { ...p, startDate: e.target.value } : p)}
+                      className="mt-2 w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-stone-700">Duration (months)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={disburseForm.durationMonths}
+                      onChange={(e) => setDisburseForm((p) => p ? { ...p, durationMonths: e.target.value } : p)}
+                      className="mt-2 w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </label>
+                </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.45fr]">
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-stone-900">Recent Applications</h3>
-              <Link className="text-sm text-emerald-600" to="/finance/applications">View All</Link>
-            </div>
-
-            <div className="space-y-3">
-              {recentActivity.map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-4 border-b border-stone-100 py-3">
-                  <div>
-                    <div className="font-semibold text-stone-900">{a.farmer}</div>
-                    <div className="text-xs text-stone-500">
-                      {a.amount} • {a.purpose || a.crop} • {a.institution || "Assigned institution"}
+                {/* Preview */}
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-sm font-semibold text-emerald-800">Repayment Schedule Preview</p>
+                  <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-emerald-600">Monthly Payment</p>
+                      <p className="text-xl font-bold text-stone-900">RWF {monthly.toLocaleString()}</p>
                     </div>
-                    {a.purposeDescription && <div className="mt-1 text-xs text-stone-400">{a.purposeDescription}</div>}
+                    <div>
+                      <p className="text-emerald-600">Duration</p>
+                      <p className="text-xl font-bold text-stone-900">{disburseForm.durationMonths} months</p>
+                    </div>
+                    <div>
+                      <p className="text-emerald-600">Total Payable</p>
+                      <p className="text-xl font-bold text-stone-900">
+                        RWF {(monthly * Number(disburseForm.durationMonths)).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm text-stone-500">{a.status}</div>
-                    {a.status !== "Approved" && a.status !== "Rejected" && a.status !== "Cancelled" && (
-                      <>
-                        <button onClick={() => void handleUpdateStatus(a.id, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-emerald-700">Approve</button>
-                        <button onClick={() => void handleUpdateStatus(a.id, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-rose-700">Reject</button>
-                      </>
-                    )}
+                  <p className="mt-3 text-xs text-emerald-700">
+                    The farmer will see this schedule in their Payments page immediately after disbursement.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button onClick={() => setDisburseForm(null)} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700">Cancel</button>
+                <button onClick={() => void handleDisburse()} disabled={disbursing} className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-70">
+                  {disbursing ? "Disbursing..." : "Disburse & Create Schedule"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Applications table */}
+        <div className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+            <h2 className="text-lg font-semibold text-stone-900">Loan Applications</h2>
+            <Link to="/finance/applications" className="text-sm text-emerald-600">View all →</Link>
+          </div>
+
+          {apps.length === 0 ? (
+            <p className="p-6 text-sm text-stone-500">No loan applications have been sent to your institution yet.</p>
+          ) : (
+            <div className="divide-y divide-stone-100">
+              {apps.map((app) => (
+                <div key={app.id} className="px-5 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-stone-900">{app.farmer}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          app.status === "Approved" ? "bg-emerald-100 text-emerald-700" :
+                          app.status === "Rejected" ? "bg-rose-100 text-rose-700" :
+                          app.status === "Under Review" ? "bg-blue-100 text-blue-700" :
+                          "bg-amber-100 text-amber-700"
+                        }`}>{app.status}</span>
+                      </div>
+                      <div className="mt-1 text-sm text-stone-500">
+                        RWF {parseMoney(app.requestedAmount ?? app.amount).toLocaleString()} • {app.purpose || app.crop} • Applied {app.date}
+                      </div>
+                      {app.scoreValue !== "-" && (
+                        <div className="mt-1 text-xs text-stone-400">Credit score: {app.scoreValue} ({app.riskLevel || "—"})</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={`/finance/applications/${app.id}`} state={{ application: app }} className="rounded-full border border-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-700">
+                        View Details
+                      </Link>
+
+                      {(app.status === "Pending" || app.status === "Under Review") && (
+                        <>
+                          <button onClick={() => void handleApprove(app)} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white">
+                            Approve
+                          </button>
+                          <button onClick={() => { setRejectingId(app.id); setRejectReason(""); }} className="rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600">
+                            Reject
+                          </button>
+                        </>
+                      )}
+
+                      {app.status === "Approved" && (
+                        <button onClick={() => openDisburseForm(app)} className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white">
+                          Set Repayment Schedule
+                        </button>
+                      )}
+
+                      {rejectingId === app.id && (
+                        <div className="mt-2 w-full space-y-2">
+                          <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Enter rejection reason (required)..."
+                            className="w-full rounded-xl border border-rose-200 px-4 py-2 text-sm outline-none focus:border-rose-400"
+                            rows={2}
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => void handleReject(app.id)} className="rounded-full bg-rose-500 px-4 py-1.5 text-xs font-semibold text-white">
+                              Confirm Rejection
+                            </button>
+                            <button onClick={() => { setRejectingId(null); setRejectReason(""); }} className="rounded-full border border-stone-200 px-4 py-1.5 text-xs font-semibold text-stone-600">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
-              {recentActivity.length === 0 && <div className="py-4 text-sm text-stone-500">No loan applications found for this institution yet.</div>}
             </div>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="text-sm text-stone-500">Notifications</div>
-            <div className="mt-3 space-y-2 text-sm text-stone-600">
-              <div>{metrics.pendingApplications} applications awaiting review</div>
-              <div>{metrics.approvedApplications} applications approved from farmer submissions</div>
-              <div>{metrics.completedLoans} completed loans in the active portfolio</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

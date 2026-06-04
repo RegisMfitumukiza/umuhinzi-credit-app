@@ -21,7 +21,7 @@ export const GovernmentSidebar = () => {
 
       <nav className="flex flex-1 flex-col gap-1">
         <NavLink to="/government" end className={navClass}>Overview</NavLink>
-        <NavLink to="/government/regions" className={navClass}>Regions</NavLink>
+        <NavLink to="/government/regions" className={navClass}>Regional Data</NavLink>
         <NavLink to="/government/reports" className={navClass}>Reports</NavLink>
         <NavLink to="/government/profile" className={navClass}>Profile</NavLink>
       </nav>

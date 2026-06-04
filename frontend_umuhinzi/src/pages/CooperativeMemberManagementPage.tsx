@@ -165,7 +165,7 @@ export const CooperativeMemberManagementPage = () => {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-stone-900">Approved Members</h2>
               <button
-                onClick={() => setShowAddForm(true)}
+                onClick={() => void (async () => { showToast("Use the profile page to invite a farmer to join your cooperative.", "info"); })()}
                 className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700"
               >
                 + Add New Member

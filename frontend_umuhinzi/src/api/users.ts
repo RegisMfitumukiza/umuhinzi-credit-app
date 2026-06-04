@@ -57,6 +57,19 @@ export const updateMyProfile = async (payload: UpdateMyProfilePayload): Promise<
   return response.data.data;
 };
 
+export type ProvisionPayload = {
+  fullName: string;
+  email: string;
+  password: string;
+  phone?: string;
+  role: "INSTITUTION" | "GOVERNMENT_PARTNER";
+};
+
+export const provisionAccount = async (payload: ProvisionPayload): Promise<AdminUser> => {
+  const response = await api.post<ApiResponse<AuthUser & { status?: string }>>("/users/provision", payload);
+  return toAdminUser(response.data.data);
+};
+
 export type CurrentUserProfile = AuthUser & {
   cooperativeManagerProfile?: {
     cooperativeId?: string | null;

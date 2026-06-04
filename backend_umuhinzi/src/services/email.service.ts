@@ -1,4 +1,4 @@
-import { resend, EMAIL_FROM, isEmailEnabled } from "../config/email.js";
+import { resend, EMAIL_FROM, isEmailEnabled, gmailTransporter } from "../config/email.js";
 import { logger } from "../utils/logger.js";
 import { APIError } from "../utils/ApiError.js";
 
@@ -9,42 +9,50 @@ type SendEmailInput = {
 };
 
 export const sendEmail = async ({ to, subject, html }: SendEmailInput) => {
-  if (!isEmailEnabled || !resend) {
-    logger.warn("Email sending skipped: RESEND_API_KEY missing", { to, subject });
+  if (!isEmailEnabled) {
+    logger.warn("Email sending skipped: no email credentials configured", { to, subject });
     return null;
   }
 
-  // In development, redirect ALL emails to DEV_EMAIL_REDIRECT.
-  // This is needed because onboarding@resend.dev only delivers to
-  // the email address you used to sign up at resend.com.
-  const isDev = process.env.NODE_ENV !== "production";
-  const devRedirect = process.env.DEV_EMAIL_REDIRECT;
+  // Prefer Gmail SMTP — can send to any address
+  if (gmailTransporter) {
+    try {
+      const fromAddress = process.env.EMAIL_USER
+        ? `Umuhinzi Credit <${process.env.EMAIL_USER}>`
+        : EMAIL_FROM;
 
-  const recipient = isDev && devRedirect ? devRedirect : to;
+      const result = await gmailTransporter.sendMail({
+        from: fromAddress,
+        to,
+        subject,
+        html,
+      });
 
-  // In dev, add a note to the subject so you know who it was originally for
-  const finalSubject =
-    isDev && devRedirect && devRedirect !== to
-      ? `[DEV → ${to}] ${subject}`
-      : subject;
-
-  try {
-    const result = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: recipient,
-      subject: finalSubject,
-      html,
-    });
-
-    logger.info("Email sent", {
-      originalTo: to,
-      deliveredTo: recipient,
-      subject: finalSubject,
-    });
-
-    return result;
-  } catch (error) {
-    logger.error("Failed to send email", { to: recipient, subject: finalSubject, error });
-    throw new APIError("Failed to send email", 500);
+      logger.info("Email sent via Gmail SMTP", { to, subject, messageId: result.messageId });
+      return result;
+    } catch (error) {
+      logger.error("Gmail SMTP failed, attempting Resend fallback", { to, subject, error });
+      // fall through to Resend if gmail fails
+    }
   }
+
+  // Resend fallback (only delivers to resend-registered email in free tier)
+  if (resend) {
+    try {
+      const result = await resend.emails.send({
+        from: EMAIL_FROM,
+        to,
+        subject,
+        html,
+      });
+
+      logger.info("Email sent via Resend", { to, subject });
+      return result;
+    } catch (error) {
+      logger.error("Failed to send email via Resend", { to, subject, error });
+      throw new APIError("Failed to send email", 500);
+    }
+  }
+
+  throw new APIError("No email provider configured", 500);
 };

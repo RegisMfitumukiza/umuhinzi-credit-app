@@ -259,6 +259,10 @@ export const farmerApi = {
     const response = await api.post<ApiResponse<unknown>>("/repayments", payload);
     return response.data.data;
   },
+  disburseLoan: async (loanId: string, payload: { disbursedAmount: number; startDate: string; durationMonths: number }) => {
+    const response = await api.patch<ApiResponse<unknown>>(`/loans/${loanId}/disburse`, payload);
+    return response.data.data;
+  },
   createCrop: async (payload: Record<string, unknown>) => {
     const response = await api.post<ApiResponse<unknown>>("/crops", {
       ...payload,

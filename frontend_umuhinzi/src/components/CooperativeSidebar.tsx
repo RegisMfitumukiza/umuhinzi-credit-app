@@ -50,24 +50,13 @@ export const CooperativeSidebar = () => {
       </section>
 
       <nav className="flex flex-1 flex-col gap-1">
-        <NavLink to="/cooperatives" end className={navClass}>
-          Dashboard
-        </NavLink>
-        <NavLink to="/cooperatives/profile" className={navClass}>
-          Profile
-        </NavLink>
-        {/* <NavLink to="/cooperatives/applications" className={navClass}>
-          Applications
-        </NavLink> */}
-        <NavLink to="/cooperatives/members" className={navClass}>
-          Members
-        </NavLink>
-        {/* <NavLink to="/cooperatives/regional-map" className={navClass}> */}
-          {/* Regional Map
-        </NavLink> */}
-        {/* <NavLink to="/cooperatives/reports" className={navClass}>
-          Reports
-        </NavLink> */}
+        <NavLink to="/cooperatives" end className={navClass}>Dashboard</NavLink>
+        <NavLink to="/cooperatives/harvest-verification" className={navClass}>Harvest Verification</NavLink>
+        <NavLink to="/cooperatives/members" className={navClass}>Members</NavLink>
+        <NavLink to="/cooperatives/applications" className={navClass}>Loan Applications</NavLink>
+        <NavLink to="/cooperatives/analytics" className={navClass}>Analytics</NavLink>
+        <NavLink to="/cooperatives/reports" className={navClass}>Reports</NavLink>
+        <NavLink to="/cooperatives/profile" className={navClass}>Profile</NavLink>
       </nav>
     </aside>
   );

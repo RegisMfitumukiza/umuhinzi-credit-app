@@ -20,18 +20,13 @@ export const AdminSidebar = () => {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        <NavLink to="/admin" end className={navClass}>
-          Overview
-        </NavLink>
-        <NavLink to="/admin/seasons" className={navClass}>
-          Seasons
-        </NavLink>
-        <NavLink to="/admin/users" className={navClass}>
-          User Management
-        </NavLink>
-        <NavLink to="/admin/profile" className={navClass}>
-          Profile
-        </NavLink>
+        <NavLink to="/admin" end className={navClass}>Overview</NavLink>
+        <NavLink to="/admin/users" className={navClass}>User Management</NavLink>
+        <NavLink to="/admin/institutions" className={navClass}>Institutions</NavLink>
+        <NavLink to="/admin/government" className={navClass}>Government Accounts</NavLink>
+        <NavLink to="/admin/seasons" className={navClass}>Seasons</NavLink>
+        <NavLink to="/admin/audit" className={navClass}>Audit Center</NavLink>
+        <NavLink to="/admin/profile" className={navClass}>Profile</NavLink>
       </nav>
     </aside>
   );

@@ -10,6 +10,7 @@ import {
   updateUserProfile,
   updateUserRole,
   updateUserStatus,
+  provisionAccount,
 } from "../../controllers/user.controller.js";
 
 import {
@@ -148,6 +149,44 @@ router.patch("/me/avatar", authenticate, uploadUserAvatar, updateUserAvatar);
  *         description: Forbidden
  */
 router.get("/stats", authenticate, requireAdmin, getUserStats);
+
+/**
+ * @swagger
+ * /api/v1/users/provision:
+ *   post:
+ *     summary: Provision INSTITUTION or GOVERNMENT_PARTNER account (Admin only)
+ *     description: Admin creates a new account, sets it ACTIVE, and emails the user their credentials and login URL.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fullName, email, password, role]
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [INSTITUTION, GOVERNMENT_PARTNER]
+ *     responses:
+ *       201:
+ *         description: Account created and credentials emailed
+ *       400:
+ *         description: Missing required fields or invalid role
+ *       409:
+ *         description: Email already exists
+ */
+router.post("/provision", authenticate, requireAdmin, provisionAccount);
 
 /**
  * @swagger

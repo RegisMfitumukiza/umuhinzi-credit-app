@@ -74,7 +74,7 @@ export const LoginPage = () => {
         <div className="flex flex-col items-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white text-xl">🌱</div>
           <h1 className="mt-4 text-2xl font-semibold text-stone-900">Welcome Back</h1>
-          <p className="mt-2 text-sm text-stone-600 text-center">Access your farm dashboard and financial services.</p>
+          <p className="mt-2 text-sm text-stone-600 text-center">Sign in to access your dashboard.</p>
         </div>
 
         <label className="mt-6 block text-sm font-medium text-stone-700">

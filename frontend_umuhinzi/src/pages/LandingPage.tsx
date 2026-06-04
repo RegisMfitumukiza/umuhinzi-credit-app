@@ -1,4 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { homeRouteByRole } from "../utils/auth";
 
 const partnerLogos = ["RRA", "MINAGRI", "BK Rwanda", "Airtel Money", "MTN MoMo"];
 
@@ -53,6 +55,23 @@ const testimonials = [
 
 export const LandingPage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+
+  const handleLogin = () => {
+    if (isAuthenticated && user) {
+      navigate(homeRouteByRole(user.role));
+    } else {
+      navigate("/login");
+    }
+  };
+
+  const handleGetStarted = () => {
+    if (isAuthenticated && user) {
+      navigate(homeRouteByRole(user.role));
+    } else {
+      navigate("/register");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-stone-900">
