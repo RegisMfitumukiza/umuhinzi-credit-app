@@ -3,6 +3,7 @@ import compression from "compression";
 import cors from "cors";
 
 import apiV1 from "./routes/v1/versioning.js";
+import { prisma } from "./lib/prisma.js";
 
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
@@ -41,6 +42,28 @@ setupSwagger(app);
 /* ================= ROUTES ================= */
 
 app.use("/api/v1", apiLimiter, perUserLimiter, apiV1);
+
+/* ================= HEALTH ================= */
+
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date(),
+      service: "umuhinzi-credit-api",
+      environment: process.env.NODE_ENV,
+      database: "connected",
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      database: "disconnected",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
 
 /* ================= ERROR HANDLING ================= */
 
