@@ -206,7 +206,7 @@ export const FarmDashboardPage = () => {
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Current loans</p>
           <h3 className="mt-2 text-3xl font-semibold text-stone-900">{activeLoans.length}</h3>
-          <p className="mt-1 text-sm text-stone-500">Backend loan portfolio</p>
+          <p className="mt-1 text-sm text-stone-500">loan portfolio</p>
         </article>
         <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Estimated income</p>
@@ -220,7 +220,7 @@ export const FarmDashboardPage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Available seasons</p>
-              <h3 className="mt-2 text-xl font-semibold text-stone-900">Season updates from admin</h3>
+              <h3 className="mt-2 text-xl font-semibold text-stone-900">Season updates</h3>
             </div>
             <button onClick={() => navigate("/crops")} className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700">Add crop</button>
           </div>
@@ -236,7 +236,7 @@ export const FarmDashboardPage = () => {
                 </div>
               </div>
             ))}
-            {topSeasons.length === 0 && <p className="text-sm text-stone-500">No seasons available yet. Ask admin to create one.</p>}
+            {topSeasons.length === 0 && <p className="text-sm text-stone-500">No seasons available yet. Ask administration  to create one.</p>}
           </div>
         </article>
 
@@ -345,7 +345,7 @@ export const FarmDashboardPage = () => {
 
           <section className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
             <h3 className="text-lg font-semibold text-stone-900">Recommendations</h3>
-            <p className="mt-2 text-sm text-stone-500">Backend recommendations based on your profile</p>
+            <p className="mt-2 text-sm text-stone-500">Recommendations based on your profile</p>
             <div className="mt-4 space-y-3 text-sm">
               {topRecommendations.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-stone-200 p-4">
@@ -365,7 +365,7 @@ export const FarmDashboardPage = () => {
 
           <section className="rounded-[1.5rem] border border-stone-200 bg-white p-5 shadow-panel">
             <h3 className="text-lg font-semibold text-stone-900">Notifications</h3>
-            <p className="mt-2 text-sm text-stone-500">Newest activity from the backend</p>
+            <p className="mt-2 text-sm text-stone-500">Newest activity</p>
             <div className="mt-4 space-y-3 text-sm">
               {topNotifications.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-stone-200 p-4">

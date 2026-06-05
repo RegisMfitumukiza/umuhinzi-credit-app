@@ -132,7 +132,7 @@ export const CooperativeMemberManagementPage = () => {
                 <h2 className="text-lg font-semibold text-stone-900">Pending Members</h2>
                 <p className="text-xs text-stone-500">For {cooperative?.name || "your cooperative"}</p>
               </div>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">From database</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700"></span>
             </div>
 
             <div className="space-y-3">

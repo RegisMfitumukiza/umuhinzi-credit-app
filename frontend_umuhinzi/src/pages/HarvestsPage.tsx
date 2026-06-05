@@ -18,7 +18,7 @@ export const HarvestsPage = () => {
     expectedYield: "",
     unit: "kg",
     harvestDate: "",
-    qualityGrade: "GOOD",
+    qualityGrade: "EXCELLENT",
   });
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export const HarvestsPage = () => {
 
       const nextHarvests = await farmerApi.getYields();
       setHarvests(nextHarvests);
-      setForm({ cropId: "", actualYield: "", expectedYield: "", unit: "kg", harvestDate: "", qualityGrade: "GOOD" });
+      setForm({ cropId: "", actualYield: "", expectedYield: "", unit: "kg", harvestDate: "", qualityGrade: "EXCELLENT" });
       showToast("Harvest record saved successfully", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Failed to save harvest record", "error");
@@ -78,7 +78,7 @@ export const HarvestsPage = () => {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-stone-900">Track Harvests</h2>
-          <p className="mt-2 text-sm text-stone-500">Log real yield records for your crops from the backend.</p>
+          <p className="mt-2 text-sm text-stone-500">Log real yield records for your crops.</p>
         </div>
         <button onClick={() => navigate("/farmer/dashboard")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">
           Back to dashboard
@@ -124,7 +124,7 @@ export const HarvestsPage = () => {
                     <p className="font-semibold text-stone-900">{record.crop?.cropName || "Harvest record"}</p>
                     <p className="text-sm text-stone-500">{record.crop?.farm?.name || "Crop backend record"}</p>
                   </div>
-                  <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{record.qualityGrade || "GOOD"}</span>
+                  <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{record.qualityGrade || "EXCELLENT"}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-stone-500">
                   <span>{record.harvestDate || "-"}</span>

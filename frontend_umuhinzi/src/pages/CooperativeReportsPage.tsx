@@ -86,7 +86,7 @@ export const CooperativeReportsPage = () => {
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Reports & Analytics</h1>
-            <p className="mt-1 text-sm text-stone-500">All figures below are loaded from the cooperative’s live database records.</p>
+            <p className="mt-1 text-sm text-stone-500">All figures below are loaded from the cooperative’s live records.</p>
           </div>
 
           <div className="flex gap-3">
@@ -107,7 +107,7 @@ export const CooperativeReportsPage = () => {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-stone-900">Application Status Breakdown</h2>
-                <p className="text-xs text-stone-500">Current cooperative loan applications by backend status</p>
+                <p className="text-xs text-stone-500">Current cooperative loan applications by status</p>
               </div>
               <div className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Live</div>
             </div>
@@ -135,7 +135,7 @@ export const CooperativeReportsPage = () => {
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm text-center">
               <div className="text-sm text-stone-500">Active Members</div>
               <div className="mt-4 text-3xl font-semibold text-stone-900">{metrics.activeMembers}</div>
-              <div className="mt-1 text-xs text-stone-500">Database member records</div>
+              <div className="mt-1 text-xs text-stone-500">member records</div>
             </div>
 
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -182,7 +182,7 @@ export const CooperativeReportsPage = () => {
 
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-stone-900">Export Engine</h3>
-            <p className="mt-1 text-xs text-stone-500">The values here are real database records ready for download or sharing.</p>
+            <p className="mt-1 text-xs text-stone-500">The values here are real  records ready for download or sharing.</p>
             <div className="mt-3 space-y-3 text-sm text-stone-600">
               <div className="rounded-xl border border-stone-100 px-3 py-2">Member records loaded: {members.length}</div>
               <div className="rounded-xl border border-stone-100 px-3 py-2">Application records loaded: {applications.length}</div>

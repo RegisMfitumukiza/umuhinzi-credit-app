@@ -68,8 +68,8 @@ export const FarmDetailsPage = () => {
           ["Ownership", farm.ownershipType],
           ["Soil type", farm.soilType],
           ["Province", farm.province],
-          ["Latitude", farm.latitude?.toString() ?? "-"] ,
-          ["Longitude", farm.longitude?.toString() ?? "-"],
+          // ["Latitude", farm.latitude?.toString() ?? "-"] ,
+          // ["Longitude", farm.longitude?.toString() ?? "-"],
         ].map(([label, value]) => (
           <article key={label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-panel">
             <p className="text-xs uppercase tracking-[0.3em] text-stone-500">{label}</p>

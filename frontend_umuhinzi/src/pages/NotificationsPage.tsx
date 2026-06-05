@@ -24,7 +24,7 @@ export const NotificationsPage = () => {
       <section className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-stone-900">Notifications</h2>
-          <p className="mt-2 text-sm text-stone-600">System messages and alerts from the backend.</p>
+          <p className="mt-2 text-sm text-stone-600">System messages and alerts.</p>
         </div>
       </section>
 

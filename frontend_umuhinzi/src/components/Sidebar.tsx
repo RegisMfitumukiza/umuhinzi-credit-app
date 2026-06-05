@@ -40,14 +40,14 @@ export const Sidebar = () => {
           <div className="flex flex-col gap-1">
             <NavLink to="/notifications" className={secondaryNavClass}>Notifications</NavLink>
             <NavLink to="/profile" className={secondaryNavClass}>Profile</NavLink>
-            <NavLink to="/settings" className={secondaryNavClass}>Settings</NavLink>
+            {/* <NavLink to="/settings" className={secondaryNavClass}>Settings</NavLink> */}
           </div>
         </div>
       </nav>
 
       <div className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-stone-400">Live mode</p>
-        <p className="mt-2 text-sm text-stone-600">Farmer pages are now connected to the backend.</p>
+        <p className="mt-2 text-sm text-stone-600">Tract you activity and get good score to get more loan.</p>
       </div>
     </aside>
   );

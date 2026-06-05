@@ -74,7 +74,7 @@ export const PaymentsPage = () => {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-stone-900">Repayments</h2>
-          <p className="mt-2 text-sm text-stone-500">Record payments and track repayment schedules from the backend.</p>
+          <p className="mt-2 text-sm text-stone-500">Record payments and track repayment schedules</p>
         </div>
         <button onClick={() => navigate("/farmer/dashboard")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">Back to dashboard</button>
       </section>

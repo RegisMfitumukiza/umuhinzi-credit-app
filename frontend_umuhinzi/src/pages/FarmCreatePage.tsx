@@ -45,7 +45,7 @@ export const FarmCreatePage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-stone-900">Create Farm</h1>
-        <p className="text-sm text-stone-600">Register a new farm for the authenticated farmer.</p>
+        <p className="text-sm text-stone-600">Register a new farm.</p>
         {isBlocked && (
           <p className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             Access blocked while your farmer status is pending. Wait for cooperative manager approval.

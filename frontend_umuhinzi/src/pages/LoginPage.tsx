@@ -74,7 +74,7 @@ export const LoginPage = () => {
         <div className="flex flex-col items-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white text-xl">🌱</div>
           <h1 className="mt-4 text-2xl font-semibold text-stone-900">Welcome Back</h1>
-          <p className="mt-2 text-sm text-stone-600 text-center">Sign in to access your dashboard.</p>
+          <p className="mt-2 text-sm text-stone-600 text-center">Sign in to access your account.</p>
         </div>
 
         <label className="mt-6 block text-sm font-medium text-stone-700">
@@ -113,7 +113,7 @@ export const LoginPage = () => {
           disabled={isSubmitting}
           className="mt-6 w-full rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-70 flex items-center justify-center gap-2"
         >
-          {isSubmitting ? "Signing in..." : "Login to Dashboard"} <span aria-hidden>→</span>
+          {isSubmitting ? "Signing in..." : "Login"} <span aria-hidden>→</span>
         </button>
 
         <div className="my-4 flex items-center">

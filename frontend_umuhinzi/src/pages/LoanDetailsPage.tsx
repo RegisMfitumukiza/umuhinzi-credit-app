@@ -73,7 +73,7 @@ export const LoanDetailsPage = () => {
         <div>
           <button onClick={() => navigate(-1)} className="mb-2 text-sm text-stone-500">← Back</button>
           <h2 className="text-2xl font-semibold text-stone-900">Loan Details</h2>
-          <p className="mt-1 text-sm text-stone-500">Full loan record from the backend.</p>
+          <p className="mt-1 text-sm text-stone-500">Full loan record</p>
         </div>
         <span className={`rounded-full px-4 py-2 text-sm font-semibold ${statusColor(loan.status)}`}>
           {loan.status || "UNKNOWN"}

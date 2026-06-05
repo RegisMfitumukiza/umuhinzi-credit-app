@@ -64,7 +64,7 @@ export const GovernmentDashboardPage = () => {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Government Dashboard</h1>
-            <p className="mt-1 text-sm text-stone-500">National rural finance, productivity, and inclusion insights — live from database.</p>
+            <p className="mt-1 text-sm text-stone-500">National rural finance, productivity, and inclusion insights.</p>
           </div>
           <div className="flex gap-3">
             <select value={province} onChange={(e) => setProvince(e.target.value)} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-700 outline-none">

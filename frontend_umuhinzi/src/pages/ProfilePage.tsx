@@ -318,7 +318,7 @@ export const ProfilePage = () => {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-xl font-semibold text-stone-900">{isCreatingInstitution ? "Create Institution Profile" : "Update Institution Profile"}</h3>
-                <p className="mt-1 text-sm text-stone-500">This is the profile stored in the backend /institutions table.</p>
+                <p className="mt-1 text-sm text-stone-500">This is the profile stored in the institutions table.</p>
               </div>
               <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{isCreatingInstitution ? "New profile" : "Saved profile"}</span>
             </div>
@@ -463,7 +463,7 @@ export const ProfilePage = () => {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-stone-900">Farmer Profile</h2>
-          <p className="mt-2 text-sm text-stone-500">Create or update your backend farmer profile before applying for loans.</p>
+          <p className="mt-2 text-sm text-stone-500">Create or update your farmer profile before applying for loans.</p>
         </div>
         <button onClick={() => navigate("/loans")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">
           Back to loans
@@ -475,7 +475,7 @@ export const ProfilePage = () => {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-xl font-semibold text-stone-900">{isCreating ? "Create Farmer Profile" : "Update Farmer Profile"}</h3>
-              <p className="mt-1 text-sm text-stone-500">This is the profile stored in the backend /farmers table.</p>
+              <p className="mt-1 text-sm text-stone-500">This is the profile stored in the farmers table.</p>
             </div>
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{isCreating ? "New profile" : "Saved profile"}</span>
           </div>

@@ -159,7 +159,7 @@ export const FinanceDashboardPage = () => {
               {institution?.name || "Financial Institution Dashboard"}
             </h1>
             <p className="mt-1 text-sm text-stone-500">
-              Showing only loan applications submitted to your institution.
+              Showing loan applications submitted to your institution.
             </p>
           </div>
           {institution?.status !== "ACTIVE" && (
@@ -281,7 +281,7 @@ export const FinanceDashboardPage = () => {
           </div>
 
           {apps.length === 0 ? (
-            <p className="p-6 text-sm text-stone-500">No loan applications have been sent to your institution yet.</p>
+            <p className="p-6 text-sm text-stone-500">No loan applications have been sent yet.</p>
           ) : (
             <div className="divide-y divide-stone-100">
               {apps.map((app) => (

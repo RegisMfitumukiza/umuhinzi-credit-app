@@ -134,7 +134,7 @@ export const LoansPage = () => {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-stone-900">Loan Application</h2>
-          <p className="mt-2 text-sm text-stone-500">Submit a real loan application to the backend.</p>
+          <p className="mt-2 text-sm text-stone-500">Submit loan application.</p>
         </div>
         <button onClick={() => navigate("/farmer/dashboard")} className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 shadow-sm">Back to dashboard</button>
       </section>

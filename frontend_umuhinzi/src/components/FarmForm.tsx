@@ -151,7 +151,7 @@ export const FarmForm = ({ initialValues, onSubmit, submitLabel }: Props) => {
         </label>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* <div className="grid gap-4 md:grid-cols-2">
         <label className="text-sm font-medium text-stone-700">
           Latitude
           <input className={fieldClass} value={values.latitude} onChange={(event) => updateField("latitude", event.target.value)} />
@@ -162,7 +162,7 @@ export const FarmForm = ({ initialValues, onSubmit, submitLabel }: Props) => {
           <input className={fieldClass} value={values.longitude} onChange={(event) => updateField("longitude", event.target.value)} />
           {errors.longitude && <p className="mt-1 text-xs text-red-600">{errors.longitude}</p>}
         </label>
-      </div>
+      </div> */}
 
       <button
         type="submit"

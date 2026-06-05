@@ -8,24 +8,25 @@ const roles = [
     desc: "Individual farmer seeking credit for seeds, fertilizer, or equipment.",
     icon: "🌱",
   },
-  {
-    key: "INSTITUTION",
-    label: "Finance Institution",
-    desc: "Banks and microfinance institutions looking to invest in local agricultural projects.",
-    icon: "🏢",
-  },
+  // {
+  //   key: "INSTITUTION",
+  //   label: "Finance Institution",
+  //   desc: "Banks and microfinance institutions looking to invest in local agricultural projects.",
+  //   icon: "🏢",
+  // },
+
   {
     key: "COOPERATIVE_MANAGER",
     label: "Cooperative Manager",
     desc: "Managing financial access for a group of smallholder farmers.",
     icon: "👥",
   },
-  {
-    key: "GOVERNMENT_PARTNER",
-    label: "Government Partner",
-    desc: "Monitoring agricultural data and supporting policy implementation.",
-    icon: "🛡️",
-  },
+  // {
+  //   key: "GOVERNMENT_PARTNER",
+  //   label: "Government Partner",
+  //   desc: "Monitoring agricultural data and supporting policy implementation.",
+  //   icon: "🛡️",
+  // },
 ];
 
 export const RegisterRolePage = () => {

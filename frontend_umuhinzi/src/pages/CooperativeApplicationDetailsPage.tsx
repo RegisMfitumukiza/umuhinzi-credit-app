@@ -84,7 +84,7 @@ export const CooperativeApplicationDetailsPage = () => {
             <button onClick={() => navigate(-1)} className="text-sm text-stone-500">← Back to Table</button>
             <div>
               <h1 className="text-2xl font-semibold text-stone-900">Application {application.id}</h1>
-              <p className="text-sm text-stone-500">Real cooperative loan application from the database</p>
+              <p className="text-sm text-stone-500">Real cooperative loan application.</p>
             </div>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>{application.status}</span>
@@ -125,7 +125,7 @@ export const CooperativeApplicationDetailsPage = () => {
           <aside className="space-y-4">
             <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-stone-900">Application Status</h2>
-              <p className="mt-2 text-sm text-stone-600">This data comes directly from the backend and only shows applications that belong to your cooperative members.</p>
+              <p className="mt-2 text-sm text-stone-600">This data  only shows applications that belong to your cooperative members.</p>
               <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-sm text-stone-700">
                 Current status: <span className="font-semibold text-stone-900">{application.status}</span>
               </div>

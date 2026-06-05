@@ -141,7 +141,7 @@ export const FinanceApplicationDetailsPage = () => {
                   <div className="rounded-2xl border border-stone-100 p-6 text-center">
                     <div className="text-sm text-stone-500">Application Purpose</div>
                     <div className="mt-4 text-base font-semibold text-stone-900">{application.crop}</div>
-                    <div className="mt-3 text-xs text-stone-400">Requested through backend loan application</div>
+                    <div className="mt-3 text-xs text-stone-400">Requested through  loan application</div>
                   </div>
                   <div className="rounded-2xl border border-stone-100 p-6 text-center">
                     <div className="text-sm text-stone-500">Amount Requested</div>
@@ -176,7 +176,7 @@ export const FinanceApplicationDetailsPage = () => {
               <div className="rounded-2xl border border-stone-100 p-5">
                 <div className="text-sm font-semibold text-stone-900">CREDIT READINESS SCORE</div>
                 <div className="mt-4 text-4xl font-semibold text-emerald-600">{score}</div>
-                <div className="mt-3 text-xs text-stone-500">Backend live score for this application</div>
+                <div className="mt-3 text-xs text-stone-500">live score for this application</div>
               </div>
 
               <div className="rounded-2xl border border-stone-100 p-4">

@@ -107,7 +107,7 @@ export const CooperativesPage = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-stone-900">Cooperative Overview</h1>
-            <p className="mt-1 text-sm text-stone-500">Live database view for your cooperative members, applications, and loan activity.</p>
+            <p className="mt-1 text-sm text-stone-500">Live view for your cooperative members, applications, and loan activity.</p>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -222,7 +222,7 @@ export const CooperativesPage = () => {
 
           <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-stone-900">Members from Database</h2>
+              <h2 className="text-lg font-semibold text-stone-900">Members</h2>
               <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">Latest</span>
             </div>
 
@@ -250,7 +250,7 @@ export const CooperativesPage = () => {
             <div>
               <h3 className="text-2xl font-semibold">Next Actions From Live Data</h3>
               <p className="mt-2 max-w-2xl text-sm text-emerald-50">
-                Keep members active, review their loan applications from the database, and maintain your cooperative approval so farmers can keep selecting it.
+                Keep members active, review their loan applications, and maintain your cooperative approval so farmers can keep selecting it.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link to="/cooperatives/members" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-emerald-700">View Members</Link>
