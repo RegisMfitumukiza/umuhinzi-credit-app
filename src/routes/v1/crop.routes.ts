@@ -9,6 +9,7 @@ import {
   getCropById,
   updateCrop,
   deleteCrop,
+  getCropPerformanceHistory,
 } from "../../controllers/crop.controller.js";
 
 import {
@@ -26,6 +27,7 @@ import {
   cropIdParamSchema,
   createSeasonSchema,
   seasonIdParamSchema,
+  cropPerformanceQuerySchema,
 } from "../../validators/crop.schema.js";
 
 /* ─────────────────────────────────────────
@@ -182,6 +184,44 @@ cropRouter.post(
   requireFarmer,
   validate(createCropSchema),
   createCrop
+);
+
+/**
+ * @swagger
+ * /api/v1/crops/performance:
+ *   get:
+ *     summary: Get crop performance history (Farmer)
+ *     description: Returns cross-season performance history for a specific crop name. Shows yield, input costs, and quality grade for every season the crop was planted.
+ *     tags: [Crops]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: cropName
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: Maize
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Crop performance history fetched successfully
+ *       400:
+ *         description: cropName is required
+ */
+cropRouter.get(
+  "/performance",
+  authenticate,
+  requireFarmer,
+  validate(cropPerformanceQuerySchema),
+  getCropPerformanceHistory
 );
 
 /**

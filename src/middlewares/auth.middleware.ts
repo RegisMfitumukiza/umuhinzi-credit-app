@@ -112,6 +112,53 @@ export const requireAdminOrGovernmentPartner = authorizeRoles(
   "GOVERNMENT_PARTNER"
 );
 
+/**
+ * Like requireAdminOrGovernmentPartner but also verifies the GOVERNMENT_PARTNER
+ * has an ACTIVE profile — blocks PENDING/REJECTED/REVOKED partners from analytics.
+ */
+export const requireAdminOrActiveGovernmentPartner = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) return next(new APIError("User not authenticated", 401));
+
+    if (req.user.role === "ADMIN") return next();
+
+    if (req.user.role !== "GOVERNMENT_PARTNER") {
+      return next(new APIError("You are not allowed to access this resource", 403));
+    }
+
+    const partner = await prisma.governmentPartner.findUnique({
+      where: { userId: req.user.id },
+      select: { status: true },
+    });
+
+    if (!partner) {
+      return next(
+        new APIError(
+          "Government partner profile not found. Please create your profile at POST /government-partners.",
+          403
+        )
+      );
+    }
+
+    if (partner.status !== "ACTIVE") {
+      return next(
+        new APIError(
+          `Analytics access is not available — your government partner profile is ${partner.status.toLowerCase()}.`,
+          403
+        )
+      );
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const requireAdminOrInstitution = authorizeRoles(
   "ADMIN",
   "INSTITUTION"

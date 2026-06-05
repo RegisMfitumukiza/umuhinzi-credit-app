@@ -29,6 +29,7 @@ model User {
   auditLogs                    AuditLog[]
   cooperativeManagerProfile    CooperativeManager?
   farmerProfile                Farmer?
+  governmentPartnerProfile     GovernmentPartner?
   institutionProfile           Institution?
   reviewedLoanApplications     LoanApplication[]
   loanStatusChanges            LoanStatusHistory[]

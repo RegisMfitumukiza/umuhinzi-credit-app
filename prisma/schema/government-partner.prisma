@@ -1,0 +1,24 @@
+model GovernmentPartner {
+  id               String                  @id @default(uuid())
+  userId           String                  @unique
+  organizationName String
+  department       String
+  officialEmail    String
+  mouReference     String?
+  accessPurpose    String
+  status           GovernmentPartnerStatus @default(PENDING)
+  adminNote        String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum GovernmentPartnerStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  REVOKED
+}

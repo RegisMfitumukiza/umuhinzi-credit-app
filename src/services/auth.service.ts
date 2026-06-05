@@ -36,6 +36,7 @@ const PUBLIC_REGISTRATION_ROLES = [
   "FARMER",
   "INSTITUTION",
   "COOPERATIVE_MANAGER",
+  "GOVERNMENT_PARTNER",
 ] as const;
 
 const getFrontendUrl = () =>
@@ -84,8 +85,15 @@ export const registerUserService = async (
 
   if (!(PUBLIC_REGISTRATION_ROLES as readonly string[]).includes(requestedRole)) {
     throw new APIError(
-      "Only farmers, institutions, and cooperative managers can self-register",
+      "Only farmers, institutions, cooperative managers, and government partners can self-register",
       403
+    );
+  }
+
+  if (requestedRole === "GOVERNMENT_PARTNER" && !input.email.endsWith(".gov.rw")) {
+    throw new APIError(
+      "Government partner accounts require an official .gov.rw email address",
+      400
     );
   }
 

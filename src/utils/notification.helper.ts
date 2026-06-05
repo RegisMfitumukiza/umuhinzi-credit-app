@@ -177,6 +177,21 @@ export const notifyCreditScoreUpdated = (
     actionUrl: `/credit-scores`,
   });
 
+export const notifyInstitutionNewApplication = (
+  userId: string,
+  applicationId: string,
+  farmerName: string,
+  requestedAmount: number
+) =>
+  createNotification({
+    userId,
+    type: "LOAN_APPROVAL",
+    priority: "MEDIUM",
+    title: "New Loan Application Received",
+    message: `${farmerName} has submitted a loan application for ${requestedAmount.toLocaleString()} RWF. Review it to proceed.`,
+    actionUrl: `/loan-applications/${applicationId}`,
+  });
+
 export const notifyMissingData = (userId: string, missingFields: string[]) =>
   createNotification({
     userId,

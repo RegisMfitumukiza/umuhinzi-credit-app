@@ -9,6 +9,7 @@ import {
   createYieldRecordService,
   getMyYieldRecordsService,
   getAllYieldRecordsService,
+  getCooperativeYieldRecordsService,
   getYieldRecordByIdService,
   updateYieldRecordService,
   verifyYieldRecordService,
@@ -25,6 +26,8 @@ import {
   getProductivityRecordByIdService,
   updateProductivityRecordService,
   deleteProductivityRecordService,
+  getProductivityDashboardService,
+  getProductivityBenchmarkService,
 } from "../services/productivity.service.js";
 
 import { Role } from "../generated/prisma/client.js";
@@ -64,11 +67,11 @@ export const getYieldRecords = asyncHandler(
     if (!req.user) throw new APIError("User not authenticated", 401);
 
     const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
-    const isAdmin = req.user.role === Role.ADMIN;
+    const role = req.user.role;
     const cropId = req.query.cropId ? String(req.query.cropId) : undefined;
 
-    if (!isAdmin) {
-      const result = await getMyYieldRecordsService(req.user.id, { skip, limit, cropId });
+    if (role === Role.ADMIN) {
+      const result = await getAllYieldRecordsService({ skip, limit });
       return res.status(200).json({
         success: true,
         message: "Yield records fetched successfully",
@@ -77,7 +80,28 @@ export const getYieldRecords = asyncHandler(
       });
     }
 
-    const result = await getAllYieldRecordsService({ skip, limit });
+    if (role === Role.COOPERATIVE_MANAGER) {
+      const rawStatus = req.query.verificationStatus
+        ? String(req.query.verificationStatus)
+        : undefined;
+      const verificationStatus =
+        rawStatus === "PENDING" || rawStatus === "VERIFIED" || rawStatus === "REJECTED"
+          ? rawStatus
+          : undefined;
+      const result = await getCooperativeYieldRecordsService(req.user.id, {
+        skip,
+        limit,
+        verificationStatus,
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Yield records fetched successfully",
+        data: result.yields,
+        pagination: { page, ...result.pagination },
+      });
+    }
+
+    const result = await getMyYieldRecordsService(req.user.id, { skip, limit, cropId });
     res.status(200).json({
       success: true,
       message: "Yield records fetched successfully",
@@ -95,7 +119,8 @@ export const getYieldRecordById = asyncHandler(
     const record = await getYieldRecordByIdService(
       String(req.params.id),
       req.user.id,
-      isAdmin
+      isAdmin,
+      req.user.role
     );
 
     res.status(200).json({
@@ -295,6 +320,39 @@ export const deleteInputCost = asyncHandler(
     res.status(200).json({
       success: true,
       message: result.message,
+    });
+  }
+);
+
+/* ─────────────────────────────────────────
+   PRODUCTIVITY DASHBOARD & BENCHMARK
+───────────────────────────────────────── */
+
+export const getProductivityBenchmark = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const cropName = String(req.query.cropName);
+    const result = await getProductivityBenchmarkService(req.user.id, cropName);
+
+    res.status(200).json({
+      success: true,
+      message: "Productivity benchmark fetched successfully",
+      data: result,
+    });
+  }
+);
+
+export const getProductivityDashboard = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const dashboard = await getProductivityDashboardService(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Productivity dashboard fetched successfully",
+      data: dashboard,
     });
   }
 );

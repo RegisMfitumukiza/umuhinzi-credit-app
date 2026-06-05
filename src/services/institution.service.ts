@@ -82,10 +82,20 @@ const assertInstitutionActivationReady = (institution: {
   }
 };
 
+const CRITICAL_INSTITUTION_FIELDS: (keyof UpdateInstitutionInput)[] = [
+  "name",
+  "type",
+  "registrationNumber",
+  "licenseNumber",
+  "email",
+  "phone",
+  "address",
+  "province",
+  "district",
+];
+
 const hasCriticalInstitutionChanges = (input: UpdateInstitutionInput) =>
-  ["name", "type", "registrationNumber", "licenseNumber"].some(
-    (field) => field in input
-  );
+  CRITICAL_INSTITUTION_FIELDS.some((field) => field in input);
 
 /* ─────────────────────────────────────────
    CREATE INSTITUTION

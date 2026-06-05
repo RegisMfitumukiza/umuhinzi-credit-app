@@ -62,6 +62,9 @@ const safeSeasonSelect = {
 
 /* ─── helpers ─── */
 
+const roundNumber = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
 const resolveFarmerIdFromUser = async (userId: string) => {
   const farmer = await prisma.farmer.findUnique({
     where: { userId },
@@ -626,6 +629,121 @@ export const updateCropService = async (
   await triggerCreditScoreRecalculation(farmerId);
 
   return updated;
+};
+
+export const getCropPerformanceHistoryService = async (
+  userId: string,
+  cropName: string,
+  options: { skip?: number; limit?: number } = {}
+) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+  const { skip = 0, limit = 20 } = options;
+
+  const where: Prisma.CropWhereInput = {
+    farm: { farmerId },
+    cropName: { equals: cropName, mode: "insensitive" },
+  };
+
+  const [crops, total] = await Promise.all([
+    prisma.crop.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: [
+        { season: { year: "desc" } },
+        { season: { startDate: "desc" } },
+      ],
+      select: {
+        id: true,
+        cropName: true,
+        cropType: true,
+        plantingDate: true,
+        expectedHarvestDate: true,
+        actualHarvestDate: true,
+        estimatedArea: true,
+        status: true,
+        notes: true,
+        farm: { select: { id: true, name: true, district: true } },
+        season: { select: { id: true, name: true, year: true } },
+        yieldRecords: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            actualYield: true,
+            expectedYield: true,
+            unit: true,
+            qualityGrade: true,
+            verificationStatus: true,
+            verifiedActualYield: true,
+            verifiedUnit: true,
+          },
+        },
+        inputCosts: { select: { totalCost: true } },
+        _count: { select: { inputCosts: true } },
+      },
+    }),
+    prisma.crop.count({ where }),
+  ]);
+
+  const history = crops.map((crop) => {
+    const yieldRecord = crop.yieldRecords[0] ?? null;
+    const inputCostTotal = roundNumber(
+      crop.inputCosts.reduce((sum, c) => sum + c.totalCost, 0)
+    );
+
+    return {
+      cropId: crop.id,
+      cropName: crop.cropName,
+      cropType: crop.cropType,
+      farm: crop.farm,
+      season: crop.season,
+      plantingDate: crop.plantingDate,
+      expectedHarvestDate: crop.expectedHarvestDate,
+      actualHarvestDate: crop.actualHarvestDate,
+      estimatedArea: crop.estimatedArea,
+      status: crop.status,
+      notes: crop.notes,
+      yield: yieldRecord
+        ? {
+            actualYield: yieldRecord.verifiedActualYield ?? yieldRecord.actualYield,
+            expectedYield: yieldRecord.expectedYield,
+            unit: yieldRecord.verifiedUnit ?? yieldRecord.unit,
+            qualityGrade: yieldRecord.qualityGrade,
+            verificationStatus: yieldRecord.verificationStatus,
+          }
+        : null,
+      inputCostTotal,
+      inputCostCount: crop._count.inputCosts,
+    };
+  });
+
+  const harvestedHistory = history.filter(
+    (c) => c.status === "HARVESTED" && c.yield !== null
+  );
+  const totalActualYield = roundNumber(
+    harvestedHistory.reduce((sum, c) => sum + (c.yield?.actualYield ?? 0), 0)
+  );
+
+  return {
+    cropName,
+    seasonsPlanted: total,
+    harvestedCount: harvestedHistory.length,
+    totalActualYield,
+    averageYieldPerSeason:
+      harvestedHistory.length > 0
+        ? roundNumber(totalActualYield / harvestedHistory.length)
+        : 0,
+    history,
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
 };
 
 export const deleteCropService = async (

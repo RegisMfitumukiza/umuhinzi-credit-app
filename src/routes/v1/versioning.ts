@@ -24,6 +24,7 @@ import {
   repaymentScheduleRouter,
 } from "./loan.routes.js";
 import { institutionRouter } from "./institution.routes.js";
+import { governmentPartnerRouter } from "./government-partner.routes.js";
 import { cooperativeRouter, cooperativeMemberRouter } from "./cooperative.routes.js";
 import { recommendationRouter } from "./recommendation.routes.js";
 import { notificationRouter } from "./notification.routes.js";
@@ -53,6 +54,7 @@ router.use("/loans", loanRouter);
 router.use("/repayments", repaymentRouter);
 router.use("/repayment-schedules", repaymentScheduleRouter);
 router.use("/institutions", institutionRouter);
+router.use("/government-partners", governmentPartnerRouter);
 router.use("/cooperatives", cooperativeRouter);
 router.use("/cooperative-members", cooperativeMemberRouter);
 router.use("/recommendations", recommendationRouter);

@@ -5,6 +5,7 @@ import app from "./app.js";
 import { prisma } from "./lib/prisma.js";
 import { logger } from "./utils/logger.js";
 import { startOverdueSchedulesJob } from "./jobs/overdue-schedules.job.js";
+import { startAutoCreditScoreJob } from "./jobs/auto-credit-score.job.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -46,6 +47,7 @@ async function startServer() {
 
       // Start background jobs
       startOverdueSchedulesJob();
+      startAutoCreditScoreJob();
     });
   } catch (error) {
     logger.error("Failed to start server", { error });

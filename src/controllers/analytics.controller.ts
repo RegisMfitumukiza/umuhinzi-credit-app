@@ -10,6 +10,9 @@ import {
   getRegionalAnalyticsService,
   generateAnalyticsReportService,
   getAnalyticsReportsService,
+  getLoanTrendsService,
+  getCreditScoreDistributionService,
+  getRepaymentTrendsService,
 } from "../services/analytics.service.js";
 
 export const getPlatformAnalytics = asyncHandler(async (req: Request, res: Response) => {
@@ -70,12 +73,53 @@ export const getAnalyticsReports = asyncHandler(async (req: Request, res: Respon
   const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
   const reportType = req.query.reportType ? String(req.query.reportType) : undefined;
 
-  const result = await getAnalyticsReportsService({ skip, limit, reportType });
+  const result = await getAnalyticsReportsService({
+    skip,
+    limit,
+    reportType,
+    userRole: req.user.role,
+  });
 
   res.status(200).json({
     success: true,
     message: "Analytics reports fetched successfully",
     data: result.reports,
     pagination: { page, ...result.pagination },
+  });
+});
+
+export const getLoanTrends = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getLoanTrendsService();
+
+  res.status(200).json({
+    success: true,
+    message: "Loan trends fetched successfully",
+    data,
+  });
+});
+
+export const getCreditScoreDistribution = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getCreditScoreDistributionService();
+
+  res.status(200).json({
+    success: true,
+    message: "Credit score distribution fetched successfully",
+    data,
+  });
+});
+
+export const getRepaymentTrends = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const data = await getRepaymentTrendsService();
+
+  res.status(200).json({
+    success: true,
+    message: "Repayment trends fetched successfully",
+    data,
   });
 });

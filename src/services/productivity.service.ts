@@ -3,6 +3,10 @@ import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
 import { triggerCreditScoreRecalculation } from "../utils/auto-credit-score.helper.js";
 import { refreshFinancialSummaryForCrop } from "./finance.service.js";
+import {
+  generateYieldVerifiedRecommendation,
+  generateYieldRejectedRecommendation,
+} from "./recommendation.service.js";
 
 import type { Prisma, Role } from "../generated/prisma/client.js";
 import type {
@@ -606,10 +610,67 @@ export const getAllYieldRecordsService = async (
   };
 };
 
+export const getCooperativeYieldRecordsService = async (
+  userId: string,
+  options: {
+    skip?: number;
+    limit?: number;
+    verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  } = {}
+) => {
+  const { skip = 0, limit = 10, verificationStatus } = options;
+
+  const manager = await prisma.cooperativeManager.findUnique({
+    where: { userId },
+    select: { cooperativeId: true, cooperative: { select: { status: true } } },
+  });
+
+  if (!manager || manager.cooperative.status !== "ACTIVE") {
+    throw new APIError("Active cooperative manager profile required", 403);
+  }
+
+  const members = await prisma.cooperativeMember.findMany({
+    where: { cooperativeId: manager.cooperativeId, status: "ACTIVE" },
+    select: { farmerId: true },
+  });
+
+  const farmerIds = members.map((m) => m.farmerId);
+
+  const where: Prisma.YieldRecordWhereInput = {
+    crop: { farm: { farmerId: { in: farmerIds } } },
+    ...(verificationStatus && { verificationStatus }),
+  };
+
+  const [records, total] = await Promise.all([
+    prisma.yieldRecord.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      select: safeYieldRecordSelect,
+    }),
+    prisma.yieldRecord.count({ where }),
+  ]);
+
+  return {
+    yields: records,
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
+};
+
 export const getYieldRecordByIdService = async (
   recordId: string,
   userId?: string,
-  isAdmin = false
+  isAdmin = false,
+  userRole?: string
 ) => {
   const record = await prisma.yieldRecord.findUnique({
     where: { id: recordId },
@@ -618,7 +679,31 @@ export const getYieldRecordByIdService = async (
 
   if (!record) throw new APIError("Yield record not found", 404);
 
-  if (!isAdmin && userId) {
+  if (isAdmin) return record;
+
+  if (userRole === "COOPERATIVE_MANAGER" && userId) {
+    const manager = await prisma.cooperativeManager.findUnique({
+      where: { userId },
+      select: { cooperativeId: true, cooperative: { select: { status: true } } },
+    });
+    if (!manager || manager.cooperative.status !== "ACTIVE") {
+      throw new APIError("Active cooperative manager profile required", 403);
+    }
+    const membership = await prisma.cooperativeMember.findUnique({
+      where: { farmerId: record.crop.farm.farmerId },
+      select: { cooperativeId: true, status: true },
+    });
+    if (
+      !membership ||
+      membership.status !== "ACTIVE" ||
+      membership.cooperativeId !== manager.cooperativeId
+    ) {
+      throw new APIError("You are not authorized to access this yield record", 403);
+    }
+    return record;
+  }
+
+  if (userId) {
     const farmerId = await resolveFarmerIdFromUser(userId);
     if (record.crop.farm.farmerId !== farmerId) {
       throw new APIError("You are not authorized to access this yield record", 403);
@@ -843,6 +928,18 @@ export const verifyYieldRecordService = async (
   );
   await refreshFinancialSummaryForCrop(existing.cropId, context);
   await triggerCreditScoreRecalculation(existing.crop.farm.farmerId);
+
+  if (input.status === "VERIFIED") {
+    await generateYieldVerifiedRecommendation(
+      existing.crop.farm.farmerId,
+      existing.crop.cropName
+    );
+  } else if (input.status === "REJECTED") {
+    await generateYieldRejectedRecommendation(
+      existing.crop.farm.farmerId,
+      existing.crop.cropName
+    );
+  }
 
   return updated;
 };
@@ -1399,6 +1496,245 @@ export const updateProductivityRecordService = async (
   });
 
   return updated;
+};
+
+export const getProductivityDashboardService = async (userId: string) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+
+  const today = new Date();
+
+  const [allRecords, activeSeason] = await Promise.all([
+    prisma.productivityRecord.findMany({
+      where: { farmerId },
+      orderBy: [
+        { season: { year: "desc" } },
+        { season: { startDate: "desc" } },
+      ],
+      select: {
+        totalActualYield: true,
+        totalExpectedYield: true,
+        unit: true,
+        productivityRate: true,
+        season: {
+          select: { id: true, name: true, year: true, startDate: true, endDate: true },
+        },
+      },
+    }),
+    prisma.farmingSeason.findFirst({
+      where: { startDate: { lte: today } },
+      orderBy: [{ year: "desc" }, { startDate: "desc" }],
+      select: { id: true, name: true, year: true, startDate: true, endDate: true },
+    }),
+  ]);
+
+  let currentSeason: {
+    season: typeof activeSeason;
+    cropsPlanted: number;
+    totalEstimatedArea: number;
+    statusBreakdown: Record<string, number>;
+    productivityRate: number | null;
+    totalActualYield: number | null;
+    yieldUnit: string | null;
+  } | null = null;
+
+  if (activeSeason) {
+    const crops = await prisma.crop.findMany({
+      where: { seasonId: activeSeason.id, farm: { farmerId } },
+      select: { status: true, estimatedArea: true },
+    });
+
+    const currentRecord = allRecords.find((r) => r.season.id === activeSeason.id) ?? null;
+
+    const statusBreakdown: Record<string, number> = {
+      PLANNED: 0,
+      PLANTED: 0,
+      GROWING: 0,
+      HARVESTED: 0,
+      FAILED: 0,
+    };
+    let totalEstimatedArea = 0;
+
+    for (const crop of crops) {
+      statusBreakdown[crop.status] = (statusBreakdown[crop.status] ?? 0) + 1;
+      if (crop.estimatedArea) totalEstimatedArea += crop.estimatedArea;
+    }
+
+    currentSeason = {
+      season: activeSeason,
+      cropsPlanted: crops.length,
+      totalEstimatedArea: roundNumber(totalEstimatedArea),
+      statusBreakdown,
+      productivityRate: currentRecord?.productivityRate ?? null,
+      totalActualYield: currentRecord?.totalActualYield ?? null,
+      yieldUnit: currentRecord?.unit ?? null,
+    };
+  }
+
+  const totalSeasons = allRecords.length;
+  const averageProductivityRate =
+    totalSeasons > 0
+      ? roundNumber(
+          allRecords.reduce((sum, r) => sum + r.productivityRate, 0) / totalSeasons
+        )
+      : 0;
+
+  const bestRecord = allRecords.reduce<(typeof allRecords)[number] | null>(
+    (best, r) => (!best || r.productivityRate > best.productivityRate ? r : best),
+    null
+  );
+
+  const seasonalTrend = allRecords.slice(0, 8).map((r) => ({
+    season: `${r.season.name} ${r.season.year}`,
+    productivityRate: r.productivityRate,
+    totalActualYield: r.totalActualYield,
+    totalExpectedYield: r.totalExpectedYield,
+    unit: r.unit,
+  }));
+
+  return {
+    summary: {
+      totalSeasons,
+      averageProductivityRate,
+      bestSeasonRate: bestRecord?.productivityRate ?? null,
+      bestSeasonName: bestRecord
+        ? `${bestRecord.season.name} ${bestRecord.season.year}`
+        : null,
+    },
+    currentSeason,
+    seasonalTrend,
+  };
+};
+
+export const getProductivityBenchmarkService = async (
+  userId: string,
+  cropName: string
+) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+
+  const AREA_TO_HECTARE: Record<string, number> = {
+    HECTARE: 1,
+    ACRE: 0.404686,
+    SQUARE_METER: 0.0001,
+  };
+
+  const farmerFarm = await prisma.farm.findFirst({
+    where: { farmerId, status: "ACTIVE" },
+    select: { district: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const farmerDistrict = farmerFarm?.district ?? null;
+
+  const yieldData = await prisma.yieldRecord.findMany({
+    where: {
+      verificationStatus: "VERIFIED",
+      crop: {
+        cropName: { equals: cropName, mode: "insensitive" },
+        estimatedArea: { gt: 0 },
+      },
+    },
+    select: {
+      verifiedActualYield: true,
+      actualYield: true,
+      crop: {
+        select: {
+          estimatedArea: true,
+          farm: {
+            select: {
+              farmerId: true,
+              district: true,
+              landUnit: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  type YieldEntry = { farmerId: string; district: string; yieldPerHa: number };
+
+  const entries: YieldEntry[] = yieldData
+    .filter((r) => r.crop.estimatedArea && r.crop.estimatedArea > 0)
+    .map((r) => {
+      const yieldValue = r.verifiedActualYield ?? r.actualYield;
+      const area = r.crop.estimatedArea!;
+      const areaFactor = AREA_TO_HECTARE[r.crop.farm.landUnit] ?? 1;
+      const areaHa = area * areaFactor;
+      return {
+        farmerId: r.crop.farm.farmerId,
+        district: r.crop.farm.district,
+        yieldPerHa: yieldValue / areaHa,
+      };
+    });
+
+  const computeAvg = (arr: YieldEntry[]) =>
+    arr.length > 0
+      ? roundNumber(arr.reduce((s, e) => s + e.yieldPerHa, 0) / arr.length)
+      : null;
+
+  const farmerEntries = entries.filter((e) => e.farmerId === farmerId);
+  const districtEntries = farmerDistrict
+    ? entries.filter((e) => e.district === farmerDistrict)
+    : [];
+
+  const farmerAvg = computeAvg(farmerEntries);
+  const districtAvg = computeAvg(districtEntries);
+  const nationalAvg = computeAvg(entries);
+
+  let districtPercentile: number | null = null;
+  if (farmerAvg !== null && districtEntries.length > 0) {
+    const below = districtEntries.filter((e) => e.yieldPerHa < farmerAvg).length;
+    districtPercentile = Math.round((below / districtEntries.length) * 100);
+  }
+
+  let performanceRating: "EXCELLENT" | "ABOVE_AVERAGE" | "AVERAGE" | "BELOW_AVERAGE" | "INSUFFICIENT_DATA" =
+    "INSUFFICIENT_DATA";
+  if (farmerAvg !== null && nationalAvg !== null) {
+    const ratio = farmerAvg / nationalAvg;
+    if (ratio >= 1.2) performanceRating = "EXCELLENT";
+    else if (ratio >= 1.05) performanceRating = "ABOVE_AVERAGE";
+    else if (ratio >= 0.85) performanceRating = "AVERAGE";
+    else performanceRating = "BELOW_AVERAGE";
+  }
+
+  const districtMap = new Map<string, number[]>();
+  for (const e of entries) {
+    const arr = districtMap.get(e.district) ?? [];
+    arr.push(e.yieldPerHa);
+    districtMap.set(e.district, arr);
+  }
+  const topDistrictsByYield = Array.from(districtMap.entries())
+    .map(([district, yields]) => ({
+      district,
+      avgYieldPerHa: roundNumber(yields.reduce((s, v) => s + v, 0) / yields.length),
+      recordCount: yields.length,
+    }))
+    .sort((a, b) => b.avgYieldPerHa - a.avgYieldPerHa)
+    .slice(0, 5);
+
+  return {
+    cropName,
+    yieldUnit: "kg/ha",
+    note: "Benchmarks include only verified yields where crop area is recorded",
+    farmer: {
+      district: farmerDistrict,
+      avgYieldPerHa: farmerAvg,
+      recordCount: farmerEntries.length,
+    },
+    districtBenchmark: farmerDistrict
+      ? {
+          district: farmerDistrict,
+          avgYieldPerHa: districtAvg,
+          recordCount: districtEntries.length,
+          farmerPercentile: districtPercentile,
+        }
+      : null,
+    nationalBenchmark: {
+      avgYieldPerHa: nationalAvg,
+      totalRecords: entries.length,
+    },
+    performanceRating,
+    topDistrictsByYield,
+  };
 };
 
 export const deleteProductivityRecordService = async (

@@ -1,7 +1,8 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
-import { notifyCreditScoreUpdated } from "../utils/notification.helper.js";
+import { notifyCreditScoreUpdated, notifyMissingData } from "../utils/notification.helper.js";
+import { autoGenerateRecommendationsFromScore } from "./recommendation.service.js";
 
 import type { Prisma, CreditScoreFactorType, RiskLevel } from "../generated/prisma/client.js";
 
@@ -531,6 +532,13 @@ export const generateCreditScoreService = async (
 
   if (!farmer) throw new APIError("Farmer not found", 404);
 
+  const pendingYieldCount = await prisma.yieldRecord.count({
+    where: {
+      verificationStatus: { notIn: ["VERIFIED"] },
+      crop: { farm: { farmerId } },
+    },
+  });
+
   // Compute factor scores
   const factorResults: Record<
     CreditScoreFactorType,
@@ -560,7 +568,11 @@ export const generateCreditScoreService = async (
   const recommendedAction = buildRecommendedAction(riskLevel);
 
   // Build individual factor breakdown for summary
-  const summary = `Score: ${totalScore}/100. Risk: ${riskLevel}. ${reason}`;
+  const pendingNote =
+    pendingYieldCount > 0
+      ? ` ${pendingYieldCount} pending yield record(s) excluded — score will update after admin verification.`
+      : "";
+  const summary = `Score: ${totalScore}/100. Risk: ${riskLevel}. ${reason}.${pendingNote}`;
 
   // Persist credit score with all factors in a single transaction
   const creditScore = await prisma.$transaction(async (tx) => {
@@ -627,14 +639,31 @@ export const generateCreditScoreService = async (
     userAgent: context.userAgent,
   });
 
-  // Notify the farmer about their updated credit score
+  // Notify the farmer about their updated credit score and auto-generate recommendations
   const farmerUser = await prisma.farmer.findUnique({
     where: { id: farmerId },
     select: { userId: true },
   });
   if (farmerUser?.userId) {
     await notifyCreditScoreUpdated(farmerUser.userId, totalScore, riskLevel);
+
+    // Alert on poor data completeness so farmer knows which fields to fill
+    if (factorResults.DATA_COMPLETENESS.score < 40) {
+      const missingFields: string[] = [];
+      if (!farmer.dateOfBirth) missingFields.push("date of birth");
+      if (!farmer.gender) missingFields.push("gender");
+      if (!farmer.farmingExperienceYears || farmer.farmingExperienceYears <= 0)
+        missingFields.push("farming experience");
+      if (!farmer.primaryCrop) missingFields.push("primary crop");
+      if (farms.length === 0) missingFields.push("farm registration");
+      if (cropsCount === 0) missingFields.push("crop records");
+      if (missingFields.length > 0) {
+        await notifyMissingData(farmerUser.userId, missingFields);
+      }
+    }
   }
+
+  await autoGenerateRecommendationsFromScore(farmerId, factorResults, riskLevel);
 
   return creditScore;
 };
@@ -742,6 +771,147 @@ export const getLatestCreditScoreService = async (userId: string) => {
   }
 
   return creditScore;
+};
+
+function buildTrendInsight(
+  trajectory: "IMPROVING" | "DECLINING" | "STABLE",
+  totalDelta: number,
+  momentumDelta: number,
+  dataPoints: number
+): string {
+  if (dataPoints < 2) {
+    return "Only one score recorded. Regenerate your score over time to track your trajectory.";
+  }
+  const absDelta = Math.abs(totalDelta);
+  const direction = totalDelta >= 0 ? "increased" : "decreased";
+  const momentum =
+    momentumDelta > 3
+      ? " Momentum is accelerating."
+      : momentumDelta < -3
+      ? " Recent momentum is declining."
+      : "";
+
+  if (trajectory === "IMPROVING") {
+    return `Your score has ${direction} by ${absDelta} points across ${dataPoints} assessments.${momentum}`;
+  }
+  if (trajectory === "DECLINING") {
+    return `Your score has ${direction} by ${absDelta} points across ${dataPoints} assessments. Focus on yield verification and repayment consistency.${momentum}`;
+  }
+  return `Your score is stable across ${dataPoints} assessments (${totalDelta >= 0 ? "+" : ""}${totalDelta} points).${momentum}`;
+}
+
+export const getCreditScoreTrendService = async (
+  userId: string,
+  limit = 10
+) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+
+  const scores = await prisma.creditScore.findMany({
+    where: { farmerId },
+    orderBy: { generatedAt: "asc" },
+    take: limit,
+    select: {
+      id: true,
+      score: true,
+      riskLevel: true,
+      yieldConsistencyScore: true,
+      farmingHistoryScore: true,
+      incomeStabilityScore: true,
+      repaymentBehaviorScore: true,
+      productivityScore: true,
+      dataCompletenessScore: true,
+      locationVerificationScore: true,
+      generatedAt: true,
+    },
+  });
+
+  if (scores.length === 0) {
+    return {
+      hasData: false,
+      trajectory: null,
+      insight: "No credit score history found. Generate your first credit score to start tracking your trajectory.",
+      currentScore: null,
+      currentRiskLevel: null,
+      previousScore: null,
+      scoreDelta: null,
+      momentumDelta: null,
+      dataPoints: 0,
+      scoreHistory: [],
+      factorTrends: null,
+    };
+  }
+
+  const first = scores[0];
+  const latest = scores[scores.length - 1];
+  const previous = scores.length >= 2 ? scores[scores.length - 2] : null;
+
+  const totalDelta = latest.score - first.score;
+  const momentumDelta = previous ? latest.score - previous.score : 0;
+
+  const trajectory: "IMPROVING" | "DECLINING" | "STABLE" =
+    scores.length < 2 ? "STABLE" : totalDelta >= 5 ? "IMPROVING" : totalDelta <= -5 ? "DECLINING" : "STABLE";
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  const factorTrends =
+    scores.length >= 2
+      ? {
+          yieldConsistency: {
+            first: round2(first.yieldConsistencyScore),
+            latest: round2(latest.yieldConsistencyScore),
+            delta: round2(latest.yieldConsistencyScore - first.yieldConsistencyScore),
+          },
+          farmingHistory: {
+            first: round2(first.farmingHistoryScore),
+            latest: round2(latest.farmingHistoryScore),
+            delta: round2(latest.farmingHistoryScore - first.farmingHistoryScore),
+          },
+          incomeStability: {
+            first: round2(first.incomeStabilityScore),
+            latest: round2(latest.incomeStabilityScore),
+            delta: round2(latest.incomeStabilityScore - first.incomeStabilityScore),
+          },
+          repaymentBehavior: {
+            first: round2(first.repaymentBehaviorScore),
+            latest: round2(latest.repaymentBehaviorScore),
+            delta: round2(latest.repaymentBehaviorScore - first.repaymentBehaviorScore),
+          },
+          productivity: {
+            first: round2(first.productivityScore),
+            latest: round2(latest.productivityScore),
+            delta: round2(latest.productivityScore - first.productivityScore),
+          },
+          dataCompleteness: {
+            first: round2(first.dataCompletenessScore),
+            latest: round2(latest.dataCompletenessScore),
+            delta: round2(latest.dataCompletenessScore - first.dataCompletenessScore),
+          },
+          locationVerification: {
+            first: round2(first.locationVerificationScore),
+            latest: round2(latest.locationVerificationScore),
+            delta: round2(latest.locationVerificationScore - first.locationVerificationScore),
+          },
+        }
+      : null;
+
+  return {
+    hasData: true,
+    trajectory,
+    insight: buildTrendInsight(trajectory, totalDelta, momentumDelta, scores.length),
+    currentScore: latest.score,
+    currentRiskLevel: latest.riskLevel,
+    previousScore: previous?.score ?? null,
+    scoreDelta: totalDelta,
+    momentumDelta,
+    dataPoints: scores.length,
+    scoreHistory: scores.map((s) => ({
+      id: s.id,
+      score: s.score,
+      riskLevel: s.riskLevel,
+      generatedAt: s.generatedAt,
+    })),
+    factorTrends,
+  };
 };
 
 export const getCreditScoresByFarmerIdService = async (farmerId: string) => {

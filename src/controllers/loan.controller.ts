@@ -102,12 +102,25 @@ export const getLoanApplications = asyncHandler(
     if (req.query.farmerId) where.farmerId = String(req.query.farmerId);
     if (req.query.status) where.status = req.query.status as LoanApplicationStatus;
 
+    const minCreditScore = req.query.minCreditScore
+      ? Number(req.query.minCreditScore)
+      : undefined;
+    const maxCreditScore = req.query.maxCreditScore
+      ? Number(req.query.maxCreditScore)
+      : undefined;
+    const creditRiskLevel = req.query.creditRiskLevel
+      ? String(req.query.creditRiskLevel)
+      : undefined;
+
     if (req.user.role === Role.INSTITUTION) {
       const result = await getAllLoanApplicationsService({
         skip,
         limit,
         where,
         institutionUserId: req.user.id,
+        minCreditScore,
+        maxCreditScore,
+        creditRiskLevel,
       });
       return res.status(200).json({
         success: true,
@@ -117,7 +130,14 @@ export const getLoanApplications = asyncHandler(
       });
     }
 
-    const result = await getAllLoanApplicationsService({ skip, limit, where });
+    const result = await getAllLoanApplicationsService({
+      skip,
+      limit,
+      where,
+      minCreditScore,
+      maxCreditScore,
+      creditRiskLevel,
+    });
     res.status(200).json({
       success: true,
       message: "Loan applications fetched successfully",

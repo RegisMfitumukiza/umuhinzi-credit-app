@@ -390,10 +390,18 @@ export const getAnalyticsReportsService = async (options: {
   skip?: number;
   limit?: number;
   reportType?: string;
+  userRole?: string;
 }) => {
-  const { skip = 0, limit = 10, reportType } = options;
+  const { skip = 0, limit = 10, reportType, userRole } = options;
+
+  // Government partners can only see reports published for them or as public summary
+  const visibilityFilter: Prisma.AnalyticsReportWhereInput =
+    userRole === "GOVERNMENT_PARTNER"
+      ? { visibility: { in: ["GOVERNMENT_PARTNER", "PUBLIC_SUMMARY"] } }
+      : {};
 
   const where: Prisma.AnalyticsReportWhereInput = {
+    ...visibilityFilter,
     ...(reportType && { reportType: reportType as never }),
   };
 
@@ -430,4 +438,90 @@ export const getAnalyticsReportsService = async (options: {
       hasPreviousPage: skip > 0,
     },
   };
+};
+
+/* ─────────────────────────────────────────
+   LOAN TRENDS (monthly, last 12 months)
+───────────────────────────────────────── */
+
+export const getLoanTrendsService = async () => {
+  const rows = await prisma.$queryRaw<
+    Array<{ month: string; loan_count: bigint; disbursed_amount: string }>
+  >`
+    SELECT
+      TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS month,
+      COUNT(*)::bigint                                      AS loan_count,
+      COALESCE(SUM("disbursedAmount"), 0)::text            AS disbursed_amount
+    FROM "Loan"
+    WHERE "createdAt" >= NOW() - INTERVAL '12 months'
+    GROUP BY DATE_TRUNC('month', "createdAt")
+    ORDER BY DATE_TRUNC('month', "createdAt") ASC
+  `;
+
+  return rows.map((r) => ({
+    month: r.month,
+    loanCount: Number(r.loan_count),
+    disbursedAmount: parseFloat(r.disbursed_amount),
+  }));
+};
+
+/* ─────────────────────────────────────────
+   CREDIT SCORE DISTRIBUTION (histogram)
+   Uses only the latest score per farmer.
+───────────────────────────────────────── */
+
+export const getCreditScoreDistributionService = async () => {
+  const rows = await prisma.$queryRaw<
+    Array<{ band: string; farmer_count: bigint; avg_score: string }>
+  >`
+    WITH latest AS (
+      SELECT DISTINCT ON ("farmerId") score
+      FROM "CreditScore"
+      ORDER BY "farmerId", "createdAt" DESC
+    )
+    SELECT
+      CASE
+        WHEN score BETWEEN 0  AND 20  THEN '0–20 (Very Poor)'
+        WHEN score BETWEEN 21 AND 40  THEN '21–40 (Poor)'
+        WHEN score BETWEEN 41 AND 60  THEN '41–60 (Fair)'
+        WHEN score BETWEEN 61 AND 80  THEN '61–80 (Good)'
+        WHEN score BETWEEN 81 AND 100 THEN '81–100 (Excellent)'
+      END                              AS band,
+      COUNT(*)::bigint                 AS farmer_count,
+      ROUND(AVG(score)::numeric, 2)::text AS avg_score
+    FROM latest
+    GROUP BY band
+    ORDER BY band
+  `;
+
+  return rows.map((r) => ({
+    band: r.band,
+    farmerCount: Number(r.farmer_count),
+    averageScore: parseFloat(r.avg_score),
+  }));
+};
+
+/* ─────────────────────────────────────────
+   REPAYMENT TRENDS (monthly, last 12 months)
+───────────────────────────────────────── */
+
+export const getRepaymentTrendsService = async () => {
+  const rows = await prisma.$queryRaw<
+    Array<{ month: string; payment_count: bigint; total_paid: string }>
+  >`
+    SELECT
+      TO_CHAR(DATE_TRUNC('month', "paidAt"), 'YYYY-MM') AS month,
+      COUNT(*)::bigint                                    AS payment_count,
+      COALESCE(SUM("amountPaid"), 0)::text               AS total_paid
+    FROM "Repayment"
+    WHERE "paidAt" >= NOW() - INTERVAL '12 months'
+    GROUP BY DATE_TRUNC('month', "paidAt")
+    ORDER BY DATE_TRUNC('month', "paidAt") ASC
+  `;
+
+  return rows.map((r) => ({
+    month: r.month,
+    paymentCount: Number(r.payment_count),
+    totalAmountPaid: parseFloat(r.total_paid),
+  }));
 };

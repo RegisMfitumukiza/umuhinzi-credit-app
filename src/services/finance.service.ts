@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
 import { triggerCreditScoreRecalculation } from "../utils/auto-credit-score.helper.js";
+import { generateMarketPriceRecommendations } from "./recommendation.service.js";
 
 import type { CashFlowStatus, Prisma } from "../generated/prisma/client.js";
 import type {
@@ -1142,6 +1143,14 @@ export const createMarketPriceService = async (
 
   await refreshFinancialSummariesForMarketCropNames([price.cropName], context);
 
+  // Fan-out market intelligence recommendations to matching farmers (fire-and-forget)
+  void generateMarketPriceRecommendations(
+    price.cropName,
+    price.pricePerUnit,
+    price.unit,
+    price.marketLocation
+  );
+
   return price;
 };
 
@@ -1267,4 +1276,132 @@ export const deleteMarketPriceService = async (
   await refreshFinancialSummariesForMarketCropNames([existing.cropName], context);
 
   return { message: "Market price deleted successfully." };
+};
+
+/* ─────────────────────────────────────────
+   FINANCIAL DASHBOARD
+───────────────────────────────────────── */
+
+export const getFinancialDashboardService = async (userId: string) => {
+  const farmerId = await resolveFarmerIdFromUser(userId);
+  const today = new Date();
+
+  const [allSummaries, activeSeason] = await Promise.all([
+    prisma.financialSummary.findMany({
+      where: { farmerId },
+      orderBy: [
+        { season: { year: "desc" } },
+        { season: { startDate: "desc" } },
+      ],
+      select: {
+        id: true,
+        totalIncome: true,
+        totalExpenses: true,
+        netProfit: true,
+        cashFlowStatus: true,
+        notes: true,
+        season: {
+          select: { id: true, name: true, year: true },
+        },
+      },
+    }),
+    prisma.farmingSeason.findFirst({
+      where: { startDate: { lte: today } },
+      orderBy: [{ year: "desc" }, { startDate: "desc" }],
+      select: { id: true, name: true, year: true },
+    }),
+  ]);
+
+  const totalSeasons = allSummaries.length;
+  const profitableSeasons = allSummaries.filter(
+    (s) => s.cashFlowStatus === "POSITIVE"
+  ).length;
+  const totalLifetimeIncome = roundMoney(
+    allSummaries.reduce((s, r) => s + r.totalIncome, 0)
+  );
+  const totalLifetimeExpenses = roundMoney(
+    allSummaries.reduce((s, r) => s + r.totalExpenses, 0)
+  );
+  const totalLifetimeNetProfit = roundMoney(
+    totalLifetimeIncome - totalLifetimeExpenses
+  );
+
+  const bestSummary = allSummaries.reduce<(typeof allSummaries)[number] | null>(
+    (best, r) => (!best || r.netProfit > best.netProfit ? r : best),
+    null
+  );
+
+  const currentSeasonSummary = activeSeason
+    ? (allSummaries.find((s) => s.season.id === activeSeason.id) ?? null)
+    : null;
+
+  const seasonalTrend = allSummaries.slice(0, 8).map((r) => ({
+    season: `${r.season.name} ${r.season.year}`,
+    totalIncome: r.totalIncome,
+    totalExpenses: r.totalExpenses,
+    netProfit: r.netProfit,
+    cashFlowStatus: r.cashFlowStatus,
+  }));
+
+  return {
+    summary: {
+      totalSeasons,
+      profitableSeasons,
+      totalLifetimeIncome,
+      totalLifetimeExpenses,
+      totalLifetimeNetProfit,
+      overallCashFlowStatus: getCashFlowStatus(totalLifetimeNetProfit),
+      bestSeasonNetProfit: bestSummary?.netProfit ?? null,
+      bestSeasonName: bestSummary
+        ? `${bestSummary.season.name} ${bestSummary.season.year}`
+        : null,
+    },
+    currentSeason: activeSeason
+      ? { season: activeSeason, financialSummary: currentSeasonSummary }
+      : null,
+    seasonalTrend,
+  };
+};
+
+/* ─────────────────────────────────────────
+   LATEST MARKET PRICES (with staleness)
+───────────────────────────────────────── */
+
+const STALE_PRICE_DAYS = 7;
+
+export const getLatestMarketPricesService = async () => {
+  const today = new Date();
+
+  const allPrices = await prisma.marketPrice.findMany({
+    orderBy: { recordedAt: "desc" },
+    select: safeMarketPriceSelect,
+  });
+
+  const latestByCrop = new Map<string, (typeof allPrices)[number]>();
+  for (const price of allPrices) {
+    const key = price.cropName.trim().toLowerCase();
+    if (!latestByCrop.has(key)) {
+      latestByCrop.set(key, price);
+    }
+  }
+
+  const prices = Array.from(latestByCrop.values())
+    .sort((a, b) => a.cropName.localeCompare(b.cropName))
+    .map((p) => {
+      const ageMs = today.getTime() - new Date(p.recordedAt).getTime();
+      const ageInDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      return { ...p, ageInDays, isStale: ageInDays >= STALE_PRICE_DAYS };
+    });
+
+  const staleCount = prices.filter((p) => p.isStale).length;
+
+  return {
+    prices,
+    meta: {
+      totalCrops: prices.length,
+      freshCount: prices.length - staleCount,
+      staleCount,
+      staleDaysThreshold: STALE_PRICE_DAYS,
+    },
+  };
 };

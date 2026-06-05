@@ -42,9 +42,11 @@ export const registerUserSchema = z.object({
     phone: phoneSchema.optional(),
     password: passwordSchema,
     role: roleSchema
-      .refine((role) => ["FARMER", "INSTITUTION", "COOPERATIVE_MANAGER"].includes(role), {
-        message: "Only farmers, institutions, and cooperative managers can self-register",
-      })
+      .refine(
+        (role) =>
+          ["FARMER", "INSTITUTION", "COOPERATIVE_MANAGER", "GOVERNMENT_PARTNER"].includes(role),
+        { message: "Only farmers, institutions, cooperative managers, and government partners can self-register" }
+      )
       .optional(),
   }),
 });

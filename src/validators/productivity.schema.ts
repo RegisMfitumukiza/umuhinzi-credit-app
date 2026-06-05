@@ -34,6 +34,27 @@ export const inputTypeSchema = z.enum([
   "OTHER",
 ]);
 
+export const agriculturalUnitSchema = z.enum([
+  "kg",
+  "g",
+  "tonnes",
+  "bags",
+  "sacks",
+  "bundles",
+  "litres",
+  "ml",
+  "pieces",
+  "plants",
+  "seedlings",
+  "bunches",
+  "heads",
+  "crates",
+  "hours",
+  "days",
+  "person-days",
+  "units",
+]);
+
 /* ================= HELPERS ================= */
 
 const uuidSchema = (message: string) => z.uuid({ message });
@@ -118,7 +139,7 @@ export const createInputCostSchema = z.object({
     name: z.string().trim().min(1, "Name is required").max(100),
     description: z.string().trim().max(500).optional(),
     quantity: z.number().positive().optional(),
-    unit: z.string().trim().max(50).optional(),
+    unit: agriculturalUnitSchema.optional(),
     unitCost: z.number().positive().optional(),
     totalCost: z.number().positive("Total cost must be greater than 0"),
     dateUsed: z.coerce.date(),
@@ -132,7 +153,7 @@ export const updateInputCostSchema = z.object({
     name: z.string().trim().min(1).max(100).optional(),
     description: z.string().trim().max(500).optional(),
     quantity: z.number().positive().optional(),
-    unit: z.string().trim().max(50).optional(),
+    unit: agriculturalUnitSchema.optional(),
     unitCost: z.number().positive().optional(),
     totalCost: z.number().positive().optional(),
     dateUsed: z.coerce.date().optional(),
@@ -171,6 +192,16 @@ export const productivityRecordIdParamSchema = z.object({
   params: z.object({ id: uuidSchema("Invalid productivity record ID") }),
 });
 
+/* ================= BENCHMARK QUERY ================= */
+
+export const productivityBenchmarkQuerySchema = z.object({
+  query: z.object({
+    cropName: z.string().trim().min(1, "Crop name is required").max(100),
+  }),
+});
+
+export type ProductivityBenchmarkQuery = z.infer<typeof productivityBenchmarkQuerySchema>["query"];
+
 /* ================= SWAGGER ================= */
 
 registry.register("CreateYieldRecordInput", createYieldRecordSchema);
@@ -190,3 +221,4 @@ export type CreateInputCostInput = z.infer<typeof createInputCostSchema>["body"]
 export type UpdateInputCostInput = z.infer<typeof updateInputCostSchema>["body"];
 export type CreateProductivityRecordInput = z.infer<typeof createProductivityRecordSchema>["body"];
 export type UpdateProductivityRecordInput = z.infer<typeof updateProductivityRecordSchema>["body"];
+export type AgriculturalUnit = z.infer<typeof agriculturalUnitSchema>;

@@ -6,12 +6,16 @@ import {
   getRegionalAnalytics,
   generateAnalyticsReport,
   getAnalyticsReports,
+  getLoanTrends,
+  getCreditScoreDistribution,
+  getRepaymentTrends,
 } from "../../controllers/analytics.controller.js";
 
 import {
   authenticate,
   requireAdmin,
   requireAdminOrGovernmentPartner,
+  requireAdminOrActiveGovernmentPartner,
   authorizeRoles,
 } from "../../middlewares/auth.middleware.js";
 
@@ -122,8 +126,65 @@ analyticsRouter.post(
 analyticsRouter.get(
   "/reports",
   authenticate,
-  requireAdminOrGovernmentPartner,
+  requireAdminOrActiveGovernmentPartner,
   getAnalyticsReports
+);
+
+/**
+ * @swagger
+ * /api/v1/analytics/trends/loans:
+ *   get:
+ *     summary: Monthly loan counts and disbursed amounts (last 12 months)
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Loan trends fetched successfully
+ */
+analyticsRouter.get(
+  "/trends/loans",
+  authenticate,
+  requireAdminOrActiveGovernmentPartner,
+  getLoanTrends
+);
+
+/**
+ * @swagger
+ * /api/v1/analytics/trends/repayments:
+ *   get:
+ *     summary: Monthly repayment counts and amounts (last 12 months)
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Repayment trends fetched successfully
+ */
+analyticsRouter.get(
+  "/trends/repayments",
+  authenticate,
+  requireAdminOrActiveGovernmentPartner,
+  getRepaymentTrends
+);
+
+/**
+ * @swagger
+ * /api/v1/analytics/credit-score-distribution:
+ *   get:
+ *     summary: Credit score histogram — farmer counts per score band (latest score per farmer)
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Credit score distribution fetched successfully
+ */
+analyticsRouter.get(
+  "/credit-score-distribution",
+  authenticate,
+  requireAdminOrActiveGovernmentPartner,
+  getCreditScoreDistribution
 );
 
 /**

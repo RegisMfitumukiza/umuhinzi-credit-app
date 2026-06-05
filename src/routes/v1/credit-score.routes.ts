@@ -6,6 +6,7 @@ import {
   getLatestCreditScore,
   getCreditScoreById,
   getCreditScoresByFarmerId,
+  getCreditScoreTrend,
 } from "../../controllers/credit-score.controller.js";
 
 import {
@@ -110,6 +111,29 @@ creditScoreRouter.get(
   authorizeRoles("FARMER", "ADMIN"),
   getCreditScores
 );
+
+/**
+ * @swagger
+ * /api/v1/credit-scores/trend:
+ *   get:
+ *     summary: Get credit score trend and trajectory (Farmer)
+ *     description: Returns the farmer's credit score trajectory over time — IMPROVING, DECLINING, or STABLE. Includes per-factor deltas, momentum, and a human-readable insight. Use ?limit=N (max 20) to control history depth.
+ *     tags: [Credit Scores]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Credit score trend fetched successfully
+ *       404:
+ *         description: Farmer profile not found
+ */
+creditScoreRouter.get("/trend", authenticate, requireFarmer, getCreditScoreTrend);
 
 /**
  * @swagger

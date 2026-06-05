@@ -24,6 +24,8 @@ import {
   getMarketPriceByIdService,
   updateMarketPriceService,
   deleteMarketPriceService,
+  getFinancialDashboardService,
+  getLatestMarketPricesService,
 } from "../services/finance.service.js";
 
 import { Role } from "../generated/prisma/client.js";
@@ -295,8 +297,38 @@ export const deleteFinancialSummary = asyncHandler(
 );
 
 /* ─────────────────────────────────────────
+   FINANCIAL DASHBOARD CONTROLLER
+───────────────────────────────────────── */
+
+export const getFinancialDashboard = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const dashboard = await getFinancialDashboardService(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Financial dashboard fetched successfully",
+      data: dashboard,
+    });
+  }
+);
+
+/* ─────────────────────────────────────────
    MARKET PRICE CONTROLLERS
 ───────────────────────────────────────── */
+
+export const getLatestMarketPrices = asyncHandler(
+  async (_req: Request, res: Response) => {
+    const result = await getLatestMarketPricesService();
+
+    res.status(200).json({
+      success: true,
+      message: "Latest market prices fetched successfully",
+      data: result,
+    });
+  }
+);
 
 export const createMarketPrice = asyncHandler(
   async (req: Request, res: Response) => {

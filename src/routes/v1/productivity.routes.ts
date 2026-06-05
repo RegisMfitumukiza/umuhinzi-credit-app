@@ -17,6 +17,8 @@ import {
   getProductivityRecordById,
   updateProductivityRecord,
   deleteProductivityRecord,
+  getProductivityDashboard,
+  getProductivityBenchmark,
 } from "../../controllers/productivity.controller.js";
 
 import {
@@ -38,6 +40,7 @@ import {
   createProductivityRecordSchema,
   updateProductivityRecordSchema,
   productivityRecordIdParamSchema,
+  productivityBenchmarkQuerySchema,
 } from "../../validators/productivity.schema.js";
 
 /* ─────────────────────────────────────────
@@ -125,7 +128,7 @@ yieldRouter.post(
 yieldRouter.get(
   "/",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN"),
+  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER"),
   getYieldRecords
 );
 
@@ -155,7 +158,7 @@ yieldRouter.get(
 yieldRouter.get(
   "/:id",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN"),
+  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER"),
   validate(yieldRecordIdParamSchema),
   getYieldRecordById
 );
@@ -412,6 +415,60 @@ inputCostRouter.delete(
 ───────────────────────────────────────── */
 
 export const productivityRouter = Router();
+
+/**
+ * @swagger
+ * /api/v1/productivity/dashboard:
+ *   get:
+ *     summary: Get productivity dashboard (Farmer)
+ *     description: Returns a farmer's productivity summary — current season overview, seasonal trend (last 8 seasons), and all-time stats. Auto-calculated from verified yield records.
+ *     tags: [Productivity]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Productivity dashboard fetched successfully
+ *       404:
+ *         description: Farmer profile not found
+ */
+productivityRouter.get(
+  "/dashboard",
+  authenticate,
+  requireFarmer,
+  getProductivityDashboard
+);
+
+/**
+ * @swagger
+ * /api/v1/productivity/benchmark:
+ *   get:
+ *     summary: Get productivity benchmark vs district & national averages (Farmer)
+ *     description: Compares a farmer's verified yield per hectare for a given crop against the district and national averages. Returns performance rating and top districts. Only verified yields with a recorded crop area are included.
+ *     tags: [Productivity]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: cropName
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: Maize
+ *     responses:
+ *       200:
+ *         description: Productivity benchmark fetched successfully
+ *       400:
+ *         description: cropName is required
+ *       404:
+ *         description: Farmer profile not found
+ */
+productivityRouter.get(
+  "/benchmark",
+  authenticate,
+  requireFarmer,
+  validate(productivityBenchmarkQuerySchema),
+  getProductivityBenchmark
+);
 
 /**
  * @swagger

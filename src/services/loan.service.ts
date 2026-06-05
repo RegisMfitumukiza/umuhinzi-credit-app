@@ -5,6 +5,7 @@ import {
   notifyLoanDisbursed,
   notifyLoanCompleted,
 } from "../utils/notification.helper.js";
+import { generateLoanDisbursedRecommendation } from "./recommendation.service.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { DisburseLoanInput, UpdateLoanStatusInput } from "../validators/loan.schema.js";
@@ -184,7 +185,7 @@ export const disburseLoanService = async (
     userAgent: context.userAgent,
   });
 
-  // Notify farmer
+  // Notify farmer and generate repayment planning recommendation
   const farmer = await prisma.farmer.findUnique({
     where: { id: loan.farmerId },
     select: { userId: true },
@@ -192,6 +193,11 @@ export const disburseLoanService = async (
   if (farmer?.userId) {
     await notifyLoanDisbursed(farmer.userId, loanId, disbursedAmount);
   }
+  await generateLoanDisbursedRecommendation(
+    loan.farmerId,
+    disbursedAmount,
+    addMonths(startDate, 1)
+  );
 
   return updatedLoan;
 };

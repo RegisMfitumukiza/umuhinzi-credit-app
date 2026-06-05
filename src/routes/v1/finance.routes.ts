@@ -17,6 +17,8 @@ import {
   getMarketPriceById,
   updateMarketPrice,
   deleteMarketPrice,
+  getFinancialDashboard,
+  getLatestMarketPrices,
 } from "../../controllers/finance.controller.js";
 
 import {
@@ -208,6 +210,28 @@ expenseRouter.delete(
 ───────────────────────────────────────── */
 
 export const financialSummaryRouter = Router();
+
+/**
+ * @swagger
+ * /api/v1/financial-summaries/dashboard:
+ *   get:
+ *     summary: Get financial dashboard (Farmer)
+ *     description: Returns a farmer's financial overview — current season income/expenses/profit, last 8 seasons trend, and all-time totals.
+ *     tags: [Financial Summaries]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Financial dashboard fetched successfully
+ *       404:
+ *         description: Farmer profile not found
+ */
+financialSummaryRouter.get(
+  "/dashboard",
+  authenticate,
+  requireFarmer,
+  getFinancialDashboard
+);
 
 /**
  * @swagger
@@ -465,6 +489,21 @@ marketPriceRouter.post(
  *         description: Market prices fetched successfully
  */
 marketPriceRouter.get("/", authenticate, getMarketPrices);
+
+/**
+ * @swagger
+ * /api/v1/market-prices/latest:
+ *   get:
+ *     summary: Get latest price per crop (with staleness indicator)
+ *     description: Returns the most recent market price for each crop name. Each entry includes ageInDays and isStale (true if price is older than 7 days). Useful for admins to identify which prices need updating.
+ *     tags: [Market Prices]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Latest market prices fetched successfully
+ */
+marketPriceRouter.get("/latest", authenticate, getLatestMarketPrices);
 
 /**
  * @swagger

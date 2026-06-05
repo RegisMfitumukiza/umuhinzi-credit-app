@@ -142,6 +142,20 @@ export const seasonIdParamSchema = z.object({
   }),
 });
 
+/* ================= CROP PERFORMANCE QUERY ================= */
+
+export const cropPerformanceQuerySchema = z.object({
+  query: z.object({
+    cropName: z
+      .string()
+      .trim()
+      .min(1, "Crop name is required")
+      .max(100, "Crop name must not exceed 100 characters"),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(50).optional(),
+  }),
+});
+
 /* ================= SWAGGER ================= */
 
 registry.register("CreateCropInput", createCropSchema);
@@ -153,3 +167,4 @@ registry.register("CreateSeasonInput", createSeasonSchema);
 export type CreateCropInput = z.infer<typeof createCropSchema>["body"];
 export type UpdateCropInput = z.infer<typeof updateCropSchema>["body"];
 export type CreateSeasonInput = z.infer<typeof createSeasonSchema>["body"];
+export type CropPerformanceQuery = z.infer<typeof cropPerformanceQuerySchema>["query"];

@@ -7,7 +7,12 @@ import {
   notifyLoanApplicationApproved,
   notifyLoanApplicationRejected,
   notifyLoanApplicationCancelled,
+  notifyInstitutionNewApplication,
 } from "../utils/notification.helper.js";
+import {
+  generateLoanApprovedRecommendation,
+  generateLoanRejectedRecommendation,
+} from "./recommendation.service.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -39,7 +44,22 @@ const loanApplicationSelect = {
   createdAt: true,
   updatedAt: true,
   loan: { select: { id: true, status: true, disbursedAt: true } },
-  creditScore: { select: { id: true, score: true, riskLevel: true } },
+  creditScore: {
+    select: {
+      id: true,
+      score: true,
+      riskLevel: true,
+      yieldConsistencyScore: true,
+      farmingHistoryScore: true,
+      incomeStabilityScore: true,
+      repaymentBehaviorScore: true,
+      productivityScore: true,
+      dataCompletenessScore: true,
+      locationVerificationScore: true,
+      summary: true,
+      generatedAt: true,
+    },
+  },
   institution: { select: { id: true, name: true, type: true } },
 } satisfies Prisma.LoanApplicationSelect;
 
@@ -189,6 +209,26 @@ export const createLoanApplicationService = async (
   // Notify farmer
   await notifyLoanApplicationSubmitted(userId, application.id);
 
+  // Notify the institution if the application was directed to one
+  if (input.institutionId) {
+    const institution = await prisma.institution.findUnique({
+      where: { id: input.institutionId },
+      select: { userId: true },
+    });
+    const farmer = await prisma.farmer.findUnique({
+      where: { id: application.farmerId },
+      select: { user: { select: { fullName: true } } },
+    });
+    if (institution?.userId) {
+      await notifyInstitutionNewApplication(
+        institution.userId,
+        application.id,
+        farmer?.user.fullName ?? "A farmer",
+        input.requestedAmount
+      );
+    }
+  }
+
   return application;
 };
 
@@ -312,11 +352,12 @@ export const updateLoanApplicationStatusService = async (
       userAgent: context.userAgent,
     });
 
-    // Notify farmer
+    // Notify farmer and generate actionable recommendation
     const farmerUserId = await resolveFarmerUserId(existing.farmerId);
     if (farmerUserId) {
       await notifyLoanApplicationApproved(farmerUserId, applicationId, approvedAmount);
     }
+    await generateLoanApprovedRecommendation(existing.farmerId, approvedAmount);
 
     return updatedApplication;
   }
@@ -353,6 +394,10 @@ export const updateLoanApplicationStatusService = async (
     } else if (status === "CANCELLED") {
       await notifyLoanApplicationCancelled(farmerUserId, applicationId);
     }
+  }
+
+  if (status === "REJECTED") {
+    await generateLoanRejectedRecommendation(existing.farmerId);
   }
 
   return updated;
@@ -405,19 +450,42 @@ export const getAllLoanApplicationsService = async (
     limit?: number;
     where?: Prisma.LoanApplicationWhereInput;
     institutionUserId?: string;
+    minCreditScore?: number;
+    maxCreditScore?: number;
+    creditRiskLevel?: string;
   } = {}
 ) => {
-  const { skip = 0, limit = 10, where = {}, institutionUserId } = options;
+  const {
+    skip = 0,
+    limit = 10,
+    where = {},
+    institutionUserId,
+    minCreditScore,
+    maxCreditScore,
+    creditRiskLevel,
+  } = options;
 
-  let finalWhere = where;
+  let finalWhere: Prisma.LoanApplicationWhereInput = { ...where };
+
   if (institutionUserId) {
     const institution = await prisma.institution.findUnique({
       where: { userId: institutionUserId },
       select: { id: true },
     });
     if (institution) {
-      finalWhere = { ...where, institutionId: institution.id };
+      finalWhere = { ...finalWhere, institutionId: institution.id };
     }
+  }
+
+  if (minCreditScore !== undefined || maxCreditScore !== undefined || creditRiskLevel) {
+    finalWhere = {
+      ...finalWhere,
+      creditScore: {
+        ...(minCreditScore !== undefined && { score: { gte: minCreditScore } }),
+        ...(maxCreditScore !== undefined && { score: { lte: maxCreditScore } }),
+        ...(creditRiskLevel && { riskLevel: creditRiskLevel as never }),
+      },
+    };
   }
 
   const [applications, total] = await Promise.all([

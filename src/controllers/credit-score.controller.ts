@@ -12,6 +12,7 @@ import {
   getCreditScoreByIdService,
   getLatestCreditScoreService,
   getCreditScoresByFarmerIdService,
+  getCreditScoreTrendService,
 } from "../services/credit-score.service.js";
 
 import { Role } from "../generated/prisma/client.js";
@@ -134,6 +135,21 @@ export const getCreditScoreById = asyncHandler(
 /* ─────────────────────────────────────────
    GET CREDIT SCORES BY FARMER ID (ADMIN)
 ───────────────────────────────────────── */
+
+export const getCreditScoreTrend = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) throw new APIError("User not authenticated", 401);
+
+    const limit = req.query.limit ? Math.min(Number(req.query.limit), 20) : 10;
+    const trend = await getCreditScoreTrendService(req.user.id, limit);
+
+    res.status(200).json({
+      success: true,
+      message: "Credit score trend fetched successfully",
+      data: trend,
+    });
+  }
+);
 
 export const getCreditScoresByFarmerId = asyncHandler(
   async (req: Request, res: Response) => {
