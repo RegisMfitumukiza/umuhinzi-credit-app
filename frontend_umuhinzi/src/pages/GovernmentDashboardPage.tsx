@@ -53,6 +53,8 @@ export const GovernmentDashboardPage = () => {
 
   const cards = [
     { label: "Farmers Registered", value: platform.farmers?.total ?? 0 },
+    { label: "Total Cooperatives", value: platform.cooperatives?.total ?? 0 },
+    { label: "Total Institutions", value: platform.institutions?.total ?? 0 },
     { label: "Total Loans Issued", value: platform.loans?.total ?? 0 },
     { label: "Active Cooperatives", value: platform.cooperatives?.active ?? 0 },
     { label: "Active Institutions", value: platform.institutions?.active ?? 0 },

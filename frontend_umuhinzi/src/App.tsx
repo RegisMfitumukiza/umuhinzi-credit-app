@@ -30,6 +30,7 @@ import { InputCostsPage } from "./pages/InputCostsPage";
 import { LivestockPage } from "./pages/LivestockPage";
 import { RegisterRolePage } from "./pages/RegisterRolePage";
 import { RegisterPersonalPage } from "./pages/RegisterPersonalPage";
+import { RegisterVerifyPage } from "./pages/RegisterVerifyPage";
 import { LandingPage } from "./pages/LandingPage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
@@ -61,6 +62,7 @@ export const App = () => {
       <Route>
         <Route path="/register" element={<RegisterRolePage />} />
         <Route path="/register/personal" element={<RegisterPersonalPage />} />
+        <Route path="/verify-email" element={<RegisterVerifyPage />} />
       </Route>
 
       <Route element={<RedirectAuthenticated />}>

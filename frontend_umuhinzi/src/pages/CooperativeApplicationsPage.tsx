@@ -7,6 +7,7 @@ import {
   type LoanApplicationUi,
   updateLoanApplicationStatus,
 } from "../api/loanApplications";
+import { institutionApi } from "../api/institutions";
 import { useToast } from "../context/ToastContext";
 
 const statusStyles: Record<string, string> = {
@@ -71,14 +72,16 @@ export const CooperativeApplicationsPage = ({
         const currentUser = await getCurrentUserProfile().catch(() => null);
 
         if (scope === "institution") {
-          const institutionId = currentUser?.institutionProfile?.id;
+          const institutionId =
+            currentUser?.institutionProfile?.id ||
+            (await institutionApi.getMyInstitution().catch(() => null))?.id;
           if (!institutionId) {
             setAppsState([]);
             return;
           }
 
-          const data = await getLoanApplications().catch(() => [] as LoanApplicationUi[]);
-          setAppsState(data);
+          const data = await getLoanApplications(institutionId).catch(() => [] as LoanApplicationUi[]);
+          setAppsState(data.filter((application) => application.institutionId === institutionId));
           return;
         }
 
@@ -104,10 +107,11 @@ export const CooperativeApplicationsPage = ({
     })();
   }, [scope, showToast]);
 
-  async function handleUpdate(id: string, status: "APPROVED" | "REJECTED", currentStatus?: string) {
+  async function handleUpdate(application: LoanApplicationUi, status: "APPROVED" | "REJECTED") {
     try {
-      const needsReviewStep = currentStatus === "Pending" || currentStatus === "PENDING";
+      const needsReviewStep = application.status === "Pending" || application.status === "PENDING";
       let rejectionReason: string | undefined;
+      let terms: Parameters<typeof updateLoanApplicationStatus>[3];
 
       if (status === "REJECTED") {
         rejectionReason = window.prompt("Enter rejection reason")?.trim() || undefined;
@@ -115,12 +119,21 @@ export const CooperativeApplicationsPage = ({
           showToast("Rejection reason is required", "error");
           return;
         }
+      } else {
+        const approvedAmount = application.requestedAmount ?? parseAmount(application.amount);
+        terms = {
+          approvedAmount,
+          interestRate: 0,
+          totalPayable: approvedAmount,
+        };
       }
 
       const updated = needsReviewStep
-        ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() => updateLoanApplicationStatus(id, status, rejectionReason))
-        : await updateLoanApplicationStatus(id, status, rejectionReason);
-      setAppsState((p) => p.map((x) => (x.id === id ? updated : x)));
+        ? await updateLoanApplicationStatus(application.id, "UNDER_REVIEW").then(() =>
+            updateLoanApplicationStatus(application.id, status, rejectionReason, terms)
+          )
+        : await updateLoanApplicationStatus(application.id, status, rejectionReason, terms);
+      setAppsState((p) => p.map((x) => (x.id === application.id ? updated : x)));
       showToast(`Application ${status.toLowerCase()} successfully`, "success");
     } catch {
       showToast("Unable to update application status", "error");
@@ -232,8 +245,8 @@ export const CooperativeApplicationsPage = ({
                           </Link>
                           {application.status !== "Approved" && application.status !== "Rejected" && application.status !== "Cancelled" && (
                             <>
-                              <button onClick={() => void handleUpdate(application.id, "APPROVED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
-                              <button onClick={() => void handleUpdate(application.id, "REJECTED", application.status)} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
+                              <button onClick={() => void handleUpdate(application, "APPROVED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-emerald-700">Approve</button>
+                              <button onClick={() => void handleUpdate(application, "REJECTED")} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-rose-700">Reject</button>
                             </>
                           )}
                         </div>

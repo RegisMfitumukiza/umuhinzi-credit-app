@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { loginRequest } from "../api/auth";
-import { homeRouteByRole } from "../utils/auth";
+import { homeRouteByRole, needsEmailVerification } from "../utils/auth";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -54,7 +54,9 @@ export const LoginPage = () => {
       }
 
       showToast("Welcome back", "success");
-      navigate(homeRouteByRole(session.user.role));
+      navigate(needsEmailVerification(session.user) ? "/verify-email" : homeRouteByRole(session.user.role), {
+        state: { email: session.user.email },
+      });
     } catch {
       showToast("Login failed. Check your credentials and account status.", "error");
     } finally {

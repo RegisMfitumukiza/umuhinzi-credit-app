@@ -30,6 +30,11 @@ type LoanApplicationRaw = {
   institution?: { name?: string; type?: string };
   reviewedBy?: { fullName?: string; email?: string };
   reviewedAt?: string;
+  loan?: {
+    id?: string;
+    status?: string;
+    disbursedAt?: string;
+  };
   creditScore?: {
     score?: number;
     riskLevel?: string;
@@ -38,6 +43,9 @@ type LoanApplicationRaw = {
 
 export type LoanApplicationUi = {
   id: string;
+  loanId?: string;
+  loanStatus?: string;
+  loanDisbursedAt?: string;
   farmerId?: string;
   institutionId?: string;
   farmer: string;
@@ -81,6 +89,9 @@ const toUiModel = (row: LoanApplicationRaw): LoanApplicationUi => {
 
   return {
     id: row.id,
+    loanId: row.loan?.id,
+    loanStatus: row.loan?.status,
+    loanDisbursedAt: row.loan?.disbursedAt,
     farmerId: row.farmerId,
     institutionId: row.institutionId,
     farmer: row.farmer?.user?.fullName || "Farmer",
@@ -118,11 +129,18 @@ export const getLoanApplicationById = async (id: string): Promise<LoanApplicatio
 export const updateLoanApplicationStatus = async (
   id: string,
   status: "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED",
-  rejectionReason?: string
+  rejectionReason?: string,
+  terms?: {
+    approvedAmount?: number;
+    recommendedAmount?: number;
+    interestRate?: number;
+    totalPayable?: number;
+  }
 ): Promise<LoanApplicationUi> => {
   const response = await api.patch<ApiResponse<LoanApplicationRaw>>(`/loan-applications/${id}/status`, {
     status,
     ...(rejectionReason ? { rejectionReason } : {}),
+    ...(terms || {}),
   });
   return toUiModel(response.data.data);
 };

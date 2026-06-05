@@ -1,4 +1,4 @@
-import type { BackendRole } from "../types/auth";
+import type { AuthUser, BackendRole } from "../types/auth";
 
 const ROLE_ALIASES: Record<string, BackendRole> = {
   FARMER: "FARMER",
@@ -26,4 +26,10 @@ export const homeRouteByRole = (role: BackendRole): string => {
 export const isRoleAllowed = (role: BackendRole, allowed?: BackendRole[]): boolean => {
   if (!allowed || allowed.length === 0) return true;
   return allowed.includes(role);
+};
+
+export const needsEmailVerification = (user: AuthUser | null): boolean => {
+  if (!user) return false;
+  if (user.role !== "FARMER" && user.role !== "COOPERATIVE_MANAGER") return false;
+  return user.isEmailVerified === false;
 };

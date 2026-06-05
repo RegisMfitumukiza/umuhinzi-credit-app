@@ -50,6 +50,11 @@ export const registerRequest = async (payload: RegisterPayload): Promise<AuthSes
   };
 };
 
+export const verifyEmailRequest = async (token: string): Promise<AuthUser> => {
+  const response = await api.post<ApiResponse<AuthUser>>("/auth/verify-email", { token });
+  return sanitizeUser(response.data.data);
+};
+
 export const getCurrentAuthUser = async (): Promise<AuthUser> => {
   const response = await api.get<ApiResponse<AuthUser>>("/auth/me");
   return sanitizeUser(response.data.data);

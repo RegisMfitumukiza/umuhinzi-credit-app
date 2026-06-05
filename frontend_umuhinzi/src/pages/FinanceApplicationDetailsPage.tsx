@@ -46,11 +46,16 @@ export const FinanceApplicationDetailsPage = () => {
     setSaving(true);
     try {
       const needsReviewStep = application.status === "Pending" || application.status === "PENDING";
+      const approvedAmount =
+        (application.approvedAmount ?? application.requestedAmount ?? Number(application.amount.replace(/,/g, ""))) || 0;
+      const terms = status === "APPROVED"
+        ? { approvedAmount, interestRate: 0, totalPayable: approvedAmount }
+        : undefined;
       const updated = needsReviewStep
         ? await updateLoanApplicationStatus(id, "UNDER_REVIEW").then(() =>
-            updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined)
+            updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined, terms)
           )
-        : await updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined);
+        : await updateLoanApplicationStatus(id, status, status === "REJECTED" ? rejectionReason.trim() : undefined, terms);
 
       setApplication(updated);
       showToast(`Application ${status.toLowerCase()} successfully`, "success");

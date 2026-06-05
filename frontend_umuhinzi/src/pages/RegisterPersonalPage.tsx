@@ -1,17 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { registerRequest } from "../api/auth";
 import { updateMyProfile } from "../api/users";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { homeRouteByRole } from "../utils/auth";
+import { homeRouteByRole, needsEmailVerification, normalizeRole } from "../utils/auth";
 import type { BackendRole } from "../types/auth";
-
-const roleOptions: Array<{ value: BackendRole; label: string }> = [
-  { value: "FARMER", label: "Farmer" },
-  { value: "COOPERATIVE_MANAGER", label: "Cooperative Manager" },
-];
 
 type FieldErrors = Partial<
   Record<
@@ -45,6 +40,11 @@ export const RegisterPersonalPage = () => {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const { login, setUser } = useAuth();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem("umuhinzi_registration") || "null") as { role?: string } | null;
+    setRole(normalizeRole(stored?.role || localStorage.getItem("umuhinzi_last_role")));
+  }, []);
 
   const setFieldError = (field: keyof FieldErrors, msg: string | undefined) =>
     setFieldErrors((prev) => ({ ...prev, [field]: msg }));
@@ -96,10 +96,20 @@ export const RegisterPersonalPage = () => {
         village,
       });
 
-      setUser(updatedUser);
+      const nextUser = {
+        ...session.user,
+        ...updatedUser,
+        isEmailVerified: updatedUser.isEmailVerified ?? session.user.isEmailVerified,
+      };
+      setUser(nextUser);
       localStorage.removeItem("umuhinzi_registration");
-      showToast("Registration successful", "success");
-      navigate(homeRouteByRole(session.user.role), { replace: true });
+      showToast("Registration successful. Please verify your email.", "success");
+
+      if (needsEmailVerification(nextUser)) {
+        navigate("/verify-email", { replace: true, state: { email: nextUser.email } });
+      } else {
+        navigate(homeRouteByRole(session.user.role), { replace: true });
+      }
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? error.response?.data?.message || error.message
@@ -125,25 +135,10 @@ export const RegisterPersonalPage = () => {
       <div className="w-full max-w-2xl rounded-3xl border border-stone-200 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:p-8">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-stone-900">Create Your Account</h2>
-          <p className="mt-2 text-sm text-stone-500">Fill in your details to register as a farmer or cooperative manager.</p>
+          <p className="mt-2 text-sm text-stone-500">Fill in your details to register your account.</p>
         </div>
 
         <div className="mt-8 space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium text-stone-900">Role</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as BackendRole)}
-              className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3 outline-none focus:border-emerald-400"
-            >
-              {roleOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <label className="block">
             <span className="text-sm font-medium text-stone-900">Full name</span>
             <input

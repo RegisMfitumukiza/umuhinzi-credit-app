@@ -93,7 +93,7 @@ export const PaymentsPage = () => {
               <span className="text-sm font-medium text-stone-700">Loan</span>
               <select value={form.loanId} onChange={(e) => setForm((prev) => ({ ...prev, loanId: e.target.value }))} className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500">
                 <option value="">Select loan</option>
-                {loans.map((loan) => <option key={loan.id} value={loan.id}>{loan.purpose || loan.id} • {loan.status || "UNKNOWN"}</option>)}
+                {loans.map((loan) => <option key={loan.id} value={loan.id}>{loan.id || loan.id} • {loan.status || "UNKNOWN"}</option>)}
               </select>
             </label>
             <label className="block">

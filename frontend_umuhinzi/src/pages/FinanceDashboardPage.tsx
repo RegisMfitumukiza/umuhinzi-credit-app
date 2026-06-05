@@ -62,8 +62,13 @@ export const FinanceDashboardPage = () => {
     try {
       const needsReview = app.status === "Pending";
       if (needsReview) await updateLoanApplicationStatus(app.id, "UNDER_REVIEW");
-      await updateLoanApplicationStatus(app.id, "APPROVED");
-      setApps((prev) => prev.map((a) => a.id === app.id ? { ...a, status: "Approved" } : a));
+      const approvedAmount = parseMoney(app.requestedAmount ?? app.amount);
+      const updated = await updateLoanApplicationStatus(app.id, "APPROVED", undefined, {
+        approvedAmount,
+        interestRate: 0,
+        totalPayable: approvedAmount,
+      });
+      setApps((prev) => prev.map((a) => a.id === app.id ? updated : a));
       showToast(`Loan application approved for ${app.farmer}`, "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to approve application", "error");
@@ -89,13 +94,13 @@ export const FinanceDashboardPage = () => {
   const openDisburseForm = (app: LoanApplicationUi) => {
     setDisburseForm({
       appId: app.id,
-      loanId: app.id,
+      loanId: app.loanId || app.id,
       farmerName: app.farmer,
-      requestedAmount: parseMoney(app.requestedAmount ?? app.amount),
-      disbursedAmount: String(parseMoney(app.requestedAmount ?? app.amount)),
+      requestedAmount: parseMoney(app.approvedAmount ?? app.requestedAmount ?? app.amount),
+      disbursedAmount: String(parseMoney(app.approvedAmount ?? app.requestedAmount ?? app.amount)),
       startDate: new Date().toISOString().split("T")[0],
       durationMonths: "12",
-      interestRate: "15",
+      interestRate: "0",
     });
   };
 
@@ -130,7 +135,7 @@ export const FinanceDashboardPage = () => {
         "success"
       );
       setDisburseForm(null);
-      setApps((prev) => prev.map((a) => a.id === loanId ? { ...a, status: "Approved" } : a));
+      setApps((prev) => prev.map((a) => a.id === disburseForm.appId ? { ...a, loanStatus: "ACTIVE", loanDisbursedAt: new Date().toISOString() } : a));
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to disburse loan", "error");
     } finally {
@@ -321,10 +326,16 @@ export const FinanceDashboardPage = () => {
                         </>
                       )}
 
-                      {app.status === "Approved" && (
+                      {app.status === "Approved" && app.loanStatus !== "ACTIVE" && (
                         <button onClick={() => openDisburseForm(app)} className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white">
                           Set Repayment Schedule
                         </button>
+                      )}
+
+                      {app.loanStatus === "ACTIVE" && (
+                        <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                          Repayment Active
+                        </span>
                       )}
 
                       {rejectingId === app.id && (
