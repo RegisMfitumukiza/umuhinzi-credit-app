@@ -1,39 +1,29 @@
 /**
  * Creates the first admin user from environment variables.
- * Safe to run multiple times — skips if the admin email already exists.
+ * Safe to call on every startup — skips if the admin already exists.
  *
- * Usage: npm run seed:admin
+ * Manual usage: npm run seed:admin
  */
 
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client.js";
-import { Pool } from "pg";
+import { prisma } from "../lib/prisma.js";
+import { logger } from "../utils/logger.js";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-});
-
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-async function seedAdmin() {
+export async function seedAdmin(): Promise<void> {
   const email    = process.env.ADMIN_EMAIL;
   const password = process.env.ADMIN_PASSWORD;
   const fullName = process.env.ADMIN_FULL_NAME ?? "Platform Admin";
 
   if (!email || !password) {
-    console.error("❌ ADMIN_EMAIL and ADMIN_PASSWORD must be set in your .env file.");
-    process.exit(1);
+    logger.warn("Admin seed: ADMIN_EMAIL or ADMIN_PASSWORD not set — skipping.");
+    return;
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
 
   if (existing) {
-    console.log(`ℹ️  Admin already exists: ${email} — skipping.`);
-    await prisma.$disconnect();
+    logger.info(`Admin seed: ${email} already exists — skipping.`);
     return;
   }
 
@@ -50,16 +40,19 @@ async function seedAdmin() {
     },
   });
 
-  console.log("✅ Admin created successfully:");
-  console.log(`   Name:  ${admin.fullName}`);
-  console.log(`   Email: ${admin.email}`);
-  console.log(`   Role:  ${admin.role}`);
-  console.log(`   ID:    ${admin.id}`);
-
-  await prisma.$disconnect();
+  logger.info(`Admin seed: created ${admin.email} (id: ${admin.id})`);
 }
 
-seedAdmin().catch((e) => {
-  console.error("❌ Failed to create admin:", e);
-  process.exit(1);
-});
+/* ── Standalone entry point (npm run seed:admin) ── */
+const isMain =
+  process.argv[1]?.endsWith("seed-admin.ts") ||
+  process.argv[1]?.endsWith("seed-admin.js");
+
+if (isMain) {
+  seedAdmin()
+    .then(() => prisma.$disconnect())
+    .catch((e) => {
+      console.error("❌ Admin seed failed:", e);
+      process.exit(1);
+    });
+}

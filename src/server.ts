@@ -6,6 +6,7 @@ import { prisma } from "./lib/prisma.js";
 import { logger } from "./utils/logger.js";
 import { startOverdueSchedulesJob } from "./jobs/overdue-schedules.job.js";
 import { startAutoCreditScoreJob } from "./jobs/auto-credit-score.job.js";
+import { seedAdmin } from "./scripts/seed-admin.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -16,6 +17,8 @@ async function startServer() {
     await prisma.$connect();
 
     logger.info("Database connected");
+
+    await seedAdmin();
 
     app.listen(PORT, () => {
       logger.info(
