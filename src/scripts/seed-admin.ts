@@ -1,6 +1,8 @@
 /**
- * Run this script ONCE to create the first admin user.
- * Usage: npx tsx src/scripts/seed-admin.ts
+ * Creates the first admin user from environment variables.
+ * Safe to run multiple times — skips if the admin email already exists.
+ *
+ * Usage: npm run seed:admin
  */
 
 import "dotenv/config";
@@ -18,13 +20,19 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function seedAdmin() {
-  const email = "alainmucyo33@gmail.com";
-  const password = "Admin2026!";
-  const fullName = "Alain Mucyo";
+  const email    = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  const fullName = process.env.ADMIN_FULL_NAME ?? "Platform Admin";
+
+  if (!email || !password) {
+    console.error("❌ ADMIN_EMAIL and ADMIN_PASSWORD must be set in your .env file.");
+    process.exit(1);
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
+
   if (existing) {
-    console.log(`Admin already exists: ${email}`);
+    console.log(`ℹ️  Admin already exists: ${email} — skipping.`);
     await prisma.$disconnect();
     return;
   }
@@ -43,10 +51,10 @@ async function seedAdmin() {
   });
 
   console.log("✅ Admin created successfully:");
-  console.log(`   Email:    ${admin.email}`);
-  console.log(`   Password: ${password}`);
-  console.log(`   Role:     ${admin.role}`);
-  console.log(`   ID:       ${admin.id}`);
+  console.log(`   Name:  ${admin.fullName}`);
+  console.log(`   Email: ${admin.email}`);
+  console.log(`   Role:  ${admin.role}`);
+  console.log(`   ID:    ${admin.id}`);
 
   await prisma.$disconnect();
 }
