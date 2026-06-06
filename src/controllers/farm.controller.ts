@@ -8,6 +8,7 @@ import { getPagination } from "../utils/pagination.js";
 import {
   createFarmService,
   getMyFarmsService,
+  getMemberFarmsService,
   getAllFarmsService,
   getFarmByIdService,
   updateFarmService,
@@ -155,6 +156,30 @@ export const updateFarmStatus = asyncHandler(
     });
   }
 );
+
+/* ─── get member farms (cooperative manager) ─── */
+
+export const getMemberFarms = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const { page, limit, skip } = getPagination(req.query.limit, req.query.page);
+  const locationVerificationStatus = req.query.locationVerificationStatus
+    ? String(req.query.locationVerificationStatus)
+    : undefined;
+
+  const result = await getMemberFarmsService(req.user.id, {
+    skip,
+    limit,
+    locationVerificationStatus,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Member farms fetched successfully",
+    data: result.farms,
+    pagination: { page, ...result.pagination },
+  });
+});
 
 /* ─── delete farm ─── */
 

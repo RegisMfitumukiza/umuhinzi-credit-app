@@ -112,7 +112,12 @@ export const registerUserService = async (
   }
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
-  const verification = createEmailVerificationToken();
+
+  // When SKIP_EMAIL_VERIFICATION=true (e.g. using Resend test domain),
+  // activate accounts immediately without requiring email confirmation.
+  const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === "true";
+
+  const verification = skipVerification ? null : createEmailVerificationToken();
 
   const createUserData = {
     fullName: input.fullName,
@@ -120,11 +125,13 @@ export const registerUserService = async (
     ...(input.phone && { phone: input.phone }),
     password: hashedPassword,
     role: requestedRole,
-    status: "PENDING",
-    isEmailVerified: false,
+    status: skipVerification ? "ACTIVE" : "PENDING",
+    isEmailVerified: skipVerification,
     isPhoneVerified: false,
-    emailVerificationToken: verification.token,
-    emailVerificationTokenExpiry: verification.expiresAt,
+    ...(verification && {
+      emailVerificationToken: verification.token,
+      emailVerificationTokenExpiry: verification.expiresAt,
+    }),
   } satisfies Prisma.UserCreateInput;
 
   const user = await prisma.user.create({
@@ -132,13 +139,14 @@ export const registerUserService = async (
     select: safeUserSelect,
   });
 
-  const verifyUrl = `${getFrontendUrl()}/verify-email?token=${verification.token}`;
-
-  await sendEmail({
-    to: user.email,
-    subject: "Verify your Umuhinzi Credit email",
-    html: emailVerificationTemplate(verifyUrl),
-  });
+  if (!skipVerification) {
+    const verifyUrl = `${getFrontendUrl()}/verify-email?token=${verification!.token}`;
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your Umuhinzi Credit email",
+      html: emailVerificationTemplate(verifyUrl),
+    });
+  }
 
   await writeAuditLog({
     actorId: user.id,

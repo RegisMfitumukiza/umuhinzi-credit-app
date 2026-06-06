@@ -16,6 +16,8 @@ import {
   removeCooperativeMember,
 } from "../../controllers/cooperative.controller.js";
 
+import { getMemberFarms } from "../../controllers/farm.controller.js";
+
 import {
   authenticate,
   requireAdmin,
@@ -133,6 +135,40 @@ cooperativeRouter.get("/", authenticate, getCooperatives);
  *         description: Cooperative fetched (data is null if none created yet)
  */
 cooperativeRouter.get("/mine", authenticate, requireCooperativeManager, getMyCooperative);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/mine/member-farms:
+ *   get:
+ *     summary: Get member farms with GPS coordinates
+ *     description: Returns farms belonging to active members of the manager's cooperative that have GPS coordinates. Optionally filter by locationVerificationStatus.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: locationVerificationStatus
+ *         schema:
+ *           type: string
+ *           enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Member farms fetched successfully
+ */
+cooperativeRouter.get(
+  "/mine/member-farms",
+  authenticate,
+  requireCooperativeManager,
+  getMemberFarms
+);
 
 /**
  * @swagger

@@ -295,6 +295,60 @@ export const createFarmService = async (
   return farm;
 };
 
+/* ─── get member farms (cooperative manager) ─── */
+
+export const getMemberFarmsService = async (
+  userId: string,
+  options: {
+    skip?: number;
+    limit?: number;
+    locationVerificationStatus?: string;
+  } = {}
+) => {
+  const manager = await resolveCooperativeManager(userId);
+
+  const { skip = 0, limit = 50 } = options;
+
+  const where: Prisma.FarmWhereInput = {
+    farmer: {
+      cooperativeMembership: {
+        cooperativeId: manager.cooperativeId,
+        status: "ACTIVE",
+      },
+    },
+    latitude: { not: null },
+    longitude: { not: null },
+    ...(options.locationVerificationStatus && {
+      locationVerificationStatus:
+        options.locationVerificationStatus as Prisma.EnumFarmLocationVerificationStatusFilter,
+    }),
+  };
+
+  const [farms, total] = await Promise.all([
+    prisma.farm.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      select: farmWithFarmerSelect,
+    }),
+    prisma.farm.count({ where }),
+  ]);
+
+  return {
+    farms,
+    pagination: {
+      total,
+      limit,
+      skip,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Math.floor(skip / limit) + 1,
+      hasNextPage: skip + limit < total,
+      hasPreviousPage: skip > 0,
+    },
+  };
+};
+
 /* ─── get my farms ─── */
 
 export const getMyFarmsService = async (
