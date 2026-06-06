@@ -139,6 +139,24 @@ const cooperativeIdentityChanged = (input: UpdateCooperativeInput) =>
   ["name", "registrationNumber"].some((field) => field in input);
 
 /* ─────────────────────────────────────────
+   GET MY COOPERATIVE (MANAGER)
+───────────────────────────────────────── */
+
+export const getMyCooperativeService = async (userId: string) => {
+  const manager = await prisma.cooperativeManager.findUnique({
+    where: { userId },
+    select: { cooperativeId: true },
+  });
+
+  if (!manager) return null;
+
+  return prisma.cooperative.findUnique({
+    where: { id: manager.cooperativeId },
+    select: cooperativeWithCountsSelect,
+  });
+};
+
+/* ─────────────────────────────────────────
    CREATE COOPERATIVE
 ───────────────────────────────────────── */
 

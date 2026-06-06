@@ -8,6 +8,7 @@ import {
   createCooperativeService,
   getAllCooperativesService,
   getCooperativeByIdService,
+  getMyCooperativeService,
   updateCooperativeService,
   deleteCooperativeService,
   addCooperativeMemberService,
@@ -28,6 +29,18 @@ const getContext = (req: Request) => ({
 /* ─────────────────────────────────────────
    COOPERATIVES
 ───────────────────────────────────────── */
+
+export const getMyCooperative = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const cooperative = await getMyCooperativeService(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: cooperative ? "Cooperative fetched successfully" : "No cooperative found",
+    data: cooperative,
+  });
+});
 
 export const createCooperative = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new APIError("User not authenticated", 401);

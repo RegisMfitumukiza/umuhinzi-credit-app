@@ -4,6 +4,7 @@ import {
   createCooperative,
   getCooperatives,
   getCooperativeById,
+  getMyCooperative,
   updateCooperative,
   deleteCooperative,
   updateCooperativeStatus,
@@ -117,6 +118,21 @@ cooperativeRouter.post(
  *         description: Cooperatives fetched successfully
  */
 cooperativeRouter.get("/", authenticate, getCooperatives);
+
+/**
+ * @swagger
+ * /api/v1/cooperatives/mine:
+ *   get:
+ *     summary: Get my cooperative
+ *     description: Returns the cooperative managed by the authenticated COOPERATIVE_MANAGER, or null if none exists yet.
+ *     tags: [Cooperatives]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cooperative fetched (data is null if none created yet)
+ */
+cooperativeRouter.get("/mine", authenticate, requireCooperativeManager, getMyCooperative);
 
 /**
  * @swagger
