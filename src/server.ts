@@ -6,6 +6,7 @@ import { prisma } from "./lib/prisma.js";
 import { logger } from "./utils/logger.js";
 import { startOverdueSchedulesJob } from "./jobs/overdue-schedules.job.js";
 import { startAutoCreditScoreJob } from "./jobs/auto-credit-score.job.js";
+import { ensureCurrentSeasons, startSeasonsJob } from "./jobs/seasons.job.js";
 import { seedAdmin } from "./scripts/seed-admin.js";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -19,6 +20,7 @@ async function startServer() {
     logger.info("Database connected");
 
     await seedAdmin();
+    await ensureCurrentSeasons();
 
     app.listen(PORT, () => {
       logger.info(
@@ -28,6 +30,7 @@ async function startServer() {
       // Start background jobs
       startOverdueSchedulesJob();
       startAutoCreditScoreJob();
+      startSeasonsJob();
     });
   } catch (error) {
     logger.error("Failed to start server", { error });
