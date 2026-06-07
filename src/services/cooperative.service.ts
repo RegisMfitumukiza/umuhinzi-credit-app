@@ -89,7 +89,7 @@ const safeMemberSelect = {
   farmer: {
     select: {
       id: true,
-      user: { select: { id: true, fullName: true, email: true } },
+      user: { select: { id: true, fullName: true, email: true, phone: true } },
     },
   },
 } satisfies Prisma.CooperativeMemberSelect;
