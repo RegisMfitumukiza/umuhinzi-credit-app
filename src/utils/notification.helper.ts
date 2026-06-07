@@ -201,3 +201,168 @@ export const notifyMissingData = (userId: string, missingFields: string[]) =>
     message: `Your profile is missing important data: ${missingFields.join(", ")}. Complete it to improve your credit score.`,
     actionUrl: `/profile`,
   });
+
+/* ─── Admin broadcast ─── */
+
+export const notifyAllAdmins = async (
+  type: NotificationType,
+  title: string,
+  message: string,
+  options?: { priority?: NotificationPriority; actionUrl?: string }
+): Promise<void> => {
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: "ADMIN", status: "ACTIVE" },
+      select: { id: true },
+    });
+    await Promise.all(
+      admins.map((admin) =>
+        createNotification({
+          userId: admin.id,
+          type,
+          priority: options?.priority ?? "MEDIUM",
+          title,
+          message,
+          actionUrl: options?.actionUrl,
+        })
+      )
+    );
+  } catch (error) {
+    logger.error("Failed to notify admins", { error });
+  }
+};
+
+/* ─── Cooperative ─── */
+
+export const notifyAdminCooperativeSubmitted = (cooperativeName: string) =>
+  notifyAllAdmins(
+    "SYSTEM",
+    "New Cooperative Pending Approval",
+    `"${cooperativeName}" has been submitted and is awaiting your review.`,
+    { priority: "MEDIUM" }
+  );
+
+export const notifyAdminInstitutionRegistered = (institutionName: string) =>
+  notifyAllAdmins(
+    "SYSTEM",
+    "New Institution Registered",
+    `"${institutionName}" has created an institution profile on the platform.`,
+    { priority: "LOW" }
+  );
+
+export const notifyCooperativeManagerStatusChanged = (
+  managerUserId: string,
+  cooperativeName: string,
+  status: string,
+  rejectionReason?: string
+): Promise<void> => {
+  if (status === "ACTIVE") {
+    return createNotification({
+      userId: managerUserId,
+      type: "SYSTEM",
+      priority: "HIGH",
+      title: "Cooperative Approved",
+      message: `Your cooperative "${cooperativeName}" has been approved and is now active.`,
+    });
+  }
+  if (status === "REJECTED") {
+    return createNotification({
+      userId: managerUserId,
+      type: "SYSTEM",
+      priority: "HIGH",
+      title: "Cooperative Rejected",
+      message: rejectionReason
+        ? `Your cooperative "${cooperativeName}" was rejected. Reason: ${rejectionReason}`
+        : `Your cooperative "${cooperativeName}" was not approved at this time.`,
+    });
+  }
+  if (status === "SUSPENDED") {
+    return createNotification({
+      userId: managerUserId,
+      type: "SYSTEM",
+      priority: "HIGH",
+      title: "Cooperative Suspended",
+      message: `Your cooperative "${cooperativeName}" has been suspended. Please contact support.`,
+    });
+  }
+  return Promise.resolve();
+};
+
+export const notifyCooperativeManagerMemberJoined = (
+  managerUserId: string,
+  farmerName: string,
+  cooperativeName: string
+) =>
+  createNotification({
+    userId: managerUserId,
+    type: "COOPERATIVE_ANNOUNCEMENT",
+    priority: "LOW",
+    title: "New Membership Request",
+    message: `${farmerName} has requested to join "${cooperativeName}". Review and approve their membership.`,
+  });
+
+export const notifyCooperativeManagerMemberLeft = (
+  managerUserId: string,
+  farmerName: string,
+  cooperativeName: string
+) =>
+  createNotification({
+    userId: managerUserId,
+    type: "COOPERATIVE_ANNOUNCEMENT",
+    priority: "LOW",
+    title: "Member Left Cooperative",
+    message: `${farmerName} has left "${cooperativeName}".`,
+  });
+
+export const notifyFarmerJoinedCooperative = (
+  farmerUserId: string,
+  cooperativeName: string
+) =>
+  createNotification({
+    userId: farmerUserId,
+    type: "COOPERATIVE_ANNOUNCEMENT",
+    priority: "LOW",
+    title: "Membership Request Submitted",
+    message: `Your request to join "${cooperativeName}" has been submitted and is pending approval from the cooperative manager.`,
+  });
+
+/* ─── Institution / Loan ─── */
+
+export const notifyInstitutionLoanStatusChanged = (
+  institutionUserId: string,
+  loanId: string,
+  status: string,
+  farmerName: string
+): Promise<void> => {
+  if (status === "DEFAULTED") {
+    return createNotification({
+      userId: institutionUserId,
+      type: "LOAN_APPROVAL",
+      priority: "URGENT",
+      title: "Loan Defaulted",
+      message: `A loan issued to ${farmerName} has been marked as defaulted. Immediate action may be required.`,
+      actionUrl: `/loans/${loanId}`,
+    });
+  }
+  if (status === "CANCELLED") {
+    return createNotification({
+      userId: institutionUserId,
+      type: "LOAN_APPROVAL",
+      priority: "MEDIUM",
+      title: "Loan Cancelled",
+      message: `A loan issued to ${farmerName} has been cancelled.`,
+      actionUrl: `/loans/${loanId}`,
+    });
+  }
+  if (status === "COMPLETED") {
+    return createNotification({
+      userId: institutionUserId,
+      type: "LOAN_APPROVAL",
+      priority: "LOW",
+      title: "Loan Fully Repaid",
+      message: `${farmerName}'s loan has been fully repaid.`,
+      actionUrl: `/loans/${loanId}`,
+    });
+  }
+  return Promise.resolve();
+};

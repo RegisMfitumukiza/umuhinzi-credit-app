@@ -1,6 +1,13 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import {
+  notifyAdminCooperativeSubmitted,
+  notifyCooperativeManagerStatusChanged,
+  notifyCooperativeManagerMemberJoined,
+  notifyCooperativeManagerMemberLeft,
+  notifyFarmerJoinedCooperative,
+} from "../utils/notification.helper.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -208,6 +215,8 @@ export const createCooperativeService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  await notifyAdminCooperativeSubmitted(cooperative.name);
 
   return cooperative;
 };
@@ -460,6 +469,25 @@ export const addCooperativeMemberService = async (
     userAgent: context.userAgent,
   });
 
+  // Notify cooperative manager and farmer
+  const coopInfo = await prisma.cooperative.findUnique({
+    where: { id: cooperativeId },
+    select: {
+      name: true,
+      managers: { take: 1, select: { user: { select: { id: true } } } },
+    },
+  });
+  if (coopInfo) {
+    const managerUserId = coopInfo.managers[0]?.user?.id;
+    const farmerName = member.farmer.user.fullName;
+    if (managerUserId) {
+      await notifyCooperativeManagerMemberJoined(managerUserId, farmerName, coopInfo.name);
+    }
+    if (userRole === "FARMER") {
+      await notifyFarmerJoinedCooperative(member.farmer.user.id, coopInfo.name);
+    }
+  }
+
   return member;
 };
 
@@ -653,6 +681,25 @@ export const removeCooperativeMemberService = async (
     userAgent: context.userAgent,
   });
 
+  // Notify cooperative manager that a member left/was removed
+  const coopInfo = await prisma.cooperative.findUnique({
+    where: { id: member.cooperativeId },
+    select: {
+      name: true,
+      managers: { take: 1, select: { user: { select: { id: true } } } },
+    },
+  });
+  const farmer = await prisma.farmer.findUnique({
+    where: { id: member.farmerId },
+    select: { user: { select: { id: true, fullName: true } } },
+  });
+  if (coopInfo && farmer) {
+    const managerUserId = coopInfo.managers[0]?.user?.id;
+    if (managerUserId) {
+      await notifyCooperativeManagerMemberLeft(managerUserId, farmer.user.fullName, coopInfo.name);
+    }
+  }
+
   return { message: "Member removed from cooperative successfully." };
 };
 
@@ -723,6 +770,22 @@ export const updateCooperativeStatusService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  // Notify cooperative manager about the status change (ACTIVE, REJECTED, SUSPENDED)
+  if (["ACTIVE", "REJECTED", "SUSPENDED"].includes(status)) {
+    const manager = await prisma.cooperativeManager.findFirst({
+      where: { cooperativeId },
+      select: { user: { select: { id: true } } },
+    });
+    if (manager?.user?.id) {
+      await notifyCooperativeManagerStatusChanged(
+        manager.user.id,
+        updated.name,
+        status,
+        rejectionReason
+      );
+    }
+  }
 
   return updated;
 };

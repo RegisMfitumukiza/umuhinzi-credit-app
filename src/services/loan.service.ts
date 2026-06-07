@@ -4,6 +4,7 @@ import { writeAuditLog } from "../utils/audit.helper.js";
 import {
   notifyLoanDisbursed,
   notifyLoanCompleted,
+  notifyInstitutionLoanStatusChanged,
 } from "../utils/notification.helper.js";
 import { generateLoanDisbursedRecommendation } from "./recommendation.service.js";
 
@@ -264,14 +265,25 @@ export const updateLoanStatusService = async (
     userAgent: context.userAgent,
   });
 
-  // Notify farmer when loan is completed
-  if (input.status === "COMPLETED") {
+  // Notify farmer + institution based on status
+  if (["COMPLETED", "DEFAULTED", "CANCELLED"].includes(input.status)) {
     const loanRecord = await prisma.loan.findUnique({
       where: { id: loanId },
-      select: { farmer: { select: { userId: true } } },
+      select: {
+        farmer: { select: { userId: true, user: { select: { fullName: true } } } },
+        institution: { select: { userId: true } },
+      },
     });
-    if (loanRecord?.farmer?.userId) {
-      await notifyLoanCompleted(loanRecord.farmer.userId, loanId);
+
+    const farmerUserId = loanRecord?.farmer?.userId;
+    const farmerName = loanRecord?.farmer?.user?.fullName ?? "A farmer";
+    const institutionUserId = loanRecord?.institution?.userId;
+
+    if (input.status === "COMPLETED" && farmerUserId) {
+      await notifyLoanCompleted(farmerUserId, loanId);
+    }
+    if (institutionUserId) {
+      await notifyInstitutionLoanStatusChanged(institutionUserId, loanId, input.status, farmerName);
     }
   }
 

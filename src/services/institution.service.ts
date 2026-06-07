@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
+import { notifyAdminInstitutionRegistered } from "../utils/notification.helper.js";
 
 import type { InstitutionType, Prisma } from "../generated/prisma/client.js";
 import type {
@@ -165,6 +166,8 @@ export const createInstitutionService = async (
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
   });
+
+  await notifyAdminInstitutionRegistered(institution.name);
 
   return institution;
 };
