@@ -7,6 +7,8 @@ export const validate =
   (req: Request, res: Response, next: NextFunction): void => {
     // First try to validate the request body directly (flat schema).
     let result = schema.safeParse(req.body);
+    let usedWrapper = false;
+
     // If that fails, fall back to the historic wrapper that validates body, params and query.
     if (!result.success) {
       result = schema.safeParse({
@@ -14,6 +16,7 @@ export const validate =
         params: req.params,
         query: req.query,
       });
+      usedWrapper = true;
     }
 
     if (!result.success) {
@@ -23,7 +26,15 @@ export const validate =
       return next(new APIError(message, 400));
     }
 
-    // Attach the validated data to request for downstream usage (optional).
+    // Replace req.body with the coerced/parsed values so controllers receive
+    // proper types (e.g. Date objects instead of raw date strings).
+    const parsed = result.data as Record<string, unknown>;
+    if (usedWrapper && parsed.body !== undefined) {
+      req.body = parsed.body;
+    } else if (!usedWrapper) {
+      req.body = parsed;
+    }
+
     // @ts-ignore – we augment the request object.
     req.validated = result.data;
     next();
