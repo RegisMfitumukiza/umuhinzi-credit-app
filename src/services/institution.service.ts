@@ -385,3 +385,21 @@ export const deleteInstitutionService = async (
 
   return { message: "Institution deactivated successfully." };
 };
+
+/* ─────────────────────────────────────────
+   GET ACTIVE INSTITUTIONS (public to farmers)
+───────────────────────────────────────── */
+
+export const getActiveInstitutionsService = async () => {
+  return prisma.institution.findMany({
+    where: { status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      district: true,
+      province: true,
+    },
+  });
+};

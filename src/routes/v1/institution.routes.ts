@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   createInstitution,
   getInstitutions,
+  getActiveInstitutions,
   getInstitutionById,
   updateInstitution,
   updateInstitutionStatus,
@@ -110,6 +111,12 @@ institutionRouter.get(
   authenticate,
   requireAdminOrInstitution,
   getInstitutions
+);
+
+institutionRouter.get(
+  "/active",
+  authenticate,
+  getActiveInstitutions
 );
 
 /**

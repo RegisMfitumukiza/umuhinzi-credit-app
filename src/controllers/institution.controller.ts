@@ -8,6 +8,7 @@ import { Role } from "../generated/prisma/client.js";
 import {
   createInstitutionService,
   getAllInstitutionsService,
+  getActiveInstitutionsService,
   getInstitutionByIdService,
   updateInstitutionService,
   updateInstitutionStatusService,
@@ -140,4 +141,18 @@ export const deleteInstitution = asyncHandler(async (req: Request, res: Response
   );
 
   res.status(200).json({ success: true, ...result });
+});
+
+/* ─────────────────────────────────────────
+   GET ACTIVE INSTITUTIONS (all authenticated)
+───────────────────────────────────────── */
+
+export const getActiveInstitutions = asyncHandler(async (_req: Request, res: Response) => {
+  const institutions = await getActiveInstitutionsService();
+
+  res.status(200).json({
+    success: true,
+    message: "Active institutions fetched successfully",
+    data: institutions,
+  });
 });
