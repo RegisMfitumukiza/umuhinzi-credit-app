@@ -128,7 +128,7 @@ yieldRouter.post(
 yieldRouter.get(
   "/",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER"),
+  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER", "INSTITUTION"),
   getYieldRecords
 );
 
@@ -158,7 +158,7 @@ yieldRouter.get(
 yieldRouter.get(
   "/:id",
   authenticate,
-  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER"),
+  authorizeRoles("FARMER", "ADMIN", "COOPERATIVE_MANAGER", "INSTITUTION"),
   validate(yieldRecordIdParamSchema),
   getYieldRecordById
 );
@@ -214,7 +214,7 @@ yieldRouter.patch(
 yieldRouter.patch(
   "/:id/verification",
   authenticate,
-  authorizeRoles("ADMIN", "COOPERATIVE_MANAGER"),
+  authorizeRoles("COOPERATIVE_MANAGER", "INSTITUTION"),
   validate(verifyYieldRecordSchema),
   verifyYieldRecord
 );
