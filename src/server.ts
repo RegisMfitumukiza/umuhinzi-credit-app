@@ -7,6 +7,7 @@ import { logger } from "./utils/logger.js";
 import { startOverdueSchedulesJob } from "./jobs/overdue-schedules.job.js";
 import { startAutoCreditScoreJob } from "./jobs/auto-credit-score.job.js";
 import { ensureCurrentSeasons, startSeasonsJob } from "./jobs/seasons.job.js";
+import { startStaleMarketPricesJob } from "./jobs/stale-market-prices.job.js";
 import { seedAdmin } from "./scripts/seed-admin.js";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -31,6 +32,7 @@ async function startServer() {
       startOverdueSchedulesJob();
       startAutoCreditScoreJob();
       startSeasonsJob();
+      startStaleMarketPricesJob();
     });
   } catch (error) {
     logger.error("Failed to start server", { error });
