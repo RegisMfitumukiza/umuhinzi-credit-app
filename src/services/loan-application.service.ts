@@ -271,10 +271,16 @@ export const updateLoanApplicationStatusService = async (
     }
   }
 
+  let claimingInstitutionId: string | undefined;
+
   if (userRole === "INSTITUTION") {
     const institutionId = await resolveInstitutionIdFromUser(userId);
     if (existing.institutionId && existing.institutionId !== institutionId) {
       throw new APIError("Not authorized to update this application", 403);
+    }
+    // If the application is unassigned, this institution claims it on UNDER_REVIEW
+    if (!existing.institutionId && status === "UNDER_REVIEW") {
+      claimingInstitutionId = institutionId;
     }
   }
 
@@ -369,6 +375,7 @@ export const updateLoanApplicationStatusService = async (
       rejectionReason: input.rejectionReason,
       reviewedById: userRole !== "FARMER" ? userId : undefined,
       reviewedAt: userRole !== "FARMER" ? new Date() : undefined,
+      ...(claimingInstitutionId && { institutionId: claimingInstitutionId }),
     },
     select: loanApplicationWithFarmerSelect,
   });
@@ -473,7 +480,14 @@ export const getAllLoanApplicationsService = async (
       select: { id: true },
     });
     if (institution) {
-      finalWhere = { ...finalWhere, institutionId: institution.id };
+      // Show applications targeted at this institution OR open applications (no institution yet)
+      finalWhere = {
+        ...finalWhere,
+        OR: [
+          { institutionId: institution.id },
+          { institutionId: null, status: "PENDING" },
+        ],
+      };
     }
   }
 
