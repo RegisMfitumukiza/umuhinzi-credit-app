@@ -26,6 +26,7 @@ import {
   requireAdmin,
   requireFarmer,
   authorizeRoles,
+  requireAdminOrCooperativeManager,
 } from "../../middlewares/auth.middleware.js";
 
 import { validate } from "../../middlewares/validate.middleware.js";
@@ -453,7 +454,7 @@ export const marketPriceRouter = Router();
 marketPriceRouter.post(
   "/",
   authenticate,
-  requireAdmin,
+  requireAdminOrCooperativeManager,
   validate(createMarketPriceSchema),
   createMarketPrice
 );
@@ -556,7 +557,7 @@ marketPriceRouter.get(
 marketPriceRouter.patch(
   "/:id",
   authenticate,
-  requireAdmin,
+  requireAdminOrCooperativeManager,
   validate(updateMarketPriceSchema),
   updateMarketPrice
 );
@@ -584,7 +585,7 @@ marketPriceRouter.patch(
 marketPriceRouter.delete(
   "/:id",
   authenticate,
-  requireAdmin,
+  requireAdminOrCooperativeManager,
   validate(marketPriceIdParamSchema),
   deleteMarketPrice
 );

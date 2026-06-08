@@ -168,3 +168,8 @@ export const requireFarmerOrCooperativeManager = authorizeRoles(
   "FARMER",
   "COOPERATIVE_MANAGER"
 );
+
+export const requireAdminOrCooperativeManager = authorizeRoles(
+  "ADMIN",
+  "COOPERATIVE_MANAGER"
+);
