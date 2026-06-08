@@ -27,7 +27,7 @@ const safeLivestockSelect = {
   status: true,
   createdAt: true,
   updatedAt: true,
-};
+} satisfies Prisma.LivestockSelect;
 
 const livestockWithFarmerSelect = {
   id: true,
@@ -51,7 +51,7 @@ const livestockWithFarmerSelect = {
       },
     },
   },
-};
+} satisfies Prisma.LivestockSelect;
 
 /* ─── helpers ─── */
 
