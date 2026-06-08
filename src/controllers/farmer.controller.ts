@@ -17,6 +17,7 @@ import {
   getFarmerProfileCompletenessService,
   joinCooperativeService,
   leaveCooperativeService,
+  searchFarmersService,
 } from "../services/farmer.service.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -115,6 +116,23 @@ export const getAllFarmers = asyncHandler(
       data: result.farmers,
       pagination: { page, ...result.pagination },
     });
+  }
+);
+
+/* ─── search farmers (cooperative manager / institution) ─── */
+
+export const searchFarmers = asyncHandler(
+  async (req: Request, res: Response) => {
+    const q = req.query.q ? String(req.query.q).trim() : "";
+
+    if (q.length < 2) {
+      res.status(200).json({ success: true, message: "Query too short", data: [] });
+      return;
+    }
+
+    const farmers = await searchFarmersService(q);
+
+    res.status(200).json({ success: true, message: "Farmers fetched", data: farmers });
   }
 );
 

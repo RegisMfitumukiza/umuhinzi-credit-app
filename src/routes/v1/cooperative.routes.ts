@@ -14,6 +14,7 @@ import {
   getCooperativeMembers,
   updateCooperativeMember,
   removeCooperativeMember,
+  registerFarmerByCooperative,
 } from "../../controllers/cooperative.controller.js";
 
 import { getMemberFarms } from "../../controllers/farm.controller.js";
@@ -415,6 +416,13 @@ cooperativeMemberRouter.post(
   authorizeRoles("FARMER", "COOPERATIVE_MANAGER", "ADMIN"),
   validate(addCooperativeMemberSchema),
   addCooperativeMember
+);
+
+cooperativeMemberRouter.post(
+  "/register-farmer",
+  authenticate,
+  requireCooperativeManager,
+  registerFarmerByCooperative
 );
 
 /**

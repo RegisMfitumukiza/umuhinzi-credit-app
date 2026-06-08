@@ -18,6 +18,7 @@ import {
   updateCooperativeStatusService,
   discoverCooperativesService,
   getPendingCooperativesService,
+  registerFarmerByCooperativeService,
 } from "../services/cooperative.service.js";
 
 const getContext = (req: Request) => ({
@@ -242,4 +243,20 @@ export const removeCooperativeMember = asyncHandler(async (req: Request, res: Re
   );
 
   res.status(200).json({ success: true, ...result });
+});
+
+export const registerFarmerByCooperative = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new APIError("User not authenticated", 401);
+
+  const result = await registerFarmerByCooperativeService(
+    req.user.id,
+    req.body,
+    getContext(req)
+  );
+
+  res.status(201).json({
+    success: true,
+    message: "Farmer registered and added to your cooperative successfully",
+    data: result,
+  });
 });

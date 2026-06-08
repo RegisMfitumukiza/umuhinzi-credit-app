@@ -12,12 +12,14 @@ import {
   getFarmerProfileCompleteness,
   joinCooperative,
   leaveCooperative,
+  searchFarmers,
 } from "../../controllers/farmer.controller.js";
 
 import {
   authenticate,
   requireAdmin,
   requireFarmer,
+  authorizeRoles,
 } from "../../middlewares/auth.middleware.js";
 
 import { validate } from "../../middlewares/validate.middleware.js";
@@ -228,6 +230,13 @@ router.delete("/me/cooperative", authenticate, requireFarmer, leaveCooperative);
  *       200:
  *         description: Farmers fetched successfully
  */
+router.get(
+  "/search",
+  authenticate,
+  authorizeRoles("COOPERATIVE_MANAGER", "INSTITUTION"),
+  searchFarmers
+);
+
 router.get("/", authenticate, requireAdmin, getAllFarmers);
 
 /**

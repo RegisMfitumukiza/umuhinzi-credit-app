@@ -215,6 +215,26 @@ export const getAllFarmersService = async ({
   };
 };
 
+/* ─── search farmers (cooperative manager / institution) ─── */
+
+export const searchFarmersService = async (q: string) => {
+  return prisma.farmer.findMany({
+    where: {
+      OR: [
+        { user: { fullName: { contains: q, mode: "insensitive" } } },
+        { user: { phone: { contains: q, mode: "insensitive" } } },
+        { user: { email: { contains: q, mode: "insensitive" } } },
+      ],
+    },
+    take: 10,
+    select: {
+      id: true,
+      status: true,
+      user: { select: { fullName: true, phone: true, email: true, district: true } },
+    },
+  });
+};
+
 /* ─── get by ID (admin) ─── */
 
 export const getFarmerByIdService = async (farmerId: string) => {

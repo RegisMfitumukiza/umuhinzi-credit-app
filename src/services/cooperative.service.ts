@@ -1,3 +1,5 @@
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { APIError } from "../utils/ApiError.js";
 import { writeAuditLog } from "../utils/audit.helper.js";
@@ -895,5 +897,115 @@ export const getPendingCooperativesService = async (
       hasNextPage: skip + limit < total,
       hasPreviousPage: skip > 0,
     },
+  };
+};
+
+/* ─────────────────────────────────────────────────────────────
+   REGISTER FARMER ON BEHALF (COOPERATIVE MANAGER)
+───────────────────────────────────────────────────────────── */
+
+export type RegisterFarmerByManagerInput = {
+  fullName: string;
+  email: string;
+  phone?: string;
+  nationalId: string;
+  district?: string;
+  province?: string;
+  dateOfBirth?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  primaryCrop?: string;
+  farmingExperienceYears?: number;
+};
+
+export const registerFarmerByCooperativeService = async (
+  managerUserId: string,
+  input: RegisterFarmerByManagerInput,
+  context: { actorId?: string; ipAddress?: string; userAgent?: string } = {}
+) => {
+  const manager = await resolveCooperativeManagerId(managerUserId);
+
+  const emailTaken = await prisma.user.findUnique({
+    where: { email: input.email },
+    select: { id: true },
+  });
+  if (emailTaken) throw new APIError("A user with this email already exists", 409);
+
+  if (input.phone) {
+    const phoneTaken = await prisma.user.findUnique({
+      where: { phone: input.phone },
+      select: { id: true },
+    });
+    if (phoneTaken) throw new APIError("A user with this phone number already exists", 409);
+  }
+
+  const nationalIdTaken = await prisma.farmer.findUnique({
+    where: { nationalId: input.nationalId },
+    select: { id: true },
+  });
+  if (nationalIdTaken) throw new APIError("This National ID is already registered", 409);
+
+  const tempPassword = crypto.randomBytes(8).toString("hex");
+  const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+  const { farmer, user } = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.phone ?? null,
+        password: hashedPassword,
+        role: "FARMER",
+        status: "ACTIVE",
+        isEmailVerified: true,
+        district: input.district ?? null,
+        province: input.province ?? null,
+      },
+    });
+
+    const newFarmer = await tx.farmer.create({
+      data: {
+        userId: newUser.id,
+        nationalId: input.nationalId,
+        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+        gender: input.gender ?? null,
+        primaryCrop: input.primaryCrop ?? null,
+        farmingExperienceYears: input.farmingExperienceYears ?? 0,
+        cooperativeId: manager.cooperativeId,
+      },
+    });
+
+    await tx.cooperativeMember.create({
+      data: {
+        farmerId: newFarmer.id,
+        cooperativeId: manager.cooperativeId,
+        status: "ACTIVE",
+        joinedAt: new Date(),
+      },
+    });
+
+    return { farmer: newFarmer, user: newUser };
+  });
+
+  await writeAuditLog({
+    actorId: context.actorId ?? managerUserId,
+    action: "CREATE",
+    resource: "FARMER",
+    resourceId: farmer.id,
+    description: "Cooperative manager registered new farmer on their behalf",
+    metadata: { cooperativeId: manager.cooperativeId },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
+
+  return {
+    farmer,
+    user: {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+    },
+    tempPassword,
+    cooperativeId: manager.cooperativeId,
   };
 };
