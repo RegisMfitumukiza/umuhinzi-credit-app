@@ -89,6 +89,11 @@ const safeInputCostSelect = {
       id: true,
       cropName: true,
       farmId: true,
+      farm: {
+        select: {
+          farmerId: true,
+        },
+      },
       season: {
         select: {
           id: true,
