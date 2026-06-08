@@ -20,20 +20,20 @@ const safeLivestockSelect = {
   id: true,
   farmerId: true,
   type: true,
-  purpose: true,
+  purposes: true,
   quantity: true,
   estimatedValue: true,
   notes: true,
   status: true,
   createdAt: true,
   updatedAt: true,
-} satisfies Prisma.LivestockSelect;
+};
 
 const livestockWithFarmerSelect = {
   id: true,
   farmerId: true,
   type: true,
-  purpose: true,
+  purposes: true,
   quantity: true,
   estimatedValue: true,
   notes: true,
@@ -51,7 +51,7 @@ const livestockWithFarmerSelect = {
       },
     },
   },
-} satisfies Prisma.LivestockSelect;
+};
 
 /* ─── helpers ─── */
 
@@ -107,7 +107,7 @@ export const createLivestockService = async (
     data: {
       farmerId,
       type: input.type,
-      purpose: input.purpose ?? "COMMERCIAL",
+      purposes: input.purposes ?? [],
       quantity: input.quantity ?? 1,
       estimatedValue: input.estimatedValue,
       notes: input.notes,
@@ -246,7 +246,7 @@ export const updateLivestockService = async (
     where: { id: livestockId },
     data: {
       type: input.type,
-      purpose: input.purpose,
+      purposes: input.purposes,
       quantity: input.quantity,
       estimatedValue: input.estimatedValue,
       notes: input.notes,

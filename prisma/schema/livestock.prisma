@@ -2,7 +2,7 @@ model Livestock {
   id             String           @id @default(uuid())
   farmerId       String
   type           LivestockType
-  purpose        LivestockPurpose @default(COMMERCIAL)
+  purposes       LivestockPurpose[]
   quantity       Int              @default(1)
   estimatedValue Float?
   notes          String?
@@ -13,7 +13,6 @@ model Livestock {
 
   @@index([farmerId])
   @@index([type])
-  @@index([purpose])
   @@index([status])
 }
 

@@ -43,7 +43,7 @@ export const createLivestockSchema = z.object({
   body: z.object({
     type: livestockTypeSchema,
 
-    purpose: livestockPurposeSchema.default("COMMERCIAL").optional(),
+    purposes: z.array(livestockPurposeSchema).min(1, "Select at least one purpose").optional(),
 
     quantity: z
       .number()
@@ -71,7 +71,7 @@ export const updateLivestockSchema = z.object({
   body: z.object({
     type: livestockTypeSchema.optional(),
 
-    purpose: livestockPurposeSchema.optional(),
+    purposes: z.array(livestockPurposeSchema).min(1, "Select at least one purpose").optional(),
 
     quantity: z
       .number()
