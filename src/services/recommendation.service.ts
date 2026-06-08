@@ -602,13 +602,13 @@ export const autoGenerateRecommendationsFromScore = async (
 
   if (templates.length === 0) return;
 
-  // Archive existing ACTIVE auto-generated recommendations for types we're replacing
+  // Archive existing ACTIVE and READ recommendations for types we're replacing
   const typesToReplace = [...new Set(templates.map((t) => t.type))] as RecommendationType[];
   await prisma.recommendation.updateMany({
     where: {
       farmerId,
       type: { in: typesToReplace },
-      status: "ACTIVE",
+      status: { in: ["ACTIVE", "READ"] },
     },
     data: { status: "ARCHIVED" },
   });
